@@ -1,0 +1,22 @@
+[
+    {
+        "iconUrl": "https://www.faselhds.life/icon-faselplud.png",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/adamwolker21/DZ",
+        "fileSize": 15336,
+        "status": 1,
+        "language": "ar",
+        "authors": [
+            "adamwolker21"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 1,
+        "internalName": "EgyDead",
+        "description": "EgyDead",
+        "url": "https://raw.githubusercontent.com/adamwolker21/DZ/builds/EgyDead.cs3",
+        "name": "EgyDead"
+    }
+]
