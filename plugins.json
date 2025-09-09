@@ -1,0 +1,23 @@
+[
+    {
+        "iconUrl": "https://5tv.lol/wp-content/uploads/2024/04/cropped-cropped-cropped-cropped-wwe-300x108-1-2-2-4-1-2.png",
+        "fileHash": "sha256-11b063b2cc11dbc2aad2d04ae575e2b19a7a7b1e2e6ba464090d9355cc9069ca",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/adamwolker21/DZ",
+        "fileSize": 27645,
+        "status": 1,
+        "language": "ar",
+        "authors": [
+            "adamwolker21"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 1,
+        "internalName": "Fivetv",
+        "description": "\u0645\u0648\u0642\u0639 Fivetv \u0641\u0627\u064a\u0641 \u062a\u064a \u0641\u064a",
+        "url": "https://raw.githubusercontent.com/adamwolker21/DZ/builds/Fivetv.cs3",
+        "name": "Fivetv"
+    }
+]
