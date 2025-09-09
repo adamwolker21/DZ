@@ -1,0 +1,42 @@
+[
+    {
+        "iconUrl": "https://asiatv.one/wp-content/uploads/2021/09/cropped-asiadrama-192x192.png.webp",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/adamwolker21/DZ",
+        "fileSize": 19859,
+        "status": 1,
+        "language": "ar",
+        "authors": [
+            "adamwolker21"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 1,
+        "internalName": "Asiatv.one",
+        "description": "Asiatv.one",
+        "url": "https://raw.githubusercontent.com/adamwolker21/DZ/builds/Asiatv.one.cs3",
+        "name": "Asiatv.one"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/adamwolker21/DZ/refs/heads/master/EgyDead/Egydead.png",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/adamwolker21/DZ",
+        "fileSize": 21226,
+        "status": 1,
+        "language": "ar",
+        "authors": [
+            "adamwolker21"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "version": 1,
+        "internalName": "EgyDead",
+        "description": "EgyDead",
+        "url": "https://raw.githubusercontent.com/adamwolker21/DZ/builds/EgyDead.cs3",
+        "name": "EgyDead"
+    }
+]
