@@ -1,19 +1,16 @@
-rootProject.name = "CloudstreamPlugins"
+// هذا الملف يخبر المشروع بكل المكونات الموجودة فيه
+// لقد أضفنا سطرين مهمين في الأسفل
 
-// This file sets what projects are included. All new projects should get automatically included unless specified in "disabled" variable.
-
-val disabled = listOf<String>()
-
-File(rootDir, ".").eachDir { dir ->
-    if (!disabled.contains(dir.name) && File(dir, "build.gradle.kts").exists()) {
-        include(dir.name)
+pluginManagement {
+    repositories {
+        google()
+        gradlePluginPortal()
+        mavenCentral()
     }
 }
 
-fun File.eachDir(block: (File) -> Unit) {
-    listFiles()?.filter { it.isDirectory }?.forEach { block(it) }
-}
-
-
-// To only include a single project, comment out the previous lines (except the first one), and include your plugin like so:
-// include("PluginName")
+rootProject.name = "CSX"
+include(":Bollyflix")
+include(":Extractors")
+include(":FaselHDS") // ✨ التأكد من وجود إضافتك في الخريطة
+include(":cloudstream3-utils") // ✨✨✨ هذا هو السطر الحاسم الذي يضيف "صندوق الأدوات" للمشروع كله ✨✨✨
