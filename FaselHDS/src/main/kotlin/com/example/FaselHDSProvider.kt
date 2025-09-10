@@ -1,6 +1,7 @@
 package com.example
 
 import com.lagradost.cloudstream3.*
+// ✨ تم التعديل هنا: إضافة سطر import لحل مشكلة Unresolved reference
 import com.lagradost.cloudstream3.utils.CloudflareKiller
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
@@ -17,11 +18,11 @@ class FaselHDSProvider : MainAPI() {
         TvType.TvSeries
     )
     
-    // ✨ تم التعديل هنا: إضافة CloudflareKiller كأداة اعتراض للطلبات
     private val interceptor = CloudflareKiller()
     
+    // ✨ تم التعديل هنا: استخدام User-Agent لمتصفح Chrome على Android
     private val headers = mapOf(
-        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
+        "User-Agent" to "Mozilla/5.0 (Linux; Android 13; SM-A536B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36"
     )
 
     override val mainPage = mainPageOf(
@@ -37,7 +38,6 @@ class FaselHDSProvider : MainAPI() {
         request: MainPageRequest
     ): HomePageResponse {
         val url = "$mainUrl${request.data}/page/$page"
-        // ✨ تم التعديل هنا: إضافة interceptor إلى الطلب
         val document = app.get(url, headers = headers, interceptor = interceptor).document
         val home = document.select("div.post-listing article.item-list").mapNotNull {
             it.toSearchResult()
@@ -59,7 +59,6 @@ class FaselHDSProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val url = "$mainUrl/?s=$query"
-        // ✨ تم التعديل هنا: إضافة interceptor إلى الطلب
         val document = app.get(url, headers = headers, interceptor = interceptor).document
 
         return document.select("div.post-listing article.item-list").mapNotNull {
@@ -68,7 +67,6 @@ class FaselHDSProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        // ✨ تم التعديل هنا: إضافة interceptor إلى الطلب
         val document = app.get(url, headers = headers, interceptor = interceptor).document
 
         val title = document.selectFirst("div.title-container h1.entry-title")?.text()?.trim() ?: "No Title"
@@ -83,7 +81,6 @@ class FaselHDSProvider : MainAPI() {
             val episodes = mutableListOf<Episode>()
             document.select("div.season-list-item a").forEach { seasonLink ->
                 val seasonUrl = seasonLink.attr("href")
-                // ✨ تم التعديل هنا: إضافة interceptor إلى الطلب
                 val seasonDoc = app.get(seasonUrl, headers = headers, interceptor = interceptor).document
                 val seasonNumText = seasonDoc.selectFirst("h2.entry-title")?.text()
                 val seasonNum = Regex("""الموسم (\d+)""").find(seasonNumText ?: "")?.groupValues?.get(1)?.toIntOrNull()
@@ -131,7 +128,6 @@ class FaselHDSProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // ✨ تم التعديل هنا: إضافة interceptor إلى الطلب
         val embedPage = app.get(data, referer = "$mainUrl/", headers = headers, interceptor = interceptor).document
         val iframeSrc = embedPage.selectFirst("iframe")?.attr("src") ?: return false
 
