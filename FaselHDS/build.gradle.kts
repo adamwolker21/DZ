@@ -1,5 +1,9 @@
-// سنبقي هذا الملف نظيفاً جداً لضمان عدم حدوث أي أخطاء في البناء
-version = 10
+// الآن يمكننا أن نطلب الاعتماديات بشكل صحيح
+dependencies {
+    implementation(project(":cloudstream3-utils"))
+}
+
+version = 11
 
 cloudstream {
     language = "ar"
