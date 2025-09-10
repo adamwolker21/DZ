@@ -1,4 +1,3 @@
-// هذا الملف يخبر المشروع بكل المكونات الموجودة فيه
 pluginManagement {
     repositories {
         google()
@@ -10,6 +9,5 @@ pluginManagement {
 rootProject.name = "CSX"
 include(":Bollyflix")
 include(":Extractors")
+// FaselHDS فقط، بدون أي إضافات أخرى
 include(":FaselHDS")
-// ✨ الآن هذا السطر سيجد المجلد الذي أنشأناه للتو ✨
-include(":cloudstream3-utils")
