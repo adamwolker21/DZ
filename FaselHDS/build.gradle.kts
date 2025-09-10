@@ -1,24 +1,21 @@
+// ✨ تم التعديل هنا: إضافة سطر implementation ✨
+// هذا السطر يخبر المشروع بأننا نحتاج "صندوق الأدوات" الذي يحتوي على CloudflareKiller
+dependencies {
+    implementation(project(":cloudstream3-utils"))
+}
 
-version = 1
+version = 7 // تم رفع الإصدار
 
 cloudstream {
-    language = "ar" // اللغة العربية
+    language = "ar"
     description = "إضافة لمشاهدة الأفلام والمسلسلات من موقع فاصل إعلاني"
-    authors = listOf("YourName") // يمكنك وضع اسمك هنا
+    authors = listOf("adamwolker21")
 
-    /**
-     * Status int as the following:
-     * 0: Down
-     * 1: Ok
-     * 2: Slow
-     * 3: Beta only
-     * */
-    status = 1 // 1 يعني أن الإضافة تعمل بشكل جيد
+    status = 1 
     tvTypes = listOf(
         "Movie",
         "TvSeries",
     )
 
-    // يمكنك إنشاء أيقونة ورفعها على موقع مثل imgur.com ووضع الرابط هنا
     iconUrl = "https://i.imgur.com/example.png"
 }
