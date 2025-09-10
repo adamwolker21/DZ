@@ -1,11 +1,10 @@
 package com.example
 
-// ✨ تم التأكد من وجود جميع سطور import الضرورية هنا ✨
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
-import com.lagradost.cloudstream3.utils.CloudflareKiller // <-- السطر الأهم لحل المشكلة
+import com.lagradost.cloudstream3.utils.CloudflareKiller 
 
 class FaselHDSProvider : MainAPI() {
     override var mainUrl = "https://www.faselhd.club"
