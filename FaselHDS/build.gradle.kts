@@ -1,9 +1,5 @@
-// الآن هذا الطلب سينجح لأن صندوق الأدوات موجود
-dependencies {
-    implementation(project(":cloudstream3-utils"))
-}
-
-version = 13 // رفعنا الإصدار
+// لا توجد أي اعتماديات على الإطلاق
+version = 14
 
 cloudstream {
     language = "ar"
