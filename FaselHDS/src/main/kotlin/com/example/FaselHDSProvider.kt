@@ -4,8 +4,8 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
-import com.lagradost.cloudstream3.utils.CloudflareKiller // سيعمل الآن!
 
+// هذه هي النسخة الأساسية التي لا تستخدم أي أدوات قد تكون مفقودة في مشروعك
 class FaselHDSProvider : MainAPI() {
     override var mainUrl = "https://www.faselhd.club"
     override var name = "FaselHDS"
@@ -17,8 +17,7 @@ class FaselHDSProvider : MainAPI() {
         TvType.TvSeries
     )
     
-    private val interceptor = CloudflareKiller()
-    
+    // سنحتفظ بـ User-Agent لأنه لا يزال أفضل فرصة لدينا
     private val headers = mapOf(
         "User-Agent" to "Mozilla/5.0 (Linux; Android 13; SM-A536B) AppleWebKit/5.0 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36"
     )
@@ -36,7 +35,8 @@ class FaselHDSProvider : MainAPI() {
         request: MainPageRequest
     ): HomePageResponse {
         val url = "$mainUrl${request.data}/page/$page"
-        val document = app.get(url, headers = headers, interceptor = interceptor).document
+        // سنعود إلى الطريقة الأساسية والآمنة التي تضمن نجاح البناء
+        val document = app.get(url, headers = headers).document
         val home = document.select("div.post-listing article.item-list").mapNotNull {
             it.toSearchResult()
         }
@@ -57,7 +57,7 @@ class FaselHDSProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val url = "$mainUrl/?s=$query"
-        val document = app.get(url, headers = headers, interceptor = interceptor).document
+        val document = app.get(url, headers = headers).document
 
         return document.select("div.post-listing article.item-list").mapNotNull {
             it.toSearchResult()
@@ -65,7 +65,7 @@ class FaselHDSProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url, headers = headers, interceptor = interceptor).document
+        val document = app.get(url, headers = headers).document
 
         val title = document.selectFirst("div.title-container h1.entry-title")?.text()?.trim() ?: "No Title"
         val posterUrl = document.selectFirst("div.poster img")?.attr("src")
@@ -79,7 +79,7 @@ class FaselHDSProvider : MainAPI() {
             val episodes = mutableListOf<Episode>()
             document.select("div.season-list-item a").forEach { seasonLink ->
                 val seasonUrl = seasonLink.attr("href")
-                val seasonDoc = app.get(seasonUrl, headers = headers, interceptor = interceptor).document
+                val seasonDoc = app.get(seasonUrl, headers = headers).document
                 val seasonNumText = seasonDoc.selectFirst("h2.entry-title")?.text()
                 val seasonNum = Regex("""الموسم (\d+)""").find(seasonNumText ?: "")?.groupValues?.get(1)?.toIntOrNull()
 
@@ -126,7 +126,7 @@ class FaselHDSProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val embedPage = app.get(data, referer = "$mainUrl/", headers = headers, interceptor = interceptor).document
+        val embedPage = app.get(data, referer = "$mainUrl/", headers = headers).document
         val iframeSrc = embedPage.selectFirst("iframe")?.attr("src") ?: return false
 
         loadExtractor(iframeSrc, "$mainUrl/", subtitleCallback, callback)
