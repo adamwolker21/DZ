@@ -1,7 +1,8 @@
-// تم حذف سطر الاعتماديات بالكامل لضمان نجاح البناء
-// dependencies { ... }
+// تم العثور على الطريقة الصحيحة لإضافة الاعتماديات لمشروعك
+// هذا السطر يخبر المشروع أنه يحتاج إلى حزمة الأدوات المساعدة
+apply(from = "$rootDir/build-scripts/helpers.gradle")
 
-version = 8 // تم رفع الإصدار
+version = 9 // تم رفع الإصدار
 
 cloudstream {
     language = "ar"
@@ -14,6 +15,5 @@ cloudstream {
         "TvSeries",
     )
 
-    // الرجاء تحديث هذا الرابط لاحقاً
     iconUrl = "https://i.imgur.com/example.png"
 }
