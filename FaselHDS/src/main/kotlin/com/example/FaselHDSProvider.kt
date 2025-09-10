@@ -1,11 +1,11 @@
-// نفس الكود من المحاولة 10، والذي سيصبح فعالاً الآن
 package com.example
 
+// نحتاج Jsoup لتحليل النص الذي يعود من WebView
+import org.jsoup.Jsoup
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
-import com.lagradost.cloudstream3.utils.CloudflareKiller // سيعمل الآن!
 
 class FaselHDSProvider : MainAPI() {
     override var mainUrl = "https://www.faselhd.club"
@@ -18,11 +18,19 @@ class FaselHDSProvider : MainAPI() {
         TvType.TvSeries
     )
     
-    private val interceptor = CloudflareKiller()
-    
-    private val headers = mapOf(
-        "User-Agent" to "Mozilla/5.0 (Linux; Android 13; SM-A536B) AppleWebKit/5.0 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36"
-    )
+    // هذه الدالة هي الأداة المخصصة التي كتبناها
+    // تفتح الرابط في متصفح ويب خفي (WebView) لحل Cloudflare
+    // ثم تعيد لنا كود HTML النهائي كـ نص
+    private suspend fun getWithWebView(url: String): String {
+        return app.get(
+            url,
+            interceptor = WebViewResolver(
+                // سنبحث عن كلمة موجودة في الصفحة للتأكد من أنها حملت بنجاح
+                // كلمة "الرئيسية" موجودة في القائمة العلوية للموقع
+                "الرئيسية" 
+            )
+        ).text
+    }
 
     override val mainPage = mainPageOf(
         "/movies" to "أحدث الأفلام",
@@ -37,7 +45,11 @@ class FaselHDSProvider : MainAPI() {
         request: MainPageRequest
     ): HomePageResponse {
         val url = "$mainUrl${request.data}/page/$page"
-        val document = app.get(url, headers = headers, interceptor = interceptor).document
+        // 1. نحصل على النص باستخدام أداتنا المخصصة
+        val html = getWithWebView(url)
+        // 2. نقوم بتحليل النص باستخدام Jsoup
+        val document = Jsoup.parse(html)
+        
         val home = document.select("div.post-listing article.item-list").mapNotNull {
             it.toSearchResult()
         }
@@ -58,7 +70,7 @@ class FaselHDSProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val url = "$mainUrl/?s=$query"
-        val document = app.get(url, headers = headers, interceptor = interceptor).document
+        val document = Jsoup.parse(getWithWebView(url))
 
         return document.select("div.post-listing article.item-list").mapNotNull {
             it.toSearchResult()
@@ -66,7 +78,7 @@ class FaselHDSProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url, headers = headers, interceptor = interceptor).document
+        val document = Jsoup.parse(getWithWebView(url))
 
         val title = document.selectFirst("div.title-container h1.entry-title")?.text()?.trim() ?: "No Title"
         val posterUrl = document.selectFirst("div.poster img")?.attr("src")
@@ -80,7 +92,8 @@ class FaselHDSProvider : MainAPI() {
             val episodes = mutableListOf<Episode>()
             document.select("div.season-list-item a").forEach { seasonLink ->
                 val seasonUrl = seasonLink.attr("href")
-                val seasonDoc = app.get(seasonUrl, headers = headers, interceptor = interceptor).document
+                // لا نحتاج لاستخدام WebView مرة أخرى لصفحات المواسم والحلقات عادة
+                val seasonDoc = app.get(seasonUrl).document
                 val seasonNumText = seasonDoc.selectFirst("h2.entry-title")?.text()
                 val seasonNum = Regex("""الموسم (\d+)""").find(seasonNumText ?: "")?.groupValues?.get(1)?.toIntOrNull()
 
@@ -127,7 +140,8 @@ class FaselHDSProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val embedPage = app.get(data, referer = "$mainUrl/", headers = headers, interceptor = interceptor).document
+        // صفحات embed لا تحتاج WebView عادة
+        val embedPage = app.get(data, referer = "$mainUrl/").document
         val iframeSrc = embedPage.selectFirst("iframe")?.attr("src") ?: return false
 
         loadExtractor(iframeSrc, "$mainUrl/", subtitleCallback, callback)
