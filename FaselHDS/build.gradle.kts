@@ -1,9 +1,5 @@
-// الآن يمكننا أن نطلب الاعتماديات بشكل صحيح
-dependencies {
-    implementation(project(":cloudstream3-utils"))
-}
-
-version = 11
+// لا توجد أي اعتماديات خارجية على الإطلاق
+version = 12
 
 cloudstream {
     language = "ar"
