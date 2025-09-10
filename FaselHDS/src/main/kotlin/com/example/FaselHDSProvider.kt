@@ -4,8 +4,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
-// ✨ تم استيراد المكتبة الجديدة والضرورية ✨
-import com.lagradost.cloudstream3.utils.getAndUnpack
+import com.lagradost.cloudstream3.utils.CloudflareKiller // سيعمل الآن!
 
 class FaselHDSProvider : MainAPI() {
     override var mainUrl = "https://www.faselhd.club"
@@ -18,8 +17,12 @@ class FaselHDSProvider : MainAPI() {
         TvType.TvSeries
     )
     
-    // ✨ لا حاجة لـ User-Agent أو CloudflareKiller بعد الآن، WebView يتكفل بكل شيء ✨
+    private val interceptor = CloudflareKiller()
     
+    private val headers = mapOf(
+        "User-Agent" to "Mozilla/5.0 (Linux; Android 13; SM-A536B) AppleWebKit/5.0 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36"
+    )
+
     override val mainPage = mainPageOf(
         "/movies" to "أحدث الأفلام",
         "/series" to "أحدث المسلسلات",
@@ -28,22 +31,12 @@ class FaselHDSProvider : MainAPI() {
         "/genre/افلام-تركية" to "أفلام تركية"
     )
 
-    // ✨✨✨ السلاح السري: دالة جديدة لجلب المحتوى باستخدام WebView ✨✨✨
-    private suspend fun getDocument(url: String): org.jsoup.nodes.Document {
-        // هذه الدالة ستقوم بفتح الصفحة في متصفح خفي لتجاوز كل أنواع الحماية
-        val unpacked = app.get(url).let { unpacked ->
-            getAndUnpack(unpacked.text)
-        }
-        return app.get(url, script = unpacked).document
-    }
-
     override suspend fun getMainPage(
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
         val url = "$mainUrl${request.data}/page/$page"
-        // ✨ استخدام الدالة الجديدة بدلاً من app.get العادية ✨
-        val document = getDocument(url)
+        val document = app.get(url, headers = headers, interceptor = interceptor).document
         val home = document.select("div.post-listing article.item-list").mapNotNull {
             it.toSearchResult()
         }
@@ -64,7 +57,7 @@ class FaselHDSProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val url = "$mainUrl/?s=$query"
-        val document = getDocument(url)
+        val document = app.get(url, headers = headers, interceptor = interceptor).document
 
         return document.select("div.post-listing article.item-list").mapNotNull {
             it.toSearchResult()
@@ -72,7 +65,7 @@ class FaselHDSProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = getDocument(url)
+        val document = app.get(url, headers = headers, interceptor = interceptor).document
 
         val title = document.selectFirst("div.title-container h1.entry-title")?.text()?.trim() ?: "No Title"
         val posterUrl = document.selectFirst("div.poster img")?.attr("src")
@@ -86,7 +79,7 @@ class FaselHDSProvider : MainAPI() {
             val episodes = mutableListOf<Episode>()
             document.select("div.season-list-item a").forEach { seasonLink ->
                 val seasonUrl = seasonLink.attr("href")
-                val seasonDoc = getDocument(seasonUrl)
+                val seasonDoc = app.get(seasonUrl, headers = headers, interceptor = interceptor).document
                 val seasonNumText = seasonDoc.selectFirst("h2.entry-title")?.text()
                 val seasonNum = Regex("""الموسم (\d+)""").find(seasonNumText ?: "")?.groupValues?.get(1)?.toIntOrNull()
 
@@ -133,8 +126,7 @@ class FaselHDSProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // صفحات الـ embed عادة لا تكون محمية، لذا يمكننا استخدام app.get العادية هنا
-        val embedPage = app.get(data, referer = "$mainUrl/").document
+        val embedPage = app.get(data, referer = "$mainUrl/", headers = headers, interceptor = interceptor).document
         val iframeSrc = embedPage.selectFirst("iframe")?.attr("src") ?: return false
 
         loadExtractor(iframeSrc, "$mainUrl/", subtitleCallback, callback)
