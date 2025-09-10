@@ -1,5 +1,7 @@
 package com.example
 
+// ✨ السطر الحاسم الذي كان مفقوداً ✨
+import com.lagradost.cloudstream3.network.WebViewResolver
 import org.jsoup.Jsoup
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
@@ -20,7 +22,7 @@ class FaselHDSProvider : MainAPI() {
     private suspend fun getWithWebView(url: String): String {
         return app.get(
             url,
-            // ✨ هذه هي الطريقة الكاملة والواضحة التي سيفهمها المشروع ✨
+            // هذه الطريقة صحيحة تماماً عندما يعرف الكمبيوتر ما هو WebViewResolver
             interceptor = WebViewResolver(predicate = { html -> 
                 html.contains("الرئيسية") 
             })
