@@ -18,17 +18,14 @@ class FaselHDSProvider : MainAPI() {
         TvType.TvSeries
     )
     
-    // هذه الدالة هي الأداة المخصصة التي كتبناها
-    // تفتح الرابط في متصفح ويب خفي (WebView) لحل Cloudflare
-    // ثم تعيد لنا كود HTML النهائي كـ نص
     private suspend fun getWithWebView(url: String): String {
         return app.get(
             url,
-            interceptor = WebViewResolver(
-                // سنبحث عن كلمة موجودة في الصفحة للتأكد من أنها حملت بنجاح
-                // كلمة "الرئيسية" موجودة في القائمة العلوية للموقع
-                "الرئيسية" 
-            )
+            interceptor = WebViewResolver {
+                // ✨ هذه هي التعليمات الصحيحة ✨
+                // "انتظر حتى يحتوي كود الصفحة على كلمة 'الرئيسية'"
+                it.contains("الرئيسية")
+            }
         ).text
     }
 
@@ -45,9 +42,7 @@ class FaselHDSProvider : MainAPI() {
         request: MainPageRequest
     ): HomePageResponse {
         val url = "$mainUrl${request.data}/page/$page"
-        // 1. نحصل على النص باستخدام أداتنا المخصصة
         val html = getWithWebView(url)
-        // 2. نقوم بتحليل النص باستخدام Jsoup
         val document = Jsoup.parse(html)
         
         val home = document.select("div.post-listing article.item-list").mapNotNull {
@@ -92,7 +87,6 @@ class FaselHDSProvider : MainAPI() {
             val episodes = mutableListOf<Episode>()
             document.select("div.season-list-item a").forEach { seasonLink ->
                 val seasonUrl = seasonLink.attr("href")
-                // لا نحتاج لاستخدام WebView مرة أخرى لصفحات المواسم والحلقات عادة
                 val seasonDoc = app.get(seasonUrl).document
                 val seasonNumText = seasonDoc.selectFirst("h2.entry-title")?.text()
                 val seasonNum = Regex("""الموسم (\d+)""").find(seasonNumText ?: "")?.groupValues?.get(1)?.toIntOrNull()
@@ -140,7 +134,6 @@ class FaselHDSProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // صفحات embed لا تحتاج WebView عادة
         val embedPage = app.get(data, referer = "$mainUrl/").document
         val iframeSrc = embedPage.selectFirst("iframe")?.attr("src") ?: return false
 
