@@ -1,6 +1,5 @@
 package com.example
 
-// نحتاج Jsoup لتحليل النص الذي يعود من WebView
 import org.jsoup.Jsoup
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
@@ -21,11 +20,10 @@ class FaselHDSProvider : MainAPI() {
     private suspend fun getWithWebView(url: String): String {
         return app.get(
             url,
-            interceptor = WebViewResolver {
-                // ✨ هذه هي التعليمات الصحيحة ✨
-                // "انتظر حتى يحتوي كود الصفحة على كلمة 'الرئيسية'"
-                it.contains("الرئيسية")
-            }
+            // ✨ هذه هي الطريقة الكاملة والواضحة التي سيفهمها المشروع ✨
+            interceptor = WebViewResolver(predicate = { html -> 
+                html.contains("الرئيسية") 
+            })
         ).text
     }
 
