@@ -1,4 +1,3 @@
- 
 package com.example
 
 import com.lagradost.cloudstream3.*
@@ -94,13 +93,13 @@ class FaselHDSProvider : MainAPI() {
                     val epTitle = episodeLink.select("span.ep-title").text()
                     val epNum = episodeLink.select("span.ep-num").text().toIntOrNull()
 
+                    // ✨ تم التعديل هنا: استخدام newEpisode بدلاً من Episode(...)
                     episodes.add(
-                        Episode(
-                            data = epHref,
-                            name = epTitle,
-                            season = seasonNum,
-                            episode = epNum,
-                        )
+                        newEpisode(epHref) {
+                            name = epTitle
+                            season = seasonNum
+                            episode = epNum
+                        }
                     )
                 }
             }
@@ -113,10 +112,12 @@ class FaselHDSProvider : MainAPI() {
             // استهداف سيرفرات المشاهدة للفيلم
             val watchLinks = document.select("ul.quality-list li a").map {
                 val embedUrl = it.attr("data-url")
-                // اسم السيرفر + الجودة
                 val name = it.text()
-                // تخزين الرابط في an Episode object
-                Episode(data = embedUrl, name = name)
+                
+                // ✨ تم التعديل هنا: استخدام newEpisode بدلاً من Episode(...)
+                newEpisode(embedUrl) {
+                    this.name = name
+                }
             }
 
             return newMovieLoadResponse(title, url, TvType.Movie, watchLinks) {
