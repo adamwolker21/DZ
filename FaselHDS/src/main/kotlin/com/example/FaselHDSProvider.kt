@@ -1,11 +1,11 @@
 package com.example
 
+// ✨ تم التأكد من وجود جميع سطور import الضرورية هنا ✨
 import com.lagradost.cloudstream3.*
-// ✨ تم التعديل هنا: إضافة سطر import لحل مشكلة Unresolved reference
-import com.lagradost.cloudstream3.utils.CloudflareKiller
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
+import com.lagradost.cloudstream3.utils.CloudflareKiller // <-- السطر الأهم لحل المشكلة
 
 class FaselHDSProvider : MainAPI() {
     override var mainUrl = "https://www.faselhd.club"
@@ -20,7 +20,6 @@ class FaselHDSProvider : MainAPI() {
     
     private val interceptor = CloudflareKiller()
     
-    // ✨ تم التعديل هنا: استخدام User-Agent لمتصفح Chrome على Android
     private val headers = mapOf(
         "User-Agent" to "Mozilla/5.0 (Linux; Android 13; SM-A536B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36"
     )
