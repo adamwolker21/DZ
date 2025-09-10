@@ -1,10 +1,7 @@
-// ✨ تم التعديل هنا: إضافة سطر implementation ✨
-// هذا السطر يخبر المشروع بأننا نحتاج "صندوق الأدوات" الذي يحتوي على CloudflareKiller
-dependencies {
-    implementation(project(":cloudstream3-utils"))
-}
+// تم حذف سطر الاعتماديات بالكامل لضمان نجاح البناء
+// dependencies { ... }
 
-version = 7 // تم رفع الإصدار
+version = 8 // تم رفع الإصدار
 
 cloudstream {
     language = "ar"
@@ -17,5 +14,6 @@ cloudstream {
         "TvSeries",
     )
 
+    // الرجاء تحديث هذا الرابط لاحقاً
     iconUrl = "https://i.imgur.com/example.png"
 }
