@@ -12,5 +12,5 @@ cloudstream {
         "TvSeries",
     )
 
-    iconUrl = "https://i.imgur.com/example.png"
+    iconUrl = "https://www.faselhds.life/icon-faselplud.png"
 }
