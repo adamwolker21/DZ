@@ -3,7 +3,7 @@ version = 1
 
 cloudstream {
     language = "ar"
-    description = "إضافة لمشاهدة الأفلام والمسلسلات من موقع فاصل إعلاني"
+    description = "Asia2TV Kdrama Cdrama Jdrama"
     authors = listOf("adamwolker21")
 
     status = 1 
@@ -12,5 +12,5 @@ cloudstream {
         "TvSeries",
     )
 
-    iconUrl = "https://i.imgur.com/example.png"
+    iconUrl = "https://asia2tv.com/frontend/default/assets/images/logo.png?ver=1.2"
 }
