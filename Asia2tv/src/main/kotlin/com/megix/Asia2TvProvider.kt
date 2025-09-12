@@ -1,50 +1,39 @@
+// v14: The final, modern provider code compatible with the new build environment.
 package com.example
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.awaitAll
 
-class Asia2TvProvider : MainAPI() {
+class Asia2Tv : MainAPI() {
     override var name = "Asia2Tv"
     override var mainUrl = "https://asia2tv.com"
     override var lang = "ar"
     override val hasMainPage = true
+    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
-    override val supportedTypes = setOf(
-        TvType.Movie,
-        TvType.TvSeries
-    )
-
-    override suspend fun getMainPage(
-        page: Int,
-        request: MainPageRequest
-    ): HomePageResponse {
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page == 1) mainUrl else request.data
         val document = app.get(url).document
+        val allhome = mutableListOf<HomePageList>()
 
-        // التعامل مع الصفحات التالية للتصنيفات (عند الضغط على "المزيد")
         if (page > 1) {
             val items = document.select("div.items div.item").mapNotNull { it.toSearchResponse() }
-            // v2 Update: The second argument to newHomePageResponse is the list itself.
-            return newHomePageResponse(request.name, items, hasNext = items.isNotEmpty())
+            return newHomePageResponse(request.name, items, true)
         }
-
-        // التعامل مع الصفحة الرئيسية
-        val allhome = document.select("div.Blocks").mapNotNull { section ->
-            val title = section.selectFirst("div.title-bar h2")?.text() ?: return@mapNotNull null
-            val categoryUrl = section.selectFirst("div.title-bar a.more")?.attr("href") ?: return@mapNotNull null
+        
+        document.select("div.Blocks").forEach { section ->
+            val title = section.selectFirst("div.title-bar h2")?.text() ?: return@forEach
             val items = section.select("div.item").mapNotNull { it.toSearchResponse() }
             if (items.isNotEmpty()) {
-                // v2 Update: 'isHorizontal' and 'url' parameters are removed from HomePageList constructor.
-                // The "view more" link is now passed as `data` in the main request.
-                // We pass the categoryUrl here so the framework can use it for the next page.
-                HomePageList(title, items, data = categoryUrl)
-            } else {
-                null
+                allhome.add(HomePageList(title, items))
             }
         }
-        return newHomePageResponse(allhome, hasNext = true)
+        return HomePageResponse(allhome)
     }
 
     private fun Element.toSearchResponse(): SearchResponse? {
@@ -55,11 +44,11 @@ class Asia2TvProvider : MainAPI() {
         val posterUrl = posterDiv.selectFirst("img")?.attr("data-src") ?: posterDiv.selectFirst("img")?.attr("src")
 
         return if (href.contains("/movie/")) {
-            newMovieSearchResponse(title, href, TvType.Movie) {
+            newMovieSearchResponse(title, href) {
                 this.posterUrl = posterUrl
             }
         } else {
-            newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
+            newTvSeriesSearchResponse(title, href) {
                 this.posterUrl = posterUrl
             }
         }
@@ -67,18 +56,12 @@ class Asia2TvProvider : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
-
         val title = document.selectFirst("div.data h1")?.text()?.trim() ?: return null
         val poster = document.selectFirst("div.poster img")?.attr("src")
         val plot = document.selectFirst("div.story p")?.text()?.trim()
         val year = document.select("div.meta span a[href*=release]").first()?.text()?.toIntOrNull()
         val tags = document.select("div.meta span a[href*=genre]").map { it.text() }
-        val ratingValue = document.selectFirst("div.imdb span")?.text()?.let {
-            (it.toFloatOrNull()?.times(100))?.toInt()
-        }
-        // v2 Update: The 'score' property now requires a Score object, not an Int.
-        val rating = ratingValue?.let { Score(it, 1000) }
-
+        val rating = document.selectFirst("div.imdb span")?.text()?.toRatingInt()
         val recommendations = document.select("div.related div.item").mapNotNull {
             it.toSearchResponse()
         }
@@ -89,23 +72,23 @@ class Asia2TvProvider : MainAPI() {
                 this.year = year
                 this.plot = plot
                 this.tags = tags
-                this.score = rating
+                this.rating = rating
                 this.recommendations = recommendations
             }
         } else {
-            val episodes = document.select("div#seasons div.season_item").flatMapIndexed { seasonIndex, seasonElement ->
+            val episodes = mutableListOf<Episode>()
+            document.select("div#seasons div.season_item").forEachIndexed { seasonIndex, seasonElement ->
                 val seasonNum = seasonElement.selectFirst("h3")?.text()?.filter { it.isDigit() }?.toIntOrNull() ?: (seasonIndex + 1)
-                seasonElement.select("ul.episodes li").mapNotNull { episodeElement ->
-                    val epLink = episodeElement.selectFirst("a") ?: return@mapNotNull null
+                seasonElement.select("ul.episodes li").forEach { episodeElement ->
+                    val epLink = episodeElement.selectFirst("a") ?: return@forEach
                     val epHref = fixUrl(epLink.attr("href"))
                     val epName = epLink.text()
                     val epNum = epName.filter { it.isDigit() }.toIntOrNull()
-
-                    newEpisode(epHref) {
-                        name = epName
-                        season = seasonNum
-                        episode = epNum
-                    }
+                    episodes.add(newEpisode(epHref) {
+                        this.name = epName
+                        this.season = seasonNum
+                        this.episode = epNum
+                    })
                 }
             }
             newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes.reversed()) {
@@ -113,25 +96,25 @@ class Asia2TvProvider : MainAPI() {
                 this.year = year
                 this.plot = plot
                 this.tags = tags
-                this.score = rating
+                this.rating = rating
                 this.recommendations = recommendations
             }
         }
     }
 
     override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
+        data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit
     ): Boolean {
         val document = app.get(data).document
-        // v2 Update: 'apmap' has been removed or is no longer accessible. Switched to a sequential 'forEach'.
-        document.select("div.servers-list iframe").forEach { iframe ->
-            val iframeSrc = iframe.attr("src")
-            if (iframeSrc.isNotBlank()) {
-                loadExtractor(iframeSrc, data, subtitleCallback, callback)
-            }
+        val iframes = document.select("div.servers-list iframe")
+        
+        coroutineScope {
+            iframes.map { iframe ->
+                async {
+                    val iframeSrc = fixUrl(iframe.attr("src"))
+                    loadExtractor(iframeSrc, data, subtitleCallback, callback)
+                }
+            }.awaitAll()
         }
         return true
     }
