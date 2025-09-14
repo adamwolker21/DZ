@@ -2,6 +2,7 @@ package com.example
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
@@ -198,16 +199,12 @@ class FaselHDSProvider : MainAPI() {
             val videoSrc = videoElement?.attr("src")
             
             if (!videoSrc.isNullOrEmpty() && videoSrc.contains(".m3u8")) {
-                callback.invoke(
-                    ExtractorLink(
-                        name,
-                        "FaselHDS - HLS",
-                        videoSrc,
-                        "$mainUrl/",
-                        Qualities.Unknown.value,
-                        isM3u8 = true
-                    )
-                )
+                // استخدام M3u8Helper لمعالجة روابط HLS
+                M3u8Helper.generateM3u8(
+                    name,
+                    videoSrc,
+                    "$mainUrl/",
+                ).forEach(callback)
                 return true
             }
             
@@ -218,16 +215,11 @@ class FaselHDSProvider : MainAPI() {
             if (iframeSrc != null) {
                 if (iframeSrc.contains(".m3u8")) {
                     // إذا كان رابط iframe مباشرةً إلى ملف HLS
-                    callback.invoke(
-                        ExtractorLink(
-                            name,
-                            "FaselHDS - HLS",
-                            iframeSrc,
-                            "$mainUrl/",
-                            Qualities.Unknown.value,
-                            isM3u8 = true
-                        )
-                    )
+                    M3u8Helper.generateM3u8(
+                        name,
+                        iframeSrc,
+                        "$mainUrl/",
+                    ).forEach(callback)
                     return true
                 } else {
                     // إذا كان iframe يؤدي إلى صفحة أخرى، تحميلها واستخراج الفيديو منها
@@ -236,16 +228,11 @@ class FaselHDSProvider : MainAPI() {
                     val iframeVideoSrc = iframeVideo?.attr("src")
                     
                     if (!iframeVideoSrc.isNullOrEmpty() && iframeVideoSrc.contains(".m3u8")) {
-                        callback.invoke(
-                            ExtractorLink(
-                                name,
-                                "FaselHDS - HLS",
-                                iframeVideoSrc,
-                                iframeSrc,
-                                Qualities.Unknown.value,
-                                isM3u8 = true
-                            )
-                        )
+                        M3u8Helper.generateM3u8(
+                            name,
+                            iframeVideoSrc,
+                            iframeSrc,
+                        ).forEach(callback)
                         return true
                     }
                     
