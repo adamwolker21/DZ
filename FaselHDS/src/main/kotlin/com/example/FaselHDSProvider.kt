@@ -2,19 +2,9 @@ package com.example
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
-
-import com.lagradost.cloudstream3.utils.ExtractorApi
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.INFER_TYPE
-import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.getAndUnpack
-import com.lagradost.cloudstream3.utils.getQualityFromName
-import com.lagradost.cloudstream3.utils.loadExtractor
-import com.lagradost.cloudstream3.utils.newExtractorLink
-
 
 class FaselHDSProvider : MainAPI() {
     override var mainUrl = "https://www.faselhds.life"
@@ -209,13 +199,13 @@ class FaselHDSProvider : MainAPI() {
             
             if (!videoSrc.isNullOrEmpty() && videoSrc.contains(".m3u8")) {
                 callback.invoke(
-                    newExtractorLink(
+                    ExtractorLink(
                         name,
                         "FaselHDS - HLS",
                         videoSrc,
                         "$mainUrl/",
-                        1080, // جودة افتراضية
-                        true
+                        Qualities.Unknown.value,
+                        isM3u8 = true
                     )
                 )
                 return true
@@ -229,13 +219,13 @@ class FaselHDSProvider : MainAPI() {
                 if (iframeSrc.contains(".m3u8")) {
                     // إذا كان رابط iframe مباشرةً إلى ملف HLS
                     callback.invoke(
-                        newExtractorLink(
+                        ExtractorLink(
                             name,
                             "FaselHDS - HLS",
                             iframeSrc,
                             "$mainUrl/",
-                            1080,
-                            true
+                            Qualities.Unknown.value,
+                            isM3u8 = true
                         )
                     )
                     return true
@@ -247,13 +237,13 @@ class FaselHDSProvider : MainAPI() {
                     
                     if (!iframeVideoSrc.isNullOrEmpty() && iframeVideoSrc.contains(".m3u8")) {
                         callback.invoke(
-                            newExtractorLink(
+                            ExtractorLink(
                                 name,
                                 "FaselHDS - HLS",
                                 iframeVideoSrc,
                                 iframeSrc,
-                                1080,
-                                true
+                                Qualities.Unknown.value,
+                                isM3u8 = true
                             )
                         )
                         return true
