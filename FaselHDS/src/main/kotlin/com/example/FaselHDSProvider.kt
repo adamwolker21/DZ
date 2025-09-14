@@ -17,7 +17,8 @@ class FaselHDSProvider : MainAPI() {
     )
     
     private val headers = mapOf(
-        "User-Agent" to "Mozilla/5.0 (Linux; Android 13; SM-A536B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36"
+        "User-Agent" to "Mozilla/5.0 (Linux; Android 13; SM-A536B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36",
+        "Referer" to "$mainUrl/"
     )
 
     override val mainPage = mainPageOf(
@@ -187,11 +188,80 @@ class FaselHDSProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val embedPage = app.get(data, referer = "$mainUrl/", headers = headers).document
-        val iframeSrc = embedPage.selectFirst("iframe")?.attr("src") ?: return false
-
-        loadExtractor(iframeSrc, "$mainUrl/", subtitleCallback, callback)
-
-        return true
+        try {
+            // أولاً: محاولة استخراج الفيديو مباشرة من الصفحة
+            val embedPage = app.get(data, referer = "$mainUrl/", headers = headers).document
+            
+            // البحث عن رابط فيديو مباشر (HLS)
+            val videoElement = embedPage.selectFirst("video#video")
+            val videoSrc = videoElement?.attr("src")
+            
+            if (!videoSrc.isNullOrEmpty() && videoSrc.contains(".m3u8")) {
+                callback(
+                    ExtractorLink(
+                        name,
+                        "FaselHDS - HLS",
+                        videoSrc,
+                        referer = "$mainUrl/",
+                        quality = Qualities.Unknown.value,
+                        isM3u8 = true
+                    )
+                )
+                return true
+            }
+            
+            // إذا لم يتم العثور على فيديو مباشر، البحث عن iframe
+            val iframeElement = embedPage.selectFirst("iframe")
+            val iframeSrc = iframeElement?.attr("src")
+            
+            if (iframeSrc != null) {
+                if (iframeSrc.contains(".m3u8")) {
+                    // إذا كان رابط iframe مباشرةً إلى ملف HLS
+                    callback(
+                        ExtractorLink(
+                            name,
+                            "FaselHDS - HLS",
+                            iframeSrc,
+                            referer = "$mainUrl/",
+                            quality = Qualities.Unknown.value,
+                            isM3u8 = true
+                        )
+                    )
+                    return true
+                } else {
+                    // إذا كان iframe يؤدي إلى صفحة أخرى، تحميلها واستخراج الفيديو منها
+                    val iframePage = app.get(iframeSrc, referer = data, headers = headers).document
+                    val iframeVideo = iframePage.selectFirst("video#video")
+                    val iframeVideoSrc = iframeVideo?.attr("src")
+                    
+                    if (!iframeVideoSrc.isNullOrEmpty() && iframeVideoSrc.contains(".m3u8")) {
+                        callback(
+                            ExtractorLink(
+                                name,
+                                "FaselHDS - HLS",
+                                iframeVideoSrc,
+                                referer = iframeSrc,
+                                quality = Qualities.Unknown.value,
+                                isM3u8 = true
+                            )
+                        )
+                        return true
+                    }
+                    
+                    // إذا لم يتم العثور على فيديو في iframe، استخدام extractors العادية
+                    loadExtractor(iframeSrc, data, subtitleCallback, callback)
+                    return true
+                }
+            }
+            
+            // إذا لم يتم العثور على أي فيديو أو iframe
+            return false
+        } catch (e: Exception) {
+            // في حالة حدوث خطأ، استخدام الطريقة التقليدية
+            val embedPage = app.get(data, referer = "$mainUrl/", headers = headers).document
+            val iframeSrc = embedPage.selectFirst("iframe")?.attr("src") ?: return false
+            loadExtractor(iframeSrc, "$mainUrl/", subtitleCallback, callback)
+            return true
+        }
     }
 }
