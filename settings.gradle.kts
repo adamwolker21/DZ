@@ -7,8 +7,4 @@ pluginManagement {
 }
 
 rootProject.name = "CSX"
-include(":Bollyflix")
-include(":Extractors")
-// FaselHDS فقط، بدون أي إضافات أخرى
 include(":FaselHDS")
-include(":Asia2tv")
