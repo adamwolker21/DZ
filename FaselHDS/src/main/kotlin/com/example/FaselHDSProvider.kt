@@ -77,69 +77,73 @@ class FaselHDSProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url, headers = headers).document
 
-        val title = document.selectFirst("h1.entry-title")?.text()?.trim() ?: "No Title"
-        val posterUrl = document.selectFirst("div.poster img, img.poster")?.attr("src")
-            ?: document.selectFirst("img[itemprop=image]")?.attr("src")
-        val plot = document.selectFirst("div.entry-content p, div.desc p")?.text()?.trim()
-            ?: document.selectFirst("div.entry-content, div.desc")?.text()?.trim()
+        // استخراج العنوان
+        val title = document.selectFirst("div.h1.title")?.text()?.trim() ?: "No Title"
+        
+        // استخراج الصورة
+        val posterUrl = document.selectFirst("div.posterImg img")?.attr("src")
+            ?: document.selectFirst("img.poster")?.attr("src")
+        
+        // استخراج القصة/الوصف
+        val plot = document.selectFirst("div.singleDesc p")?.text()?.trim()
+            ?: document.selectFirst("div.singleDesc")?.text()?.trim()
         
         // استخراج السنة
         var year: Int? = null
-        document.select("span.year, div.meta-bar:contains(سنة)").forEach { element ->
-            val text = element.text()
-            year = text.toIntOrNull() 
-                ?: Regex("""(\d{4})""").find(text)?.groupValues?.get(1)?.toIntOrNull()
-        }
+        val yearText = document.select("span:contains(موعد الصدور)").firstOrNull()?.text()
+        year = Regex("""موعد الصدور : (\d{4})""").find(yearText ?: "")?.groupValues?.get(1)?.toIntOrNull()
         
         // استخراج التصنيفات
-        val tags = document.select("span.cat, a[rel=tag]").map { it.text() }
+        val tags = mutableListOf<String>()
+        document.select("span:contains(تصنيف المسلسل) a[rel=tag]").forEach {
+            tags.add(it.text())
+        }
         
         // تحديد إذا كان مسلسلاً
-        val isTvSeries = document.select("div#season-list, div.season-list, div.ep-list").isNotEmpty() 
+        val isTvSeries = document.select("div#seasonList").isNotEmpty() 
             || url.contains("/series/")
             || document.select("span:contains(حلقة)").isNotEmpty()
 
         if (isTvSeries) {
             val episodes = mutableListOf<Episode>()
             
-            // محاولة استخراج المواسم والحلقات
-            val seasonElements = document.select("div.season-list-item, div.season-item")
+            // استخراج المواسم
+            val seasonElements = document.select("div#seasonList div.seasonDiv")
             
             if (seasonElements.isNotEmpty()) {
                 // هناك مواسم متعددة
                 seasonElements.forEach { seasonElement ->
-                    val seasonLink = seasonElement.selectFirst("a")?.attr("href") ?: return@forEach
-                    val seasonDoc = app.get(seasonLink, headers = headers).document
-                    val seasonNumText = seasonDoc.selectFirst("h2.entry-title, h1.entry-title")?.text()
-                    val seasonNum = Regex("""الموسم (\d+)""").find(seasonNumText ?: "")?.groupValues?.get(1)?.toIntOrNull()
+                    val seasonLink = seasonElement.attr("onclick")?.substringAfter("window.location.href = '")?.substringBefore("'")
+                        ?: seasonElement.selectFirst("a")?.attr("href")
+                    val seasonUrl = if (seasonLink?.startsWith("/") == true) "$mainUrl$seasonLink" else seasonLink
+                    val seasonNumText = seasonElement.selectFirst("div.title")?.text()
+                    val seasonNum = Regex("""موسم (\d+)""").find(seasonNumText ?: "")?.groupValues?.get(1)?.toIntOrNull()
                         ?: 1
 
-                    seasonDoc.select("div.ep-item a, div.episode-item a").forEach { episodeLink ->
-                        val epHref = episodeLink.attr("href")
-                        val epTitle = episodeLink.select("span.ep-title, span.ep-name").text()
-                            ?: episodeLink.attr("title")
-                            ?: episodeLink.text()
-                        val epNum = episodeLink.select("span.ep-num, span.ep-number").text().toIntOrNull()
-                            ?: Regex("""الحلقة (\d+)""").find(epTitle)?.groupValues?.get(1)?.toIntOrNull()
+                    if (seasonUrl != null) {
+                        val seasonDoc = app.get(seasonUrl, headers = headers).document
+                        
+                        seasonDoc.select("a:contains(الحلقة)").forEach { episodeLink ->
+                            val epHref = episodeLink.attr("href")
+                            val epTitle = episodeLink.text()
+                            val epNum = Regex("""الحلقة (\d+)""").find(epTitle)?.groupValues?.get(1)?.toIntOrNull()
 
-                        episodes.add(
-                            newEpisode(epHref) {
-                                this.name = epTitle
-                                this.season = seasonNum
-                                this.episode = epNum
-                            }
-                        )
+                            episodes.add(
+                                newEpisode(epHref) {
+                                    this.name = epTitle
+                                    this.season = seasonNum
+                                    this.episode = epNum
+                                }
+                            )
+                        }
                     }
                 }
             } else {
-                // موسم واحد فقط
-                document.select("div.ep-item a, div.episode-item a").forEach { episodeLink ->
+                // موسم واحد فقط - استخراج الحلقات مباشرة من الصفحة
+                document.select("a:contains(الحلقة)").forEach { episodeLink ->
                     val epHref = episodeLink.attr("href")
-                    val epTitle = episodeLink.select("span.ep-title, span.ep-name").text()
-                        ?: episodeLink.attr("title")
-                        ?: episodeLink.text()
-                    val epNum = episodeLink.select("span.ep-num, span.ep-number").text().toIntOrNull()
-                        ?: Regex("""الحلقة (\d+)""").find(epTitle)?.groupValues?.get(1)?.toIntOrNull()
+                    val epTitle = episodeLink.text()
+                    val epNum = Regex("""الحلقة (\d+)""").find(epTitle)?.groupValues?.get(1)?.toIntOrNull()
 
                     episodes.add(
                         newEpisode(epHref) {
@@ -158,11 +162,11 @@ class FaselHDSProvider : MainAPI() {
                 this.tags = tags
             }
         } else {
-            // فيلم
-            val watchLinks = document.select("ul.quality-list li a, div.watch-list a, a.watch-btn").map {
+            // فيلم - استخراج أزرار المشاهدة
+            val watchLinks = document.select("a.watch-btn, ul.quality-list li a").map {
                 val embedUrl = it.attr("data-url") ?: it.attr("href")
-                val name = it.text().ifEmpty { it.select("span.quality").text() }
-                
+                val name = it.text()
+
                 newEpisode(embedUrl) {
                     this.name = name
                 }
