@@ -198,13 +198,13 @@ class FaselHDSProvider : MainAPI() {
             
             if (!videoSrc.isNullOrEmpty() && videoSrc.contains(".m3u8")) {
                 callback.invoke(
-                    ExtractorLink(
+                    newExtractorLink(
+                        videoSrc,
                         name,
                         "FaselHDS - HLS",
-                        videoSrc,
                         "$mainUrl/",
                         Qualities.Unknown.value,
-                        isM3u8 = true
+                        true
                     )
                 )
                 return true
@@ -218,13 +218,13 @@ class FaselHDSProvider : MainAPI() {
                 if (iframeSrc.contains(".m3u8")) {
                     // إذا كان رابط iframe مباشرةً إلى ملف HLS
                     callback.invoke(
-                        ExtractorLink(
+                        newExtractorLink(
+                            iframeSrc,
                             name,
                             "FaselHDS - HLS",
-                            iframeSrc,
                             "$mainUrl/",
                             Qualities.Unknown.value,
-                            isM3u8 = true
+                            true
                         )
                     )
                     return true
@@ -236,13 +236,13 @@ class FaselHDSProvider : MainAPI() {
                     
                     if (!iframeVideoSrc.isNullOrEmpty() && iframeVideoSrc.contains(".m3u8")) {
                         callback.invoke(
-                            ExtractorLink(
+                            newExtractorLink(
+                                iframeVideoSrc,
                                 name,
                                 "FaselHDS - HLS",
-                                iframeVideoSrc,
                                 iframeSrc,
                                 Qualities.Unknown.value,
-                                isM3u8 = true
+                                true
                             )
                         )
                         return true
