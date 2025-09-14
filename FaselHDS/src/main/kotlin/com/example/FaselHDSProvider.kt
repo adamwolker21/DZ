@@ -203,7 +203,7 @@ class FaselHDSProvider : MainAPI() {
                         "FaselHDS - HLS",
                         videoSrc,
                         "$mainUrl/",
-                        getQualityFromName("Unknown"),
+                        Qualities.Unknown.value,
                         isM3u8 = true
                     )
                 )
@@ -223,7 +223,7 @@ class FaselHDSProvider : MainAPI() {
                             "FaselHDS - HLS",
                             iframeSrc,
                             "$mainUrl/",
-                            getQualityFromName("Unknown"),
+                            Qualities.Unknown.value,
                             isM3u8 = true
                         )
                     )
@@ -241,7 +241,7 @@ class FaselHDSProvider : MainAPI() {
                                 "FaselHDS - HLS",
                                 iframeVideoSrc,
                                 iframeSrc,
-                                getQualityFromName("Unknown"),
+                                Qualities.Unknown.value,
                                 isM3u8 = true
                             )
                         )
