@@ -199,11 +199,11 @@ class FaselHDSProvider : MainAPI() {
             if (!videoSrc.isNullOrEmpty() && videoSrc.contains(".m3u8")) {
                 callback.invoke(
                     newExtractorLink(
+                        videoSrc,
                         name,
                         "FaselHDS - HLS",
-                        videoSrc,
                         "$mainUrl/",
-                        1080, // جودة افتراضية
+                        Qualities.Unknown.value,
                         true
                     )
                 )
@@ -219,11 +219,11 @@ class FaselHDSProvider : MainAPI() {
                     // إذا كان رابط iframe مباشرةً إلى ملف HLS
                     callback.invoke(
                         newExtractorLink(
+                            iframeSrc,
                             name,
                             "FaselHDS - HLS",
-                            iframeSrc,
                             "$mainUrl/",
-                            1080,
+                            Qualities.Unknown.value,
                             true
                         )
                     )
@@ -237,11 +237,11 @@ class FaselHDSProvider : MainAPI() {
                     if (!iframeVideoSrc.isNullOrEmpty() && iframeVideoSrc.contains(".m3u8")) {
                         callback.invoke(
                             newExtractorLink(
+                                iframeVideoSrc,
                                 name,
                                 "FaselHDS - HLS",
-                                iframeVideoSrc,
                                 iframeSrc,
-                                1080,
+                                Qualities.Unknown.value,
                                 true
                             )
                         )
