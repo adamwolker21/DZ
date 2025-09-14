@@ -2,6 +2,7 @@ package com.example
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
 
@@ -198,13 +199,13 @@ class FaselHDSProvider : MainAPI() {
             
             if (!videoSrc.isNullOrEmpty() && videoSrc.contains(".m3u8")) {
                 callback.invoke(
-                    newExtractorLink(
-                        videoSrc,
+                    ExtractorLink(
                         name,
                         "FaselHDS - HLS",
+                        videoSrc,
                         "$mainUrl/",
                         Qualities.Unknown.value,
-                        true
+                        isM3u8 = true
                     )
                 )
                 return true
@@ -218,13 +219,13 @@ class FaselHDSProvider : MainAPI() {
                 if (iframeSrc.contains(".m3u8")) {
                     // إذا كان رابط iframe مباشرةً إلى ملف HLS
                     callback.invoke(
-                        newExtractorLink(
-                            iframeSrc,
+                        ExtractorLink(
                             name,
                             "FaselHDS - HLS",
+                            iframeSrc,
                             "$mainUrl/",
                             Qualities.Unknown.value,
-                            true
+                            isM3u8 = true
                         )
                     )
                     return true
@@ -236,13 +237,13 @@ class FaselHDSProvider : MainAPI() {
                     
                     if (!iframeVideoSrc.isNullOrEmpty() && iframeVideoSrc.contains(".m3u8")) {
                         callback.invoke(
-                            newExtractorLink(
-                                iframeVideoSrc,
+                            ExtractorLink(
                                 name,
                                 "FaselHDS - HLS",
+                                iframeVideoSrc,
                                 iframeSrc,
                                 Qualities.Unknown.value,
-                                true
+                                isM3u8 = true
                             )
                         )
                         return true
