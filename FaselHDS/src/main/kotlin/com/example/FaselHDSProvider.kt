@@ -2,7 +2,6 @@ package com.example
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.utils.M3u8Helper
 import org.jsoup.nodes.Element
 
@@ -137,21 +136,19 @@ class FaselHDSProvider : MainAPI() {
             try {
                 val playerPageContent = app.get(serverUrl, headers = headers).text
                 
-                // Find all m3u8 links in the page content
                 val m3u8Links = Regex("""(https?://.*?\.m3u8)""").findAll(playerPageContent).map { it.value }.toList().distinct()
 
                 if (m3u8Links.isNotEmpty()) {
-                    // Use M3u8Helper which works well with modern CloudStream versions
-                    // It will handle master playlists and add headers correctly
+                    // THE FIX: Changed 'name =' to 'source ='
                     M3u8Helper.generateM3u8(
-                        name = "$name S${index + 1}", // Name the server S1, S2 etc.
-                        streamUrl = m3u8Links.first(), // Usually the first one is the master playlist
+                        source = "$name S${index + 1}", // This is the correct parameter name
+                        streamUrl = m3u8Links.first(),
                         referer = serverUrl,
                         headers = headers
                     ).forEach(callback)
                 }
             } catch (e: Exception) {
-                // Ignore errors for a single server and continue to the next
+                // Ignore errors
             }
         }
         return true
