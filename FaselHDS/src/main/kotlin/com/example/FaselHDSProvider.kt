@@ -3,7 +3,6 @@ package com.example
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.newExtractorLink
-import com.lagradost.cloudstream3.utils.Qualities
 import org.jsoup.nodes.Element
 
 class FaselHDSProvider : MainAPI() {
@@ -141,9 +140,7 @@ class FaselHDSProvider : MainAPI() {
                             newExtractorLink(
                                 source = name,
                                 name = "$name - Auto",
-                                url = fileLink,
-                                // الإصلاح: تمرير الـ Referer داخل headers
-                                headers = mapOf("Referer" to serverUrl)
+                                url = fileLink
                             )
                         )
                     }
@@ -154,9 +151,7 @@ class FaselHDSProvider : MainAPI() {
                             newExtractorLink(
                                 source = name,
                                 name = name,
-                                url = videoSrc,
-                                // الإصلاح: تمرير الـ Referer داخل headers
-                                headers = mapOf("Referer" to serverUrl)
+                                url = videoSrc
                             )
                         )
                     }
