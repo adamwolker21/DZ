@@ -136,13 +136,26 @@ class FaselHDSProvider : MainAPI() {
             try {
                 val playerPageContent = app.get(serverUrl, headers = headers).text
                 
-                val m3u8Links = Regex("""(https?://.*?\.m3u8)""").findAll(playerPageContent).map { it.value }.toList().distinct()
+                // THE FIX: Create a list of regex patterns to try in order.
+                val linkRegexes = listOf(
+                    Regex("""var videoSrc = '([^']+)';"""), // Pattern for Server 2
+                    Regex("""(https?://.*?\.m3u8)""")       // Pattern for Server 1
+                )
 
-                if (m3u8Links.isNotEmpty()) {
-                    // THE FIX: Changed 'name =' to 'source ='
+                var foundLink: String? = null
+                for (regex in linkRegexes) {
+                    // Find the first match and break the loop.
+                    val match = regex.find(playerPageContent)
+                    if (match != null) {
+                        foundLink = match.groupValues[1] // groupValues[1] gets the captured group
+                        break
+                    }
+                }
+
+                if (foundLink != null) {
                     M3u8Helper.generateM3u8(
-                        source = "$name S${index + 1}", // This is the correct parameter name
-                        streamUrl = m3u8Links.first(),
+                        source = "$name S${index + 1}",
+                        streamUrl = foundLink,
                         referer = serverUrl,
                         headers = headers
                     ).forEach(callback)
