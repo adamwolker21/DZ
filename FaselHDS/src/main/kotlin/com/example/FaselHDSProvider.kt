@@ -2,6 +2,7 @@ package com.example
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import org.jsoup.nodes.Element
 
@@ -82,8 +83,12 @@ class FaselHDSProvider : MainAPI() {
                 seasonElements.apmap { seasonElement ->
                     val seasonLink = seasonElement.attr("onclick")?.substringAfter("'")?.substringBefore("'")
                         ?: seasonElement.selectFirst("a")?.attr("href") ?: return@apmap
+                    
+                    // الإصلاح الأول: التأكد من أن رابط الموسم كامل
+                    val absoluteSeasonLink = if (seasonLink.startsWith("http")) seasonLink else "$mainUrl$seasonLink"
+
                     val seasonNum = Regex("""\d+""").find(seasonElement.selectFirst("div.title")?.text() ?: "")?.value?.toIntOrNull()
-                    val seasonDoc = app.get(seasonLink, headers = headers).document
+                    val seasonDoc = app.get(absoluteSeasonLink, headers = headers).document
                     seasonDoc.select("div.ep-item a").forEach { ep ->
                         episodes.add(
                             newEpisode(ep.attr("href")) {
@@ -136,24 +141,22 @@ class FaselHDSProvider : MainAPI() {
                 if (hlsJson != null) {
                     val fileLink = Regex(""""file":"([^"]+)"""").find(hlsJson)?.groupValues?.get(1)
                     if(fileLink != null) {
-                        callback.invoke(
-                            newExtractorLink(
-                                source = name,
-                                name = "$name - Auto",
-                                url = fileLink
-                            )
-                        )
+                        // الإصلاح الثاني: استخدام M3u8Helper لإضافة Referer
+                        M3u8Helper.generateM3u8(
+                            name,
+                            fileLink,
+                            serverUrl,
+                        ).forEach(callback)
                     }
                 } else {
                     val videoSrc = Regex("""var videoSrc = '([^']+)';""").find(playerPageContent)?.groupValues?.get(1)
                     if(videoSrc != null) {
-                        callback.invoke(
-                            newExtractorLink(
-                                source = name,
-                                name = name,
-                                url = videoSrc
-                            )
-                        )
+                        // الإصلاح الثاني: استخدام M3u8Helper لإضافة Referer
+                        M3u8Helper.generateM3u8(
+                            name,
+                            videoSrc,
+                            serverUrl,
+                        ).forEach(callback)
                     }
                 }
             } catch (e: Exception) {
