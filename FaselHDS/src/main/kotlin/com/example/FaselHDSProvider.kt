@@ -2,10 +2,9 @@ package com.example
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
+import com.lagradost.cloudstream3.utils.getQualityFromName
 
 class FaselHDSProvider : MainAPI() {
     override var mainUrl = "https://www.faselhds.life"
@@ -18,8 +17,9 @@ class FaselHDSProvider : MainAPI() {
         TvType.TvSeries
     )
     
+    // تحسين: جعل Headers قابلة للوصول في كل مكان
     private val headers = mapOf(
-        "User-Agent" to "Mozilla/5.0 (Linux; Android 13; SM-A536B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36",
+        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
         "Referer" to "$mainUrl/"
     )
 
@@ -46,6 +46,7 @@ class FaselHDSProvider : MainAPI() {
     private fun Element.toSearchResult(): SearchResponse? {
         val anchor = this.selectFirst("a") ?: return null
         val href = anchor.attr("href")
+        if (href.isBlank()) return null
         val title = anchor.selectFirst("div.h1, h3 a")?.text() ?: "No Title"
         val posterElement = anchor.selectFirst("div.imgdiv-class img, div.post-thumb img")
         val posterUrl = posterElement?.attr("data-src") 
@@ -53,7 +54,6 @@ class FaselHDSProvider : MainAPI() {
             ?: anchor.selectFirst("div.post-thumb a")?.attr("style")
                 ?.substringAfter("url(")?.substringBefore(")")
         
-        // تحديد النوع بناءً على الرابط والمحتوى
         val isSeries = href.contains("/series/") || this.selectFirst("span.quality:contains(حلقة)") != null
         val type = if (isSeries) TvType.TvSeries else TvType.Movie
 
@@ -80,56 +80,35 @@ class FaselHDSProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url, headers = headers).document
 
-        // استخراج العنوان
         val title = document.selectFirst("div.h1.title")?.text()?.trim() ?: "No Title"
-        
-        // استخراج الصورة
         val posterUrl = document.selectFirst("div.posterImg img")?.attr("src")
             ?: document.selectFirst("img.poster")?.attr("src")
-        
-        // استخراج القصة/الوصف
         val plot = document.selectFirst("div.singleDesc p")?.text()?.trim()
             ?: document.selectFirst("div.singleDesc")?.text()?.trim()
-        
-        // استخراج السنة
-        var year: Int? = null
         val yearText = document.select("span:contains(موعد الصدور)").firstOrNull()?.text()
-        year = Regex("""موعد الصدور : (\d{4})""").find(yearText ?: "")?.groupValues?.get(1)?.toIntOrNull()
+        val year = Regex("""\d{4}""").find(yearText ?: "")?.value?.toIntOrNull()
         
-        // استخراج التصنيفات
-        val tags = mutableListOf<String>()
-        document.select("span:contains(تصنيف المسلسل) a[rel=tag]").forEach {
-            tags.add(it.text())
-        }
+        val tags = document.select("span:contains(تصنيف) a").map { it.text() }
         
-        // تحديد إذا كان مسلسلاً
-        val isTvSeries = document.select("div#seasonList").isNotEmpty() 
-            || url.contains("/series/")
-            || document.select("span:contains(حلقة)").isNotEmpty()
+        val isTvSeries = url.contains("/series/") || document.select("div#seasonList").isNotEmpty()
 
         if (isTvSeries) {
             val episodes = mutableListOf<Episode>()
-            
-            // استخراج المواسم
             val seasonElements = document.select("div#seasonList div.seasonDiv")
             
             if (seasonElements.isNotEmpty()) {
-                // هناك مواسم متعددة
-                seasonElements.forEach { seasonElement ->
+                seasonElements.apmap { seasonElement ->
                     val seasonLink = seasonElement.attr("onclick")?.substringAfter("window.location.href = '")?.substringBefore("'")
                         ?: seasonElement.selectFirst("a")?.attr("href")
-                    val seasonUrl = if (seasonLink?.startsWith("/") == true) "$mainUrl$seasonLink" else seasonLink
                     val seasonNumText = seasonElement.selectFirst("div.title")?.text()
-                    val seasonNum = Regex("""موسم (\d+)""").find(seasonNumText ?: "")?.groupValues?.get(1)?.toIntOrNull()
-                        ?: 1
+                    val seasonNum = Regex("""\d+""").find(seasonNumText ?: "")?.value?.toIntOrNull()
 
-                    if (seasonUrl != null) {
-                        val seasonDoc = app.get(seasonUrl, headers = headers).document
-                        
-                        seasonDoc.select("a:contains(الحلقة)").forEach { episodeLink ->
+                    if (seasonLink != null) {
+                        val seasonDoc = app.get(seasonLink, headers = headers).document
+                        seasonDoc.select("div.ep-item a").forEach { episodeLink ->
                             val epHref = episodeLink.attr("href")
-                            val epTitle = episodeLink.text()
-                            val epNum = Regex("""الحلقة (\d+)""").find(epTitle)?.groupValues?.get(1)?.toIntOrNull()
+                            val epTitle = episodeLink.selectFirst(".eph-num")?.text() ?: "الحلقة"
+                            val epNum = Regex("""\d+""").find(epTitle)?.value?.toIntOrNull()
 
                             episodes.add(
                                 newEpisode(epHref) {
@@ -142,12 +121,10 @@ class FaselHDSProvider : MainAPI() {
                     }
                 }
             } else {
-                // موسم واحد فقط - استخراج الحلقات مباشرة من الصفحة
-                document.select("a:contains(الحلقة)").forEach { episodeLink ->
-                    val epHref = episodeLink.attr("href")
-                    val epTitle = episodeLink.text()
-                    val epNum = Regex("""الحلقة (\d+)""").find(epTitle)?.groupValues?.get(1)?.toIntOrNull()
-
+                document.select("div.ep-item a").forEach { episodeLink ->
+                     val epHref = episodeLink.attr("href")
+                     val epTitle = episodeLink.selectFirst(".eph-num")?.text() ?: "الحلقة"
+                     val epNum = Regex("""\d+""").find(epTitle)?.value?.toIntOrNull()
                     episodes.add(
                         newEpisode(epHref) {
                             this.name = epTitle
@@ -158,105 +135,76 @@ class FaselHDSProvider : MainAPI() {
                 }
             }
             
-            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-                this.posterUrl = posterUrl
-                this.plot = plot
-                this.year = year
-                this.tags = tags
+            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
+                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
             }
         } else {
-            // فيلم - استخراج أزرار المشاهدة
-            val watchLinks = document.select("a.watch-btn, ul.quality-list li a").map {
-                val embedUrl = it.attr("data-url") ?: it.attr("href")
-                val name = it.text()
-
-                newEpisode(embedUrl) {
-                    this.name = name
-                }
-            }
-
-            return newMovieLoadResponse(title, url, TvType.Movie, watchLinks) {
-                this.posterUrl = posterUrl
-                this.plot = plot
-                this.year = year
-                this.tags = tags
+            // تعديل مهم: بالنسبة للأفلام، نمرر رابط الفيلم نفسه إلى loadLinks
+            return newMovieLoadResponse(title, url, TvType.Movie, url) {
+                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
             }
         }
     }
 
     override suspend fun loadLinks(
-        data: String,
+        data: String, // هنا `data` هو رابط الحلقة أو الفيلم
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // إذا كان الرابط من نوع video_player، استخدم الـ Extractor الجديد
-        if (data.contains("video_player?player_token=")) {
-            val extractor = FaselHDSExtractor()
-            return extractor.extractFromUrl(data, callback)
+        // الخطوة 1: جلب محتوى صفحة الفيلم أو الحلقة
+        val document = app.get(data, headers = headers).document
+
+        // الخطوة 2: استخراج جميع روابط السيرفرات (صفحات المشغل)
+        val serverUrls = document.select("ul.tabs-ul li").mapNotNull {
+            it.attr("onclick").substringAfter("href = '").substringBefore("'")
         }
 
-        // إذا كان الرابط العادي، استخدم الطريقة التقليدية
-        try {
-            // أولاً: محاولة استخراج الفيديو مباشرة من الصفحة
-            val embedPage = app.get(data, referer = "$mainUrl/", headers = headers).document
-            
-            // البحث عن رابط فيديو مباشر (HLS)
-            val videoElement = embedPage.selectFirst("video#video")
-            val videoSrc = videoElement?.attr("src")
-            
-            if (!videoSrc.isNullOrEmpty() && videoSrc.contains(".m3u8")) {
-                // استخدام M3u8Helper لمعالجة روابط HLS
-                M3u8Helper.generateM3u8(
-                    name,
-                    videoSrc,
-                    "$mainUrl/",
-                ).forEach(callback)
-                return true
-            }
-            
-            // إذا لم يتم العثور على فيديو مباشر، البحث عن iframe
-            val iframeElement = embedPage.selectFirst("iframe")
-            val iframeSrc = iframeElement?.attr("src")
-            
-            if (iframeSrc != null) {
-                if (iframeSrc.contains(".m3u8")) {
-                    // إذا كان رابط iframe مباشرةً إلى ملف HLS
-                    M3u8Helper.generateM3u8(
-                        name,
-                        iframeSrc,
-                        "$mainUrl/",
-                    ).forEach(callback)
-                    return true
-                } else {
-                    // إذا كان iframe يؤدي إلى صفحة أخرى، تحميلها واستخراج الفيديو منها
-                    val iframePage = app.get(iframeSrc, referer = data, headers = headers).document
-                    val iframeVideo = iframePage.selectFirst("video#video")
-                    val iframeVideoSrc = iframeVideo?.attr("src")
-                    
-                    if (!iframeVideoSrc.isNullOrEmpty() && iframeVideoSrc.contains(".m3u8")) {
-                        M3u8Helper.generateM3u8(
-                            name,
-                            iframeVideoSrc,
-                            iframeSrc,
-                        ).forEach(callback)
-                        return true
+        if (serverUrls.isEmpty()) return false
+
+        // الخطوة 3: المرور على كل رابط سيرفر واستخراج الفيديو منه
+        serverUrls.apmap { serverUrl ->
+            try {
+                val playerPageContent = app.get(serverUrl, headers = headers).text
+                
+                // البحث بالطريقة الأولى (hlsPlaylist & data-url)
+                val hlsJson = Regex("""var hlsPlaylist = (\{.+?});""").find(playerPageContent)?.groupValues?.get(1)
+                if (hlsJson != null) {
+                    val fileLink = Regex(""""file":"([^"]+)"""").find(hlsJson)?.groupValues?.get(1)
+                    if(fileLink != null) {
+                         callback.invoke(
+                            ExtractorLink(
+                                this.name,
+                                "${this.name} - Auto",
+                                fileLink,
+                                serverUrl,
+                                Qualities.Unknown.value,
+                                fileLink.contains(".m3u8")
+                            )
+                        )
                     }
-                    
-                    // إذا لم يتم العثور على فيديو في iframe، استخدام extractors العادية
-                    loadExtractor(iframeSrc, data, subtitleCallback, callback)
-                    return true
+                // الطريقة الثانية (videoSrc)
+                } else {
+                    val videoSrc = Regex("""var videoSrc = '([^']+)';""").find(playerPageContent)?.groupValues?.get(1)
+                    if(videoSrc != null) {
+                        callback.invoke(
+                            ExtractorLink(
+                                this.name,
+                                this.name,
+                                videoSrc,
+                                serverUrl,
+                                Qualities.Unknown.value,
+                                videoSrc.contains(".m3u8")
+                            )
+                        )
+                    }
                 }
+            } catch (e: Exception) {
+                // تجاهل الخطأ في حالة فشل أحد السيرفرات
             }
-            
-            // إذا لم يتم العثور على أي فيديو أو iframe
-            return false
-        } catch (e: Exception) {
-            // في حالة حدوث خطأ، استخدام الطريقة التقليدية
-            val embedPage = app.get(data, referer = "$mainUrl/", headers = headers).document
-            val iframeSrc = embedPage.selectFirst("iframe")?.attr("src") ?: return false
-            loadExtractor(iframeSrc, "$mainUrl/", subtitleCallback, callback)
-            return true
         }
+
+        return true
     }
 }
+
