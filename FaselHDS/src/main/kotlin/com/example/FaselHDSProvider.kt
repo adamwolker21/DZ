@@ -116,7 +116,6 @@ class FaselHDSProvider : MainAPI() {
         }
     }
 
-    // الإصلاح النهائي: إعادة `suspend` و `Boolean`
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -143,9 +142,8 @@ class FaselHDSProvider : MainAPI() {
                                 source = name,
                                 name = "$name - Auto",
                                 url = fileLink,
-                                referer = serverUrl,
-                                quality = Qualities.Unknown.value,
-                                isM3u8 = fileLink.contains(".m3u8")
+                                // الإصلاح: تمرير الـ Referer داخل headers
+                                headers = mapOf("Referer" to serverUrl)
                             )
                         )
                     }
@@ -157,9 +155,8 @@ class FaselHDSProvider : MainAPI() {
                                 source = name,
                                 name = name,
                                 url = videoSrc,
-                                referer = serverUrl,
-                                quality = Qualities.Unknown.value,
-                                isM3u8 = videoSrc.contains(".m3u8")
+                                // الإصلاح: تمرير الـ Referer داخل headers
+                                headers = mapOf("Referer" to serverUrl)
                             )
                         )
                     }
