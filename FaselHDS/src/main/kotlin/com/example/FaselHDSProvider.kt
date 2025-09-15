@@ -3,7 +3,7 @@ package com.example
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.newExtractorLink
-import com.lagradost.cloudstream3.utils.getQualityFromName
+import com.lagradost.cloudstream3.utils.M3u8Helper
 import org.jsoup.nodes.Element
 
 class FaselHDSProvider : MainAPI() {
@@ -122,47 +122,6 @@ class FaselHDSProvider : MainAPI() {
         }
     }
 
-    private suspend fun M3u8Helper(
-        m3u8url: String,
-        referer: String,
-        qualityName: String,
-        callback: (ExtractorLink) -> Unit
-    ) {
-        val m3u8Content = app.get(m3u8url, headers = headers.plus("Referer" to referer)).text
-        val masterPlaylistRegex = Regex("""#EXT-X-STREAM-INF:.*?RESOLUTION=(\d+)x(\d+).*?\n(.*?)\s""")
-        
-        if (m3u8Content.contains("EXT-X-STREAM-INF")) {
-            masterPlaylistRegex.findAll(m3u8Content).forEach { match ->
-                val (width, height, link) = match.destructured
-                val quality = getQualityFromName("${height}p")
-                val absoluteLink = if (link.startsWith("http")) link else {
-                    m3u8url.substringBeforeLast("/") + "/" + link
-                }
-                callback.invoke(
-                    newExtractorLink(
-                        source = "$name - $qualityName",
-                        name = "$name - $qualityName ${quality.name}",
-                        url = absoluteLink,
-                        referer = referer,
-                        quality = quality.value,
-                        isM3u8 = true
-                    )
-                )
-            }
-        } else {
-             callback.invoke(
-                newExtractorLink(
-                    source = "$name - $qualityName",
-                    name = "$name - $qualityName",
-                    url = m3u8url,
-                    referer = referer,
-                    quality = getQualityFromName(qualityName).value,
-                    isM3u8 = true
-                )
-            )
-        }
-    }
-
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -173,18 +132,26 @@ class FaselHDSProvider : MainAPI() {
         
         document.select("ul.tabs-ul li").forEachIndexed { index, serverElement ->
             val serverUrl = serverElement.attr("onclick").substringAfter("href = '").substringBefore("'")
-            if(serverUrl.isBlank()) return@forEachIndexed
+            if (serverUrl.isBlank()) return@forEachIndexed
 
             try {
                 val playerPageContent = app.get(serverUrl, headers = headers).text
-                val m3u8Link = Regex("""(https?://.*?\.m3u8)""").find(playerPageContent)?.groupValues?.get(1)
+                
+                // Find all m3u8 links in the page content
+                val m3u8Links = Regex("""(https?://.*?\.m3u8)""").findAll(playerPageContent).map { it.value }.toList().distinct()
 
-                if (m3u8Link != null) {
-                    val serverName = "S${index + 1}" // Shorter name: S1, S2
-                    M3u8Helper(m3u8Link, serverUrl, serverName, callback)
+                if (m3u8Links.isNotEmpty()) {
+                    // Use M3u8Helper which works well with modern CloudStream versions
+                    // It will handle master playlists and add headers correctly
+                    M3u8Helper.generateM3u8(
+                        name = "$name S${index + 1}", // Name the server S1, S2 etc.
+                        streamUrl = m3u8Links.first(), // Usually the first one is the master playlist
+                        referer = serverUrl,
+                        headers = headers
+                    ).forEach(callback)
                 }
             } catch (e: Exception) {
-                // Ignore
+                // Ignore errors for a single server and continue to the next
             }
         }
         return true
