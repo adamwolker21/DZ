@@ -2,7 +2,7 @@ package com.example
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.M3u8Helper
+import com.lagradost.cloudstream3.utils.getQualityFromName
 import org.jsoup.nodes.Element
 
 class FaselHDSProvider : MainAPI() {
@@ -15,20 +15,21 @@ class FaselHDSProvider : MainAPI() {
         TvType.Movie,
         TvType.TvSeries
     )
-    
-    // الإصلاح رقم 1: تحديث الـ Headers لتكون أكثر دقة ومطابقة للمتصفح
+
     private val headers = mapOf(
         "User-Agent" to "Mozilla/5.0 (Linux; Android 13; SM-A536B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36",
         "Referer" to "$mainUrl/",
         "Origin" to mainUrl,
     )
 
+    // يمكنك إضافة المزيد من الأقسام هنا بأمان
     override val mainPage = mainPageOf(
         "/movies" to "أحدث الأفلام",
         "/series" to "أحدث المسلسلات",
         "/genre/افلام-انمي" to "أفلام أنمي",
         "/genre/افلام-اسيوية" to "أفلام أسيوية",
-        "/genre/افلام-تركية" to "أفلام تركية"
+        "/genre/افلام-تركية" to "أفلام تركية",
+        "/genre/افلام-هندية" to "أفلام هندية" 
     )
 
     override suspend fun getMainPage(
@@ -80,7 +81,6 @@ class FaselHDSProvider : MainAPI() {
             val episodes = mutableListOf<Episode>()
             val seasonElements = document.select("div#seasonList div.seasonDiv")
             
-            // الإصلاح رقم 2: تعديل محددات البحث عن الحلقات
             val episodeSelector = "div#epAll a, div.ep-item a"
 
             if (seasonElements.isNotEmpty()) {
@@ -122,6 +122,52 @@ class FaselHDSProvider : MainAPI() {
         }
     }
 
+    // A helper function to parse M3U8 master playlists
+    private suspend fun M3u8Helper(
+        m3u8url: String,
+        referer: String,
+        qualityName: String, // e.g. "Server 1"
+        callback: (ExtractorLink) -> Unit
+    ) {
+        val m3u8Content = app.get(m3u8url, headers = headers.plus("Referer" to referer)).text
+        val masterPlaylistRegex = Regex("""#EXT-X-STREAM-INF:.*?RESOLUTION=(\d+)x(\d+).*?\n(.*?)\s""")
+        
+        if (m3u8Content.contains("EXT-X-STREAM-INF")) {
+            masterPlaylistRegex.findAll(m3u8Content).forEach { match ->
+                val (width, height, link) = match.destructured
+                val quality = getQualityFromName("${height}p")
+                // Make sure the link is absolute
+                val absoluteLink = if (link.startsWith("http")) link else {
+                    m3u8url.substringBeforeLast("/") + "/" + link
+                }
+                callback.invoke(
+                    ExtractorLink(
+                        "$name - $qualityName",
+                        "$name - $qualityName ${quality.name}",
+                        absoluteLink,
+                        referer,
+                        quality.value,
+                        isM3u8 = true,
+                        headers = headers
+                    )
+                )
+            }
+        } else {
+            // It's not a master playlist, just a regular m3u8
+             callback.invoke(
+                ExtractorLink(
+                    "$name - $qualityName",
+                    "$name - $qualityName",
+                    m3u8url,
+                    referer,
+                    getQualityFromName(qualityName).value,
+                    isM3u8 = true,
+                    headers = headers
+                )
+            )
+        }
+    }
+
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -129,40 +175,36 @@ class FaselHDSProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val document = app.get(data, headers = headers).document
-        val serverUrls = document.select("ul.tabs-ul li").mapNotNull {
-            it.attr("onclick").substringAfter("href = '").substringBefore("'")
-        }
+        
+        document.select("ul.tabs-ul li").forEachIndexed { index, serverElement ->
+            val serverUrl = serverElement.attr("onclick").substringAfter("href = '").substringBefore("'")
+            if(serverUrl.isBlank()) return@forEachIndexed
 
-        if (serverUrls.isEmpty()) return false
-
-        serverUrls.apmap { serverUrl ->
             try {
-                // نستخدم ترويسات مخصصة لكل طلب لضمان إرسال الـ Referer الصحيح
-                val dynamicHeaders = headers.toMutableMap()
-                dynamicHeaders["Referer"] = serverUrl
+                val playerPageContent = app.get(serverUrl, headers = headers).text
+                val m3u8Link = Regex("""(https?://.*?\.m3u8)""").find(playerPageContent)?.groupValues?.get(1)
 
-                val playerPageContent = app.get(serverUrl, headers = dynamicHeaders).text
-                
-                val m3u8Regex = listOf(
-                    Regex("""var hlsPlaylist = .*?"file":"([^"]+)""""),
-                    Regex("""var videoSrc = '([^']+)';""")
-                )
-
-                m3u8Regex.forEach { regex ->
-                    regex.find(playerPageContent)?.groupValues?.get(1)?.let { link ->
-                        // الإصلاح رقم 3: استخدام M3u8Helper مع الترويسات الكاملة
-                        M3u8Helper.generateM3u8(
-                            name,
-                            link,
-                            serverUrl,
-                            headers = headers
-                        ).forEach(callback)
-                    }
+                if (m3u8Link != null) {
+                    val serverName = "Server ${index + 1}"
+                    // Use our new helper to parse the m3u8 link
+                    M3u8Helper(m3u8Link, serverUrl, serverName, callback)
                 }
             } catch (e: Exception) {
-                // Ignore errors
+                // Ignore errors for a single server
             }
         }
         return true
     }
-                    }
+}
+
+// Re-add the ExtractorLink data class for compatibility with your CloudStream version
+data class ExtractorLink(
+    val source: String,
+    val name: String,
+    val url: String,
+    val referer: String,
+    val quality: Int,
+    val isM3u8: Boolean = false,
+    val headers: Map<String, String> = mapOf(),
+    val extractorData: String? = null,
+)
