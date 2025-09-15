@@ -1,5 +1,6 @@
 package com.example
 
+import com.example.FaselHDSExtractor
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.app
