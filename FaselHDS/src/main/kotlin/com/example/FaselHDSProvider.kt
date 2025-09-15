@@ -1,10 +1,9 @@
 package com.example
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.ExtractorLink // <-- الإصلاح: إضافة الاستيراد المفقود
+import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.utils.Qualities
-import kotlinx.coroutines.launch // <-- الإصلاح: إضافة استيراد الكوروتين
 import org.jsoup.nodes.Element
 
 class FaselHDSProvider : MainAPI() {
@@ -117,60 +116,58 @@ class FaselHDSProvider : MainAPI() {
         }
     }
 
-    // الإصلاح: إزالة `suspend` وتغيير نوع الإرجاع إلى `Unit`
-    override fun loadLinks(
+    // الإصلاح النهائي: إعادة `suspend` و `Boolean`
+    override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
-    ): Unit {
-        // الإصلاح: استخدام `mainScope.launch` لتشغيل كود الشبكة
-        mainScope.launch {
-            val document = app.get(data, headers = headers).document
-            val serverUrls = document.select("ul.tabs-ul li").mapNotNull {
-                it.attr("onclick").substringAfter("href = '").substringBefore("'")
-            }
+    ): Boolean {
+        val document = app.get(data, headers = headers).document
+        val serverUrls = document.select("ul.tabs-ul li").mapNotNull {
+            it.attr("onclick").substringAfter("href = '").substringBefore("'")
+        }
 
-            if (serverUrls.isEmpty()) return@launch
+        if (serverUrls.isEmpty()) return false
 
-            serverUrls.apmap { serverUrl ->
-                try {
-                    val playerPageContent = app.get(serverUrl, headers = headers).text
-                    
-                    val hlsJson = Regex("""var hlsPlaylist = (\{.+?});""").find(playerPageContent)?.groupValues?.get(1)
-                    if (hlsJson != null) {
-                        val fileLink = Regex(""""file":"([^"]+)"""").find(hlsJson)?.groupValues?.get(1)
-                        if(fileLink != null) {
-                            callback.invoke(
-                                newExtractorLink(
-                                    source = name,
-                                    name = "$name - Auto",
-                                    url = fileLink,
-                                    referer = serverUrl,
-                                    quality = Qualities.Unknown.value,
-                                    isM3u8 = fileLink.contains(".m3u8")
-                                )
+        serverUrls.apmap { serverUrl ->
+            try {
+                val playerPageContent = app.get(serverUrl, headers = headers).text
+                
+                val hlsJson = Regex("""var hlsPlaylist = (\{.+?});""").find(playerPageContent)?.groupValues?.get(1)
+                if (hlsJson != null) {
+                    val fileLink = Regex(""""file":"([^"]+)"""").find(hlsJson)?.groupValues?.get(1)
+                    if(fileLink != null) {
+                        callback.invoke(
+                            newExtractorLink(
+                                source = name,
+                                name = "$name - Auto",
+                                url = fileLink,
+                                referer = serverUrl,
+                                quality = Qualities.Unknown.value,
+                                isM3u8 = fileLink.contains(".m3u8")
                             )
-                        }
-                    } else {
-                        val videoSrc = Regex("""var videoSrc = '([^']+)';""").find(playerPageContent)?.groupValues?.get(1)
-                        if(videoSrc != null) {
-                            callback.invoke(
-                                newExtractorLink(
-                                    source = name,
-                                    name = name,
-                                    url = videoSrc,
-                                    referer = serverUrl,
-                                    quality = Qualities.Unknown.value,
-                                    isM3u8 = videoSrc.contains(".m3u8")
-                                )
-                            )
-                        }
+                        )
                     }
-                } catch (e: Exception) {
-                    // Ignore errors
+                } else {
+                    val videoSrc = Regex("""var videoSrc = '([^']+)';""").find(playerPageContent)?.groupValues?.get(1)
+                    if(videoSrc != null) {
+                        callback.invoke(
+                            newExtractorLink(
+                                source = name,
+                                name = name,
+                                url = videoSrc,
+                                referer = serverUrl,
+                                quality = Qualities.Unknown.value,
+                                isM3u8 = videoSrc.contains(".m3u8")
+                            )
+                        )
+                    }
                 }
+            } catch (e: Exception) {
+                // Ignore errors
             }
         }
+        return true
     }
-                                             }
+                                         }
