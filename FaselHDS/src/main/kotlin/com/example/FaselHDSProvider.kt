@@ -3,7 +3,6 @@ package com.example
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.M3u8Helper
-import com.lagradost.cloudstream3.utils.newExtractorLink
 import org.jsoup.nodes.Element
 
 class FaselHDSProvider : MainAPI() {
@@ -17,9 +16,11 @@ class FaselHDSProvider : MainAPI() {
         TvType.TvSeries
     )
     
+    // الإصلاح رقم 1: تحديث الـ Headers لتكون أكثر دقة ومطابقة للمتصفح
     private val headers = mapOf(
-        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-        "Referer" to "$mainUrl/"
+        "User-Agent" to "Mozilla/5.0 (Linux; Android 13; SM-A536B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36",
+        "Referer" to "$mainUrl/",
+        "Origin" to mainUrl,
     )
 
     override val mainPage = mainPageOf(
@@ -75,24 +76,25 @@ class FaselHDSProvider : MainAPI() {
         val year = Regex("""\d{4}""").find(document.select("span:contains(موعد الصدور)").firstOrNull()?.text() ?: "")?.value?.toIntOrNull()
         val tags = document.select("span:contains(تصنيف) a").map { it.text() }
         
-        if (url.contains("/series/") || document.select("div#seasonList").isNotEmpty()) {
+        if (url.contains("/series/") || document.select("div#seasonList, div#epAll").isNotEmpty()) {
             val episodes = mutableListOf<Episode>()
             val seasonElements = document.select("div#seasonList div.seasonDiv")
             
+            // الإصلاح رقم 2: تعديل محددات البحث عن الحلقات
+            val episodeSelector = "div#epAll a, div.ep-item a"
+
             if (seasonElements.isNotEmpty()) {
                 seasonElements.apmap { seasonElement ->
                     val seasonLink = seasonElement.attr("onclick")?.substringAfter("'")?.substringBefore("'")
                         ?: seasonElement.selectFirst("a")?.attr("href") ?: return@apmap
-                    
-                    // الإصلاح الأول: التأكد من أن رابط الموسم كامل
                     val absoluteSeasonLink = if (seasonLink.startsWith("http")) seasonLink else "$mainUrl$seasonLink"
-
                     val seasonNum = Regex("""\d+""").find(seasonElement.selectFirst("div.title")?.text() ?: "")?.value?.toIntOrNull()
                     val seasonDoc = app.get(absoluteSeasonLink, headers = headers).document
-                    seasonDoc.select("div.ep-item a").forEach { ep ->
+                    
+                    seasonDoc.select(episodeSelector).forEach { ep ->
                         episodes.add(
                             newEpisode(ep.attr("href")) {
-                                name = ep.selectFirst(".eph-num")?.text()
+                                name = ep.text().trim()
                                 season = seasonNum
                                 episode = Regex("""\d+""").find(name ?: "")?.value?.toIntOrNull()
                             }
@@ -100,10 +102,10 @@ class FaselHDSProvider : MainAPI() {
                     }
                 }
             } else {
-                document.select("div.ep-item a").forEach { ep ->
+                document.select(episodeSelector).forEach { ep ->
                     episodes.add(
                         newEpisode(ep.attr("href")) {
-                            name = ep.selectFirst(".eph-num")?.text()
+                            name = ep.text().trim()
                             season = 1
                             episode = Regex("""\d+""").find(name ?: "")?.value?.toIntOrNull()
                         }
@@ -135,27 +137,25 @@ class FaselHDSProvider : MainAPI() {
 
         serverUrls.apmap { serverUrl ->
             try {
-                val playerPageContent = app.get(serverUrl, headers = headers).text
+                // نستخدم ترويسات مخصصة لكل طلب لضمان إرسال الـ Referer الصحيح
+                val dynamicHeaders = headers.toMutableMap()
+                dynamicHeaders["Referer"] = serverUrl
+
+                val playerPageContent = app.get(serverUrl, headers = dynamicHeaders).text
                 
-                val hlsJson = Regex("""var hlsPlaylist = (\{.+?});""").find(playerPageContent)?.groupValues?.get(1)
-                if (hlsJson != null) {
-                    val fileLink = Regex(""""file":"([^"]+)"""").find(hlsJson)?.groupValues?.get(1)
-                    if(fileLink != null) {
-                        // الإصلاح الثاني: استخدام M3u8Helper لإضافة Referer
+                val m3u8Regex = listOf(
+                    Regex("""var hlsPlaylist = .*?"file":"([^"]+)""""),
+                    Regex("""var videoSrc = '([^']+)';""")
+                )
+
+                m3u8Regex.forEach { regex ->
+                    regex.find(playerPageContent)?.groupValues?.get(1)?.let { link ->
+                        // الإصلاح رقم 3: استخدام M3u8Helper مع الترويسات الكاملة
                         M3u8Helper.generateM3u8(
                             name,
-                            fileLink,
+                            link,
                             serverUrl,
-                        ).forEach(callback)
-                    }
-                } else {
-                    val videoSrc = Regex("""var videoSrc = '([^']+)';""").find(playerPageContent)?.groupValues?.get(1)
-                    if(videoSrc != null) {
-                        // الإصلاح الثاني: استخدام M3u8Helper لإضافة Referer
-                        M3u8Helper.generateM3u8(
-                            name,
-                            videoSrc,
-                            serverUrl,
+                            headers = headers
                         ).forEach(callback)
                     }
                 }
@@ -165,4 +165,4 @@ class FaselHDSProvider : MainAPI() {
         }
         return true
     }
-                                         }
+                    }
