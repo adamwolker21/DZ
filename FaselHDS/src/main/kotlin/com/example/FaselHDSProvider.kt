@@ -1,10 +1,9 @@
 package com.example
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.utils.Qualities
 import org.jsoup.nodes.Element
-import com.lagradost.cloudstream3.utils.getQualityFromName
 
 class FaselHDSProvider : MainAPI() {
     override var mainUrl = "https://www.faselhds.life"
@@ -17,7 +16,6 @@ class FaselHDSProvider : MainAPI() {
         TvType.TvSeries
     )
     
-    // تحسين: جعل Headers قابلة للوصول في كل مكان
     private val headers = mapOf(
         "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
         "Referer" to "$mainUrl/"
@@ -139,7 +137,6 @@ class FaselHDSProvider : MainAPI() {
                 this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
             }
         } else {
-            // تعديل مهم: بالنسبة للأفلام، نمرر رابط الفيلم نفسه إلى loadLinks
             return newMovieLoadResponse(title, url, TvType.Movie, url) {
                 this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
             }
@@ -147,64 +144,58 @@ class FaselHDSProvider : MainAPI() {
     }
 
     override suspend fun loadLinks(
-        data: String, // هنا `data` هو رابط الحلقة أو الفيلم
+        data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // الخطوة 1: جلب محتوى صفحة الفيلم أو الحلقة
         val document = app.get(data, headers = headers).document
 
-        // الخطوة 2: استخراج جميع روابط السيرفرات (صفحات المشغل)
         val serverUrls = document.select("ul.tabs-ul li").mapNotNull {
             it.attr("onclick").substringAfter("href = '").substringBefore("'")
         }
 
         if (serverUrls.isEmpty()) return false
 
-        // الخطوة 3: المرور على كل رابط سيرفر واستخراج الفيديو منه
         serverUrls.apmap { serverUrl ->
             try {
                 val playerPageContent = app.get(serverUrl, headers = headers).text
                 
-                // البحث بالطريقة الأولى (hlsPlaylist & data-url)
                 val hlsJson = Regex("""var hlsPlaylist = (\{.+?});""").find(playerPageContent)?.groupValues?.get(1)
                 if (hlsJson != null) {
                     val fileLink = Regex(""""file":"([^"]+)"""").find(hlsJson)?.groupValues?.get(1)
                     if(fileLink != null) {
                          callback.invoke(
-                            ExtractorLink(
-                                this.name,
-                                "${this.name} - Auto",
-                                fileLink,
-                                serverUrl,
-                                Qualities.Unknown.value,
-                                fileLink.contains(".m3u8")
+                            newExtractorLink(
+                                source = this.name,
+                                name = "${this.name} - Auto",
+                                url = fileLink,
+                                referer = serverUrl,
+                                quality = Qualities.Unknown.value,
+                                isM3u8 = fileLink.contains(".m3u8")
                             )
                         )
                     }
-                // الطريقة الثانية (videoSrc)
                 } else {
                     val videoSrc = Regex("""var videoSrc = '([^']+)';""").find(playerPageContent)?.groupValues?.get(1)
                     if(videoSrc != null) {
                         callback.invoke(
-                            ExtractorLink(
-                                this.name,
-                                this.name,
-                                videoSrc,
-                                serverUrl,
-                                Qualities.Unknown.value,
-                                videoSrc.contains(".m3u8")
+                            newExtractorLink(
+                                source = this.name,
+                                name = this.name,
+                                url = videoSrc,
+                                referer = serverUrl,
+                                quality = Qualities.Unknown.value,
+                                isM3u8 = videoSrc.contains(".m3u8")
                             )
                         )
                     }
                 }
             } catch (e: Exception) {
-                // تجاهل الخطأ في حالة فشل أحد السيرفرات
+                // Ignore errors
             }
         }
 
         return true
     }
-}
-
+                                         }
