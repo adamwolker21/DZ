@@ -190,6 +190,13 @@ class FaselHDSProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        // إذا كان الرابط من نوع video_player، استخدم الـ Extractor الجديد
+        if (data.contains("video_player?player_token=")) {
+            val extractor = FaselHDSExtractor()
+            return extractor.extractFromUrl(data, callback)
+        }
+
+        // إذا كان الرابط العادي، استخدم الطريقة التقليدية
         try {
             // أولاً: محاولة استخراج الفيديو مباشرة من الصفحة
             val embedPage = app.get(data, referer = "$mainUrl/", headers = headers).document
