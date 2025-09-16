@@ -22,14 +22,13 @@ class FaselHDSProvider : MainAPI() {
         "Origin" to mainUrl,
     )
 
-    // THE FIX: Added a header section
+    // THE FIX 1: Updated main page structure
     override val mainPage = mainPageOf(
-        
-        "HEADER_ASIAN" to "—  Movies  —",
+        "HEADER_Movies" to "—  Movies  —",
         "/movies" to "أفلام أجنبي",
         "/asian-movies" to "أفلام آسيوي",
         
-        "HEADER_ASIAN" to "— Series —",
+        "HEADER_Series" to "— Series —",
         "/series" to "جميع المسلسلات",
         "/recent_series" to "أحدث المسلسلات",
         "/episodes" to "احدث الحلقات",
@@ -38,22 +37,20 @@ class FaselHDSProvider : MainAPI() {
         "/asian-episodes" to "أحدث الحلقات",
         "/recent_asian" to "المضاف حديثا",
         "/asian-series" to "جميع المسلسلات",
-        
     )
 
     override suspend fun getMainPage(
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
-        // THE FIX: Check for the special header tag
         if (request.data.startsWith("HEADER_")) {
-            // If it's a header, just return the title with an empty list
             return newHomePageResponse(request.name, listOf())
         }
         
-        // If it's a normal section, proceed as usual
-        val document = app.get("$mainUrl${request.data}/page/$page", headers = headers).document
-        val home = document.select("div.itemviews div.postDiv, div.post-listing article.item-list").mapNotNull {
+        // THE FIX 2: Updated selector for main content and pagination
+        val url = "$mainUrl${request.data}" + (if (page > 1) "/page/$page" else "")
+        val document = app.get(url, headers = headers).document
+        val home = document.select("div.postDiv").mapNotNull {
             it.toSearchResult()
         }
         return newHomePageResponse(request.name, home)
@@ -62,13 +59,12 @@ class FaselHDSProvider : MainAPI() {
     private fun Element.toSearchResult(): SearchResponse? {
         val anchor = this.selectFirst("a") ?: return null
         val href = anchor.attr("href").ifBlank { return null }
-        val title = anchor.selectFirst("div.h1, h3 a")?.text() ?: "No Title"
-        val posterElement = anchor.selectFirst("div.imgdiv-class img, div.post-thumb img")
+        val title = anchor.selectFirst("div.h1")?.text() ?: "No Title"
+        val posterElement = anchor.selectFirst("div.imgdiv-class img")
         val posterUrl = posterElement?.attr("data-src") 
             ?: posterElement?.attr("src")
-            ?: anchor.selectFirst("div.post-thumb a")?.attr("style")?.substringAfter("url(")?.substringBefore(")")
         
-        val isSeries = href.contains("/series/") || this.selectFirst("span.quality:contains(حلقة)") != null
+        val isSeries = href.contains("/series/") || href.contains("/seasons/") || this.selectFirst("span.quality:contains(حلقة)") != null || this.selectFirst("span.quality:contains(مواسم)") != null
         return if (isSeries) {
             newTvSeriesSearchResponse(title, href, TvType.TvSeries) { this.posterUrl = posterUrl }
         } else {
@@ -77,8 +73,9 @@ class FaselHDSProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
+        // THE FIX 2: Updated selector for search results
         val document = app.get("$mainUrl/?s=$query", headers = headers).document
-        return document.select("div.itemviews div.postDiv, div.post-listing article.item-list").mapNotNull {
+        return document.select("div.postDiv").mapNotNull {
             it.toSearchResult()
         }
     }
@@ -91,9 +88,18 @@ class FaselHDSProvider : MainAPI() {
         val plot = document.selectFirst("div.singleDesc p")?.text()?.trim()
             ?: document.selectFirst("div.singleDesc")?.text()?.trim()
         val year = Regex("""\d{4}""").find(document.select("span:contains(موعد الصدور)").firstOrNull()?.text() ?: "")?.value?.toIntOrNull()
-        val tags = document.select("span:contains(تصنيف) a").map { it.text() }
         
-        if (url.contains("/series/") || document.select("div#seasonList, div#epAll").isNotEmpty()) {
+        // THE FIX 3: More specific selectors for tags and status
+        val tags = document.select("div.col-xl-6:contains(تصنيف) a").map { it.text() }
+        var status: ShowStatus? = null
+        val statusText = document.selectFirst("span:contains(حالة المسلسل)")?.text() ?: ""
+        if (statusText.contains("مستمر")) {
+            status = ShowStatus.Ongoing
+        } else if (statusText.contains("مكتمل")) {
+            status = ShowStatus.Completed
+        }
+
+        if (url.contains("/series/") || url.contains("/seasons/") || document.select("div#seasonList, div#epAll").isNotEmpty()) {
             val episodes = mutableListOf<Episode>()
             val seasonElements = document.select("div#seasonList div.seasonDiv")
             
@@ -129,11 +135,18 @@ class FaselHDSProvider : MainAPI() {
                 }
             }
             return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
-                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
+                this.posterUrl = posterUrl
+                this.plot = plot
+                this.year = year
+                this.tags = tags
+                this.showStatus = status
             }
         } else {
             return newMovieLoadResponse(title, url, TvType.Movie, url) {
-                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
+                this.posterUrl = posterUrl
+                this.plot = plot
+                this.year = year
+                this.tags = tags
             }
         }
     }
