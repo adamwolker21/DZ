@@ -39,8 +39,8 @@ class FaselHDSProvider : MainAPI() {
     ): HomePageResponse {
         val url = "$mainUrl${request.data}" + (if (page > 1) "/page/$page" else "")
         val document = app.get(url, headers = headers).document
-        // THE FIX: Use a more specific selector to target only the main content listing
-        val home = document.select("div.post-listing div.postDiv").mapNotNull {
+        // THE FIX: Reverted to the general selector that works for all pages
+        val home = document.select("div.postDiv").mapNotNull {
             it.toSearchResult()
         }
         return newHomePageResponse(request.name, home)
@@ -67,8 +67,8 @@ class FaselHDSProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val document = app.get("$mainUrl/?s=$query", headers = headers).document
-        // THE FIX: Also apply the specific selector to search results
-        return document.select("div.post-listing div.postDiv").mapNotNull {
+        // THE FIX: Reverted to the general selector for search
+        return document.select("div.postDiv").mapNotNull {
             it.toSearchResult()
         }
     }
@@ -122,7 +122,7 @@ class FaselHDSProvider : MainAPI() {
 
             val episodes = mutableListOf<Episode>()
             val seasonElements = document.select("div#seasonList div.seasonDiv")
-            val episodeSelector = "div#epAll a, div.ep-item a"
+            val episodeSelector = "div#epAll a, div#episodes a, div.ep-item a" // Added more selectors for robustness
 
             if (seasonElements.isNotEmpty()) {
                 seasonElements.apmap { seasonElement ->
