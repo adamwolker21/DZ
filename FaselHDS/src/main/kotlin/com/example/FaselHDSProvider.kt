@@ -130,24 +130,25 @@ class FaselHDSProvider : MainAPI() {
         val document = app.get(data, headers = headers).document
         
         document.select("ul.tabs-ul li").forEachIndexed { index, serverElement ->
+            // Diagnostic Test: Only process Server 2 (index 1)
+            if (index != 1) return@forEachIndexed
+
             val serverUrl = serverElement.attr("onclick").substringAfter("href = '").substringBefore("'")
             if (serverUrl.isBlank()) return@forEachIndexed
 
             try {
                 val playerPageContent = app.get(serverUrl, headers = headers).text
                 
-                // THE FIX: Create a list of regex patterns to try in order.
                 val linkRegexes = listOf(
-                    Regex("""var videoSrc = '([^']+)';"""), // Pattern for Server 2
-                    Regex("""(https?://.*?\.m3u8)""")       // Pattern for Server 1
+                    Regex("""var videoSrc = '([^']+)';"""),
+                    Regex("""(https?://.*?\.m3u8)""")
                 )
 
                 var foundLink: String? = null
                 for (regex in linkRegexes) {
-                    // Find the first match and break the loop.
                     val match = regex.find(playerPageContent)
                     if (match != null) {
-                        foundLink = match.groupValues[1] // groupValues[1] gets the captured group
+                        foundLink = match.groupValues[1]
                         break
                     }
                 }
