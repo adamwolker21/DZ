@@ -93,14 +93,6 @@ class FaselHDSProvider : MainAPI() {
 
         val tags = document.select("div.col-xl-6:contains(تصنيف) a").map { it.text() }
         
-        // Feature 1: Get Trailer
-        val trailerUrl = document.selectFirst("a.trailer-btn")?.attr("href")
-
-        // Feature 2: Get Recommendations
-        val recommendations = document.select("div.related-posts div.postDiv").mapNotNull {
-            it.toSearchResult()
-        }
-
         val isTvSeries = document.select("div#seasonList, div#epAll").isNotEmpty()
 
         if (isTvSeries) {
@@ -166,8 +158,6 @@ class FaselHDSProvider : MainAPI() {
                 this.tags = tags
                 this.showStatus = status
                 this.duration = duration
-                this.trailer = trailerUrl
-                this.recommendations = recommendations
             }
         } else { // It's a Movie
             val year = document.selectFirst("span:contains(سنة الإنتاج) a")?.text()?.toIntOrNull()
@@ -178,14 +168,7 @@ class FaselHDSProvider : MainAPI() {
             }
 
             return newMovieLoadResponse(title, url, TvType.Movie, url) {
-                this.posterUrl = posterUrl
-                this.plot = plot
-                this.year = year
-                this.tags = tags
-                this.duration = duration
-                this.rating = rating
-                this.trailer = trailerUrl
-                this.recommendations = recommendations
+                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags; this.duration = duration; this.rating = rating
             }
         }
     }
