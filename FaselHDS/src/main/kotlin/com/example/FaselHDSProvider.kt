@@ -39,7 +39,8 @@ class FaselHDSProvider : MainAPI() {
     ): HomePageResponse {
         val url = "$mainUrl${request.data}" + (if (page > 1) "/page/$page" else "")
         val document = app.get(url, headers = headers).document
-        val home = document.select("div.postDiv").mapNotNull {
+        // THE FIX: Use a more specific selector to target only the main content listing
+        val home = document.select("div.post-listing div.postDiv").mapNotNull {
             it.toSearchResult()
         }
         return newHomePageResponse(request.name, home)
@@ -66,7 +67,8 @@ class FaselHDSProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val document = app.get("$mainUrl/?s=$query", headers = headers).document
-        return document.select("div.postDiv").mapNotNull {
+        // THE FIX: Also apply the specific selector to search results
+        return document.select("div.post-listing div.postDiv").mapNotNull {
             it.toSearchResult()
         }
     }
@@ -105,7 +107,6 @@ class FaselHDSProvider : MainAPI() {
                 status = ShowStatus.Completed
             }
             
-            // THE FIX 1 & 2: Move duration to the top and reformat plot info
             val duration = document.getMetaInfo("fa-clock")?.filter { it.isDigit() }?.toIntOrNull()
             
             val country = document.getMetaInfo("fa-flag")
