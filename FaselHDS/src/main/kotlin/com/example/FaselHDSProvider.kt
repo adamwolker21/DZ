@@ -22,19 +22,38 @@ class FaselHDSProvider : MainAPI() {
         "Origin" to mainUrl,
     )
 
+    // THE FIX: Added a header section
     override val mainPage = mainPageOf(
         "/movies" to "أحدث الأفلام",
         "/series" to "أحدث المسلسلات",
-        "/genre/افلام-انمي" to "أفلام أنمي",
-        "/genre/افلام-اسيوية" to "أفلام أسيوية",
+        
+        // مثال على القسم الفارغ
+        "HEADER_ASIAN" to "— القسم الآسيوي —",
+        "/asian-movies" to "أفلام أسيوية",
+        "/asian-episodes" to "أحدث الحلقات",
+        "/recent_asian" to "المضاف حديثا",
+        "/asian-series" to "جميع المسلسلات",
+        "HEADER_TURKISH" to "— القسم التركي —",
         "/genre/افلام-تركية" to "أفلام تركية",
-        "/genre/افلام-هندية" to "أفلام هندية"
+
+        "HEADER_INDIAN" to "— القسم الهندي —",
+        "/genre/افلام-هندية" to "أفلام هندية",
+
+        "HEADER_ANIME" to "— قسم الأنمي —",
+        "/genre/افلام-انمي" to "أفلام أنمي"
     )
 
     override suspend fun getMainPage(
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
+        // THE FIX: Check for the special header tag
+        if (request.data.startsWith("HEADER_")) {
+            // If it's a header, just return the title with an empty list
+            return newHomePageResponse(request.name, listOf())
+        }
+        
+        // If it's a normal section, proceed as usual
         val document = app.get("$mainUrl${request.data}/page/$page", headers = headers).document
         val home = document.select("div.itemviews div.postDiv, div.post-listing article.item-list").mapNotNull {
             it.toSearchResult()
@@ -152,7 +171,6 @@ class FaselHDSProvider : MainAPI() {
 
                 if (foundLink != null) {
                     M3u8Helper.generateM3u8(
-                        // THE FIX: Use a unique name for each server to prevent deduplication
                         source = "$name Server ${index + 1}",
                         streamUrl = foundLink,
                         referer = serverUrl,
