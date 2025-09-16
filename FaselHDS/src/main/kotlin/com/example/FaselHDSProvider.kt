@@ -24,23 +24,21 @@ class FaselHDSProvider : MainAPI() {
 
     // THE FIX: Added a header section
     override val mainPage = mainPageOf(
-        "/movies" to "أحدث الأفلام",
-        "/series" to "أحدث المسلسلات",
         
-        // مثال على القسم الفارغ
+        "HEADER_ASIAN" to "—  Movies  —",
+        "/movies" to "أفلام أجنبي",
+        "/asian-movies" to "أفلام آسيوي",
+        
+        "HEADER_ASIAN" to "— Series —",
+        "/series" to "جميع المسلسلات",
+        "/recent_series" to "أحدث المسلسلات",
+        "/episodes" to "احدث الحلقات",
+
         "HEADER_ASIAN" to "— القسم الآسيوي —",
-        "/asian-movies" to "أفلام أسيوية",
         "/asian-episodes" to "أحدث الحلقات",
         "/recent_asian" to "المضاف حديثا",
         "/asian-series" to "جميع المسلسلات",
-        "HEADER_TURKISH" to "— القسم التركي —",
-        "/genre/افلام-تركية" to "أفلام تركية",
-
-        "HEADER_INDIAN" to "— القسم الهندي —",
-        "/genre/افلام-هندية" to "أفلام هندية",
-
-        "HEADER_ANIME" to "— قسم الأنمي —",
-        "/genre/افلام-انمي" to "أفلام أنمي"
+        
     )
 
     override suspend fun getMainPage(
