@@ -22,32 +22,22 @@ class FaselHDSProvider : MainAPI() {
         "Origin" to mainUrl,
     )
 
-    // THE FIX 1: Updated main page structure
+    // THE FIX 1: Removed header sections for better compatibility
     override val mainPage = mainPageOf(
-        "HEADER_Movies" to "—  Movies  —",
         "/movies" to "أفلام أجنبي",
         "/asian-movies" to "أفلام آسيوي",
-        
-        "HEADER_Series" to "— Series —",
         "/series" to "جميع المسلسلات",
         "/recent_series" to "أحدث المسلسلات",
         "/episodes" to "احدث الحلقات",
-
-        "HEADER_ASIAN" to "— القسم الآسيوي —",
-        "/asian-episodes" to "أحدث الحلقات",
-        "/recent_asian" to "المضاف حديثا",
-        "/asian-series" to "جميع المسلسلات",
+        "/asian-episodes" to "أحدث الحلقات الآسيوية",
+        "/recent_asian" to "المضاف حديثا آسيوي",
+        "/asian-series" to "جميع المسلسلات الآسيوية",
     )
 
     override suspend fun getMainPage(
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
-        if (request.data.startsWith("HEADER_")) {
-            return newHomePageResponse(request.name, listOf())
-        }
-        
-        // THE FIX 2: Updated selector for main content and pagination
         val url = "$mainUrl${request.data}" + (if (page > 1) "/page/$page" else "")
         val document = app.get(url, headers = headers).document
         val home = document.select("div.postDiv").mapNotNull {
@@ -60,11 +50,13 @@ class FaselHDSProvider : MainAPI() {
         val anchor = this.selectFirst("a") ?: return null
         val href = anchor.attr("href").ifBlank { return null }
         val title = anchor.selectFirst("div.h1")?.text() ?: "No Title"
-        val posterElement = anchor.selectFirst("div.imgdiv-class img")
+        
+        // THE FIX 2: More flexible poster selector
+        val posterElement = this.selectFirst("div.imgdiv-class img, a > img.img-fluid")
         val posterUrl = posterElement?.attr("data-src") 
             ?: posterElement?.attr("src")
         
-        val isSeries = href.contains("/series/") || href.contains("/seasons/") || this.selectFirst("span.quality:contains(حلقة)") != null || this.selectFirst("span.quality:contains(مواسم)") != null
+        val isSeries = href.contains("/series/") || href.contains("/seasons/") || href.contains("asian_seasons") || this.selectFirst("span.quality:contains(حلقة)") != null || this.selectFirst("span.quality:contains(مواسم)") != null
         return if (isSeries) {
             newTvSeriesSearchResponse(title, href, TvType.TvSeries) { this.posterUrl = posterUrl }
         } else {
@@ -73,7 +65,6 @@ class FaselHDSProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        // THE FIX 2: Updated selector for search results
         val document = app.get("$mainUrl/?s=$query", headers = headers).document
         return document.select("div.postDiv").mapNotNull {
             it.toSearchResult()
@@ -89,7 +80,6 @@ class FaselHDSProvider : MainAPI() {
             ?: document.selectFirst("div.singleDesc")?.text()?.trim()
         val year = Regex("""\d{4}""").find(document.select("span:contains(موعد الصدور)").firstOrNull()?.text() ?: "")?.value?.toIntOrNull()
         
-        // THE FIX 3: More specific selectors for tags and status
         val tags = document.select("div.col-xl-6:contains(تصنيف) a").map { it.text() }
         var status: ShowStatus? = null
         val statusText = document.selectFirst("span:contains(حالة المسلسل)")?.text() ?: ""
@@ -99,7 +89,7 @@ class FaselHDSProvider : MainAPI() {
             status = ShowStatus.Completed
         }
 
-        if (url.contains("/series/") || url.contains("/seasons/") || document.select("div#seasonList, div#epAll").isNotEmpty()) {
+        if (url.contains("/series/") || url.contains("/seasons/") || url.contains("asian_seasons") || document.select("div#seasonList, div#epAll").isNotEmpty()) {
             val episodes = mutableListOf<Episode>()
             val seasonElements = document.select("div#seasonList div.seasonDiv")
             
