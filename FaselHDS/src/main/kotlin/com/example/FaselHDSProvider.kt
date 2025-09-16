@@ -54,7 +54,6 @@ class FaselHDSProvider : MainAPI() {
         val posterUrl = posterElement?.attr("data-src") 
             ?: posterElement?.attr("src")
         
-        // THE FIX 1: Differentiate based on title keywords, as URL is not reliable
         val isSeries = title.contains("مسلسل") || title.contains("برنامج") ||
                        this.selectFirst("span.quality:contains(حلقة), span.quality:contains(مواسم)") != null
         
@@ -80,16 +79,20 @@ class FaselHDSProvider : MainAPI() {
         val document = app.get(url, headers = headers).document
         val title = document.selectFirst("div.h1.title")?.ownText()?.trim() ?: "No Title"
         
-        // THE FIX 2: Poster fallback logic
-        val posterUrl = document.selectFirst("div.posterImg img")?.attr("src")
-            ?: document.selectFirst("img.poster")?.attr("src")
+        var posterUrl = document.selectFirst("div.posterImg img")?.attr("src")
+        if (posterUrl.isNullOrBlank()) {
+            val seasonListPoster = document.selectFirst("div#seasonList img")
+            posterUrl = seasonListPoster?.attr("data-src") ?: seasonListPoster?.attr("src")
+        }
+        if (posterUrl.isNullOrBlank()) {
+            posterUrl = document.selectFirst("img.poster")?.attr("src")
+        }
 
         var plot = document.selectFirst("div.singleDesc p")?.text()?.trim()
             ?: document.selectFirst("div.singleDesc")?.text()?.trim()
 
         val tags = document.select("div.col-xl-6:contains(تصنيف) a").map { it.text() }
         
-        // THE FIX 1: Differentiate based on presence of episode list, which is the most reliable method
         val isTvSeries = document.select("div#seasonList, div#epAll").isNotEmpty()
 
         if (isTvSeries) {
@@ -102,17 +105,19 @@ class FaselHDSProvider : MainAPI() {
                 status = ShowStatus.Completed
             }
 
+            // THE FIX: Use HTML formatting for the plot
             val country = document.getInfo("span:contains(دولة المسلسل)")
             val episodeCount = document.getInfo("span:contains(الحلقات)")
             var extraInfo = ""
-            if(episodeCount != null) extraInfo += "عدد الحلقات: $episodeCount"
+            if(episodeCount != null) extraInfo += "<b>عدد الحلقات:</b> $episodeCount"
             if(country != null) {
                 if(extraInfo.isNotBlank()) extraInfo += " | "
-                extraInfo += "الدولة: $country"
+                extraInfo += "<b>الدولة:</b> $country"
             }
 
             if(extraInfo.isNotBlank()) {
-                plot += "\n\n$extraInfo"
+                // Add line breaks using <br> for separation
+                plot += "<br><br>$extraInfo"
             }
 
             val episodes = mutableListOf<Episode>()
