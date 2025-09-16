@@ -22,7 +22,6 @@ class FaselHDSProvider : MainAPI() {
         "Origin" to mainUrl,
     )
 
-    // THE FIX 1: Removed header sections for better compatibility
     override val mainPage = mainPageOf(
         "/movies" to "أفلام أجنبي",
         "/asian-movies" to "أفلام آسيوي",
@@ -51,7 +50,6 @@ class FaselHDSProvider : MainAPI() {
         val href = anchor.attr("href").ifBlank { return null }
         val title = anchor.selectFirst("div.h1")?.text() ?: "No Title"
         
-        // THE FIX 2: More flexible poster selector
         val posterElement = this.selectFirst("div.imgdiv-class img, a > img.img-fluid")
         val posterUrl = posterElement?.attr("data-src") 
             ?: posterElement?.attr("src")
@@ -71,28 +69,70 @@ class FaselHDSProvider : MainAPI() {
         }
     }
 
+    // Helper function to extract text after an icon
+    private fun Element.getInfo(selector: String): String? {
+        return this.selectFirst(selector)?.ownText()?.trim()
+    }
+
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url, headers = headers).document
-        val title = document.selectFirst("div.h1.title")?.text()?.trim() ?: "No Title"
+        
+        // THE FIX 1: Correctly extract movie title
+        val title = document.selectFirst("div.h1.title")?.ownText()?.trim() ?: "No Title"
+        
         val posterUrl = document.selectFirst("div.posterImg img")?.attr("src")
             ?: document.selectFirst("img.poster")?.attr("src")
-        val plot = document.selectFirst("div.singleDesc p")?.text()?.trim()
+        var plot = document.selectFirst("div.singleDesc p")?.text()?.trim()
             ?: document.selectFirst("div.singleDesc")?.text()?.trim()
-        val year = Regex("""\d{4}""").find(document.select("span:contains(موعد الصدور)").firstOrNull()?.text() ?: "")?.value?.toIntOrNull()
-        
-        val tags = document.select("div.col-xl-6:contains(تصنيف) a").map { it.text() }
-        var status: ShowStatus? = null
-        val statusText = document.selectFirst("span:contains(حالة المسلسل)")?.text() ?: ""
-        if (statusText.contains("مستمر")) {
-            status = ShowStatus.Ongoing
-        } else if (statusText.contains("مكتمل")) {
-            status = ShowStatus.Completed
-        }
 
-        if (url.contains("/series/") || url.contains("/seasons/") || url.contains("asian_seasons") || document.select("div#seasonList, div#epAll").isNotEmpty()) {
+        val tags = document.select("div.col-xl-6:contains(تصنيف) a").map { it.text() }
+        
+        val isMovie = url.contains("/movies/")
+
+        if (isMovie) {
+            // THE FIX 2: Extract movie-specific data
+            val year = document.selectFirst("span:contains(سنة الإنتاج) a")?.text()?.toIntOrNull()
+            val duration = document.getInfo("span:contains(مدة الفيلم)")?.toIntOrNull()
+            val ratingText = document.selectFirst("span.singleStar strong")?.text()
+            val rating = ratingText?.let {
+                if (it.equals("N/A", true)) null else (it.toFloatOrNull()?.times(1000))?.toInt()
+            }
+
+            return newMovieLoadResponse(title, url, TvType.Movie, url) {
+                this.posterUrl = posterUrl
+                this.plot = plot
+                this.year = year
+                this.tags = tags
+                this.duration = duration
+                this.rating = rating
+            }
+
+        } else { // It's a TV Series
+            val year = Regex("""\d{4}""").find(document.select("span:contains(موعد الصدور)").firstOrNull()?.text() ?: "")?.value?.toIntOrNull()
+            var status: ShowStatus? = null
+            val statusText = document.selectFirst("span:contains(حالة المسلسل)")?.text() ?: ""
+            if (statusText.contains("مستمر")) {
+                status = ShowStatus.Ongoing
+            } else if (statusText.contains("مكتمل")) {
+                status = ShowStatus.Completed
+            }
+
+            // THE FIX 3: Add extra info to the plot
+            val country = document.getInfo("span:contains(دولة المسلسل)")
+            val episodeCount = document.getInfo("span:contains(الحلقات)")
+            var extraInfo = ""
+            if(episodeCount != null) extraInfo += "عدد الحلقات: $episodeCount"
+            if(country != null) {
+                if(extraInfo.isNotBlank()) extraInfo += " | "
+                extraInfo += "الدولة: $country"
+            }
+
+            if(extraInfo.isNotBlank()) {
+                plot += "\n\n$extraInfo"
+            }
+
             val episodes = mutableListOf<Episode>()
             val seasonElements = document.select("div#seasonList div.seasonDiv")
-            
             val episodeSelector = "div#epAll a, div.ep-item a"
 
             if (seasonElements.isNotEmpty()) {
@@ -130,13 +170,6 @@ class FaselHDSProvider : MainAPI() {
                 this.year = year
                 this.tags = tags
                 this.showStatus = status
-            }
-        } else {
-            return newMovieLoadResponse(title, url, TvType.Movie, url) {
-                this.posterUrl = posterUrl
-                this.plot = plot
-                this.year = year
-                this.tags = tags
             }
         }
     }
