@@ -111,11 +111,6 @@ class FaselHDSProvider : MainAPI() {
             val episodeCount = document.getMetaInfo("fa-film")
             val episodeDuration = document.getMetaInfo("fa-clock")
 
-            val infoList = mutableListOf<String>()
-            episodeCount?.let { infoList.add("🎬 <b>$it</b>") }
-            country?.let { infoList.add("🌍 <b>$it</b>") }
-            episodeDuration?.let { infoList.add("🕒 <b>$it</b>") }
-            
             if (infoList.isNotEmpty()) {
                 plot += "<br><br>${infoList.joinToString(" | ")}"
             }
