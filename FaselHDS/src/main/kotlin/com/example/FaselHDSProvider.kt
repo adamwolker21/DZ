@@ -71,7 +71,6 @@ class FaselHDSProvider : MainAPI() {
         }
     }
     
-    // THE FIX: More specific helper functions
     private fun Element.getMetaInfo(iconClass: String): String? {
         return this.selectFirst("span:has(i.$iconClass)")?.ownText()?.substringAfter(":")?.trim()
     }
@@ -106,11 +105,16 @@ class FaselHDSProvider : MainAPI() {
                 status = ShowStatus.Completed
             }
             
-            // THE FIX: Build the extra info string with icons and HTML
+            // THE FIX 1 & 2: Move duration to the top and reformat plot info
+            val duration = document.getMetaInfo("fa-clock")?.filter { it.isDigit() }?.toIntOrNull()
+            
             val country = document.getMetaInfo("fa-flag")
             val episodeCount = document.getMetaInfo("fa-film")
-            val episodeDuration = document.getMetaInfo("fa-clock")
 
+            val infoList = mutableListOf<String>()
+            episodeCount?.let { infoList.add("<b>الحلقات:</b> $it") }
+            country?.let { infoList.add("<b>دولة المسلسل:</b> $it") }
+            
             if (infoList.isNotEmpty()) {
                 plot += "<br><br>${infoList.joinToString(" | ")}"
             }
@@ -149,7 +153,12 @@ class FaselHDSProvider : MainAPI() {
                 }
             }
             return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
-                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags; this.showStatus = status
+                this.posterUrl = posterUrl
+                this.plot = plot
+                this.year = year
+                this.tags = tags
+                this.showStatus = status
+                this.duration = duration
             }
         } else { // It's a Movie
             val year = document.selectFirst("span:contains(سنة الإنتاج) a")?.text()?.toIntOrNull()
