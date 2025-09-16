@@ -54,8 +54,8 @@ class FaselHDSProvider : MainAPI() {
         val posterUrl = posterElement?.attr("data-src") 
             ?: posterElement?.attr("src")
         
-        // A more robust way to detect series
-        val isSeries = listOf("/series/", "/seasons/", "asian_seasons").any { href.contains(it) } || 
+        // THE FIX 1: Differentiate based on title keywords, as URL is not reliable
+        val isSeries = title.contains("مسلسل") || title.contains("برنامج") ||
                        this.selectFirst("span.quality:contains(حلقة), span.quality:contains(مواسم)") != null
         
         return if (isSeries) {
@@ -79,16 +79,18 @@ class FaselHDSProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url, headers = headers).document
         val title = document.selectFirst("div.h1.title")?.ownText()?.trim() ?: "No Title"
+        
+        // THE FIX 2: Poster fallback logic
         val posterUrl = document.selectFirst("div.posterImg img")?.attr("src")
             ?: document.selectFirst("img.poster")?.attr("src")
+
         var plot = document.selectFirst("div.singleDesc p")?.text()?.trim()
             ?: document.selectFirst("div.singleDesc")?.text()?.trim()
 
         val tags = document.select("div.col-xl-6:contains(تصنيف) a").map { it.text() }
         
-        // THE FIX: More robust logic to differentiate movies from series
-        val isTvSeries = listOf("/series/", "/seasons/", "asian_seasons").any { url.contains(it) } || 
-                         document.select("div#seasonList, div#epAll").isNotEmpty()
+        // THE FIX 1: Differentiate based on presence of episode list, which is the most reliable method
+        val isTvSeries = document.select("div#seasonList, div#epAll").isNotEmpty()
 
         if (isTvSeries) {
             val year = Regex("""\d{4}""").find(document.select("span:contains(موعد الصدور)").firstOrNull()?.text() ?: "")?.value?.toIntOrNull()
