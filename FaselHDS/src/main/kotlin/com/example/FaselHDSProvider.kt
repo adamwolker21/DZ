@@ -54,7 +54,10 @@ class FaselHDSProvider : MainAPI() {
         val posterUrl = posterElement?.attr("data-src") 
             ?: posterElement?.attr("src")
         
-        val isSeries = href.contains("/series/") || href.contains("/seasons/") || href.contains("asian_seasons") || this.selectFirst("span.quality:contains(حلقة)") != null || this.selectFirst("span.quality:contains(مواسم)") != null
+        // A more robust way to detect series
+        val isSeries = listOf("/series/", "/seasons/", "asian_seasons").any { href.contains(it) } || 
+                       this.selectFirst("span.quality:contains(حلقة), span.quality:contains(مواسم)") != null
+        
         return if (isSeries) {
             newTvSeriesSearchResponse(title, href, TvType.TvSeries) { this.posterUrl = posterUrl }
         } else {
@@ -69,17 +72,13 @@ class FaselHDSProvider : MainAPI() {
         }
     }
 
-    // Helper function to extract text after an icon
     private fun Element.getInfo(selector: String): String? {
         return this.selectFirst(selector)?.ownText()?.trim()
     }
 
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url, headers = headers).document
-        
-        // THE FIX 1: Correctly extract movie title
         val title = document.selectFirst("div.h1.title")?.ownText()?.trim() ?: "No Title"
-        
         val posterUrl = document.selectFirst("div.posterImg img")?.attr("src")
             ?: document.selectFirst("img.poster")?.attr("src")
         var plot = document.selectFirst("div.singleDesc p")?.text()?.trim()
@@ -87,27 +86,11 @@ class FaselHDSProvider : MainAPI() {
 
         val tags = document.select("div.col-xl-6:contains(تصنيف) a").map { it.text() }
         
-        val isMovie = url.contains("/movies/")
+        // THE FIX: More robust logic to differentiate movies from series
+        val isTvSeries = listOf("/series/", "/seasons/", "asian_seasons").any { url.contains(it) } || 
+                         document.select("div#seasonList, div#epAll").isNotEmpty()
 
-        if (isMovie) {
-            // THE FIX 2: Extract movie-specific data
-            val year = document.selectFirst("span:contains(سنة الإنتاج) a")?.text()?.toIntOrNull()
-            val duration = document.getInfo("span:contains(مدة الفيلم)")?.toIntOrNull()
-            val ratingText = document.selectFirst("span.singleStar strong")?.text()
-            val rating = ratingText?.let {
-                if (it.equals("N/A", true)) null else (it.toFloatOrNull()?.times(1000))?.toInt()
-            }
-
-            return newMovieLoadResponse(title, url, TvType.Movie, url) {
-                this.posterUrl = posterUrl
-                this.plot = plot
-                this.year = year
-                this.tags = tags
-                this.duration = duration
-                this.rating = rating
-            }
-
-        } else { // It's a TV Series
+        if (isTvSeries) {
             val year = Regex("""\d{4}""").find(document.select("span:contains(موعد الصدور)").firstOrNull()?.text() ?: "")?.value?.toIntOrNull()
             var status: ShowStatus? = null
             val statusText = document.selectFirst("span:contains(حالة المسلسل)")?.text() ?: ""
@@ -117,7 +100,6 @@ class FaselHDSProvider : MainAPI() {
                 status = ShowStatus.Completed
             }
 
-            // THE FIX 3: Add extra info to the plot
             val country = document.getInfo("span:contains(دولة المسلسل)")
             val episodeCount = document.getInfo("span:contains(الحلقات)")
             var extraInfo = ""
@@ -165,11 +147,18 @@ class FaselHDSProvider : MainAPI() {
                 }
             }
             return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
-                this.posterUrl = posterUrl
-                this.plot = plot
-                this.year = year
-                this.tags = tags
-                this.showStatus = status
+                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags; this.showStatus = status
+            }
+        } else { // It's a Movie
+            val year = document.selectFirst("span:contains(سنة الإنتاج) a")?.text()?.toIntOrNull()
+            val duration = document.getInfo("span:contains(مدة الفيلم)")?.toIntOrNull()
+            val ratingText = document.selectFirst("span.singleStar strong")?.text()
+            val rating = ratingText?.let {
+                if (it.equals("N/A", true)) null else (it.toFloatOrNull()?.times(1000))?.toInt()
+            }
+
+            return newMovieLoadResponse(title, url, TvType.Movie, url) {
+                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags; this.duration = duration; this.rating = rating
             }
         }
     }
