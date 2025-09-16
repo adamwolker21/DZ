@@ -70,9 +70,10 @@ class FaselHDSProvider : MainAPI() {
             it.toSearchResult()
         }
     }
-
-    private fun Element.getInfo(selector: String): String? {
-        return this.selectFirst(selector)?.ownText()?.trim()
+    
+    // THE FIX: More specific helper functions
+    private fun Element.getMetaInfo(iconClass: String): String? {
+        return this.selectFirst("span:has(i.$iconClass)")?.ownText()?.substringAfter(":")?.trim()
     }
 
     override suspend fun load(url: String): LoadResponse? {
@@ -104,20 +105,19 @@ class FaselHDSProvider : MainAPI() {
             } else if (statusText.contains("مكتمل")) {
                 status = ShowStatus.Completed
             }
+            
+            // THE FIX: Build the extra info string with icons and HTML
+            val country = document.getMetaInfo("fa-flag")
+            val episodeCount = document.getMetaInfo("fa-film")
+            val episodeDuration = document.getMetaInfo("fa-clock")
 
-            // THE FIX: Use HTML formatting for the plot
-            val country = document.getInfo("span:contains(دولة المسلسل)")
-            val episodeCount = document.getInfo("span:contains(الحلقات)")
-            var extraInfo = ""
-            if(episodeCount != null) extraInfo += "<b>عدد الحلقات:</b> $episodeCount"
-            if(country != null) {
-                if(extraInfo.isNotBlank()) extraInfo += " | "
-                extraInfo += "<b>الدولة:</b> $country"
-            }
-
-            if(extraInfo.isNotBlank()) {
-                // Add line breaks using <br> for separation
-                plot += "<br><br>$extraInfo"
+            val infoList = mutableListOf<String>()
+            episodeCount?.let { infoList.add("🎬 <b>$it</b>") }
+            country?.let { infoList.add("🌍 <b>$it</b>") }
+            episodeDuration?.let { infoList.add("🕒 <b>$it</b>") }
+            
+            if (infoList.isNotEmpty()) {
+                plot += "<br><br>${infoList.joinToString(" | ")}"
             }
 
             val episodes = mutableListOf<Episode>()
@@ -158,7 +158,7 @@ class FaselHDSProvider : MainAPI() {
             }
         } else { // It's a Movie
             val year = document.selectFirst("span:contains(سنة الإنتاج) a")?.text()?.toIntOrNull()
-            val duration = document.getInfo("span:contains(مدة الفيلم)")?.toIntOrNull()
+            val duration = document.getMetaInfo("fa-clock")?.filter { it.isDigit() }?.toIntOrNull()
             val ratingText = document.selectFirst("span.singleStar strong")?.text()
             val rating = ratingText?.let {
                 if (it.equals("N/A", true)) null else (it.toFloatOrNull()?.times(1000))?.toInt()
