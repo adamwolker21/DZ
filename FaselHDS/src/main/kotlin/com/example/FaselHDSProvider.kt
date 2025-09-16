@@ -39,7 +39,17 @@ class FaselHDSProvider : MainAPI() {
     ): HomePageResponse {
         val url = "$mainUrl${request.data}" + (if (page > 1) "/page/$page" else "")
         val document = app.get(url, headers = headers).document
-        val home = document.select("div.postDiv").mapNotNull {
+        
+        // THE FINAL FIX: Use conditional logic for the selector
+        // If the specific container exists, use it to avoid duplicates.
+        // Otherwise, use the general selector to ensure content is always found.
+        val selector = if (document.selectFirst("div.post-listing") != null) {
+            "div.post-listing div.postDiv"
+        } else {
+            "div.postDiv"
+        }
+
+        val home = document.select(selector).mapNotNull {
             it.toSearchResult()
         }
         return newHomePageResponse(request.name, home)
@@ -66,6 +76,7 @@ class FaselHDSProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val document = app.get("$mainUrl/?s=$query", headers = headers).document
+        // Search page has a simple structure, the general selector is best
         return document.select("div.postDiv").mapNotNull {
             it.toSearchResult()
         }
