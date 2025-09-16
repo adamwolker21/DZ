@@ -130,9 +130,6 @@ class FaselHDSProvider : MainAPI() {
         val document = app.get(data, headers = headers).document
         
         document.select("ul.tabs-ul li").forEachIndexed { index, serverElement ->
-            // Diagnostic Test: Only process Server 2 (index 1)
-            if (index != 1) return@forEachIndexed
-
             val serverUrl = serverElement.attr("onclick").substringAfter("href = '").substringBefore("'")
             if (serverUrl.isBlank()) return@forEachIndexed
 
@@ -155,7 +152,8 @@ class FaselHDSProvider : MainAPI() {
 
                 if (foundLink != null) {
                     M3u8Helper.generateM3u8(
-                        source = "$name S${index + 1}",
+                        // THE FIX: Use a unique name for each server to prevent deduplication
+                        source = "$name Server ${index + 1}",
                         streamUrl = foundLink,
                         referer = serverUrl,
                         headers = headers
