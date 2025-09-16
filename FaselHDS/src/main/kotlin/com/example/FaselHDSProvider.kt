@@ -39,7 +39,6 @@ class FaselHDSProvider : MainAPI() {
     ): HomePageResponse {
         val url = "$mainUrl${request.data}" + (if (page > 1) "/page/$page" else "")
         val document = app.get(url, headers = headers).document
-        // THE FIX: Reverted to the general selector that works for all pages
         val home = document.select("div.postDiv").mapNotNull {
             it.toSearchResult()
         }
@@ -67,7 +66,6 @@ class FaselHDSProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val document = app.get("$mainUrl/?s=$query", headers = headers).document
-        // THE FIX: Reverted to the general selector for search
         return document.select("div.postDiv").mapNotNull {
             it.toSearchResult()
         }
@@ -95,6 +93,14 @@ class FaselHDSProvider : MainAPI() {
 
         val tags = document.select("div.col-xl-6:contains(تصنيف) a").map { it.text() }
         
+        // Feature 1: Get Trailer
+        val trailerUrl = document.selectFirst("a.trailer-btn")?.attr("href")
+
+        // Feature 2: Get Recommendations
+        val recommendations = document.select("div.related-posts div.postDiv").mapNotNull {
+            it.toSearchResult()
+        }
+
         val isTvSeries = document.select("div#seasonList, div#epAll").isNotEmpty()
 
         if (isTvSeries) {
@@ -122,7 +128,7 @@ class FaselHDSProvider : MainAPI() {
 
             val episodes = mutableListOf<Episode>()
             val seasonElements = document.select("div#seasonList div.seasonDiv")
-            val episodeSelector = "div#epAll a, div#episodes a, div.ep-item a" // Added more selectors for robustness
+            val episodeSelector = "div#epAll a, div#episodes a, div.ep-item a"
 
             if (seasonElements.isNotEmpty()) {
                 seasonElements.apmap { seasonElement ->
@@ -160,6 +166,8 @@ class FaselHDSProvider : MainAPI() {
                 this.tags = tags
                 this.showStatus = status
                 this.duration = duration
+                this.trailer = trailerUrl
+                this.recommendations = recommendations
             }
         } else { // It's a Movie
             val year = document.selectFirst("span:contains(سنة الإنتاج) a")?.text()?.toIntOrNull()
@@ -170,7 +178,14 @@ class FaselHDSProvider : MainAPI() {
             }
 
             return newMovieLoadResponse(title, url, TvType.Movie, url) {
-                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags; this.duration = duration; this.rating = rating
+                this.posterUrl = posterUrl
+                this.plot = plot
+                this.year = year
+                this.tags = tags
+                this.duration = duration
+                this.rating = rating
+                this.trailer = trailerUrl
+                this.recommendations = recommendations
             }
         }
     }
