@@ -8,7 +8,7 @@ import org.jsoup.nodes.Element
 
 class EgyDeadProvider : MainAPI() {
     override var name = "EgyDead"
-    override var mainUrl = "https://tv5.egydead.live/"
+    override var mainUrl = "https://tv5.egydead.live"
     override var lang = "ar"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
@@ -25,22 +25,20 @@ class EgyDeadProvider : MainAPI() {
 
     private fun getStatus(element: Element?): ShowStatus {
         return when {
-            element?.hasClass("live") == true -> ShowStatus.Ongoing
-            element?.hasClass("complete") == true -> ShowStatus.Completed
+            element?.text()?.contains("مكتمل", true) == true -> ShowStatus.Completed
+            element?.text()?.contains("مستمر", true) == true -> ShowStatus.Ongoing
             else -> ShowStatus.Completed
         }
     }
 
     private fun Element.toSearchResponse(): SearchResponse? {
-        val titleElement = this.selectFirst("h4 a") ?: return null
-        val href = fixUrlNull(titleElement.attr("href")) ?: return null
+        val titleElement = this.selectFirst("h1.BottomTitle") ?: return null
+        val href = fixUrlNull(this.selectFirst("a")?.attr("href")) ?: return null
         val title = titleElement.text()
 
-        val posterUrl = fixUrlNull(this.selectFirst("div.postmovie-photo img")?.let {
-            it.attr("data-src").ifBlank { it.attr("src") }
-        })
+        val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("src"))
 
-        val isMovie = href.contains("/movie/")
+        val isMovie = href.contains("/movie/") || this.selectFirst("span.cat_name")?.text()?.contains("فيلم") == true
 
         return if (isMovie) {
             newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = posterUrl }
@@ -50,96 +48,91 @@ class EgyDeadProvider : MainAPI() {
     }
 
     override val mainPage = mainPageOf(
-        "/category/افلام-اجنبي-اونلاين/" to "أفلام",
-        "/category/افلام-اسيوية/" to "يبث حاليا",
-        "/series-category/مسلسلات-تركية-ا/" to "الأعمال القادمة",
-        "/status/complete" to "أعمال مكتملة",
-        "/series" to "المسلسلات",
-        "/movies" to "الأفلام"
+        "/" to "أحدث المسلسلات",
+        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-%d8%a7%d9%88%d9%86%d9%84%d8%a7%d9%8a%d9%86/" to "أحدث الأفلام",
+        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات آسيوية",
+        "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات آسيوية"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val url = "$mainUrl${request.data}?page=$page"
+        val url = if (page == 1) {
+            "$mainUrl${request.data}"
+        } else {
+            "$mainUrl${request.data}page/$page/"
+        }
+        
         val document = app.get(url, headers = customHeaders).document
 
-        val items = document.select("div.postmovie").mapNotNull {
+        val items = document.select("li.movieItem, div.postItem").mapNotNull {
             it.toSearchResponse()
         }
 
-        val hasNext = document.selectFirst("a.next.page-numbers, a[rel=next]") != null
+        val hasNext = document.selectFirst("a.next.page-numbers") != null
         return newHomePageResponse(request.name, items, hasNext)
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val url = "$mainUrl/search?s=$query"
+        val url = "$mainUrl/?s=$query"
         val document = app.get(url, headers = customHeaders).document
 
-        return document.select("div.postmovie").mapNotNull { it.toSearchResponse() }
+        return document.select("li.movieItem, div.postItem").mapNotNull { it.toSearchResponse() }
     }
 
     override suspend fun load(url: String): LoadResponse {
         val document = app.get(url, headers = customHeaders).document
-        val detailsContainer = document.selectFirst("div.info-detail-single")
 
-        val title = detailsContainer?.selectFirst("h1")?.text()?.trim() ?: "No Title"
-        var plot = detailsContainer?.selectFirst("p")?.text()?.trim()
+        val title = document.selectFirst("h1.entry-title")?.text()?.trim() ?: "No Title"
+        var plot = document.selectFirst("div.extra-content p")?.text()?.trim()
 
-        val posterUrl = fixUrlNull(document.selectFirst("meta[property=og:image]")?.attr("content"))
+        val posterUrl = fixUrlNull(document.selectFirst("div.single-thumbnail img")?.attr("src"))
 
-        val year = detailsContainer?.select("ul.mb-2 li")
-            ?.find { it.text().contains("سنة العرض") }
-            ?.selectFirst("a")?.text()?.toIntOrNull()
-
-        val rating = detailsContainer?.selectFirst("div.post_review_avg")?.text()?.trim()
-            ?.toFloatOrNull()?.times(100)?.toInt()
-
-        val tags = detailsContainer?.select("div.post_tags a")?.map { it.text() }
-
-        val status = getStatus(document.selectFirst("span.serie-isstatus"))
-
+        // استخراج المعلومات من الجدول
+        val details = document.select("div.LeftBox li")
+        var year: Int? = null
+        var rating: Int? = null
         var country: String? = null
-        var totalEpisodes: String? = null
+        var status: ShowStatus? = null
+        val tags = mutableListOf<String>()
 
-        detailsContainer?.select("ul.mb-2 li")?.forEach { li ->
+        details.forEach { li ->
             val text = li.text()
             when {
-                text.contains("البلد المنتج") -> country = li.selectFirst("a")?.text()?.trim()
-                text.contains("عدد الحلقات") -> totalEpisodes = li.ownText().trim().removePrefix(": ")
+                text.contains("السنه") -> {
+                    year = li.selectFirst("a")?.text()?.toIntOrNull()
+                }
+                text.contains("البلد") -> {
+                    country = li.selectFirst("a")?.text()?.trim()
+                }
+                text.contains("النوع") -> {
+                    tags.addAll(li.select("a").map { it.text().trim() })
+                }
+                text.contains("التقييم") -> {
+                    rating = li.selectFirst("span")?.text()?.toFloatOrNull()?.times(10)?.toInt()
+                }
+                text.contains("الحاله") -> {
+                    status = getStatus(li)
+                }
             }
         }
 
-        val statusText = document.selectFirst("span.serie-isstatus")?.text()?.trim()
-        
-        val extraInfoList = listOfNotNull(
-            statusText?.let { "الحالة: $it" },
-            country?.let { "البلد: $it" },
-            totalEpisodes?.let { "عدد الحلقات: $it" }
-        )
-        val extraInfo = extraInfoList.joinToString(" | ")
-
-        plot = if (extraInfo.isNotBlank()) {
-            listOfNotNull(plot, extraInfo).joinToString("<br><br>")
-        } else {
-            plot
-        }
-
-        val episodes = document.select("div.box-loop-episode a").mapNotNull { a ->
+        // الحصول على الحلقات
+        val episodes = document.select("div.episodeList a, div.episodes a").mapNotNull { a ->
             val href = fixUrlNull(a.attr("href")) ?: return@mapNotNull null
-            val epNumText = a.selectFirst(".titlepisode")?.text()?.replace(Regex("[^0-9]"), "")
-            val epNum = epNumText?.toIntOrNull()
+            val epNumText = a.selectFirst("span.epNum")?.text() ?: a.text()
+            val epNum = epNumText.replace(Regex("[^0-9]"), "").toIntOrNull()
 
             newEpisode(href) {
-                name = a.selectFirst(".titlepisode")?.text()?.trim()
+                name = a.selectFirst("span.epTitle")?.text() ?: "الحلقة ${epNum ?: ""}"
                 episode = epNum
             }
-        }.reversed()
+        }
 
         return if (episodes.isNotEmpty()) {
             newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
                 this.posterUrl = posterUrl
                 this.year = year
                 this.plot = plot
-                this.tags = tags
+                this.tags = tags.takeIf { it.isNotEmpty() }
                 this.rating = rating
                 this.showStatus = status
             }
@@ -148,7 +141,7 @@ class EgyDeadProvider : MainAPI() {
                 this.posterUrl = posterUrl
                 this.year = year
                 this.plot = plot
-                this.tags = tags
+                this.tags = tags.takeIf { it.isNotEmpty() }
                 this.rating = rating
             }
         }
@@ -162,44 +155,65 @@ class EgyDeadProvider : MainAPI() {
     ): Boolean {
         val document = app.get(data, headers = customHeaders).document
         
-        val servers = document.select("ul.dropdown-menu li a")
+        // البحث عن زر المشاهدة ونموذج الفيديو
+        val watchButton = document.selectFirst("button:contains(المشاهده), button:contains(المشاهدة)")
         var foundLinks = false
         
-        servers.apmap { server ->
-            try {
-                val code = server.attr("data-code")
-                if (code.isBlank()) return@apmap
-
-                val ajaxUrl = "$mainUrl/ajaxGetRequest"
-                val response = app.post(
-                    ajaxUrl,
-                    data = mapOf("action" to "iframe_server", "code" to code),
-                    referer = data,
-                    headers = customHeaders + mapOf(
-                        "X-Requested-With" to "XMLHttpRequest",
-                        "Origin" to mainUrl
-                    )
-                ).text
-
-                val jsonResponse = parseJson<NewPlayerAjaxResponse>(response)
-                if (!jsonResponse.status) return@apmap
-
-                val iframeHtml = jsonResponse.codeplay
-                val iframeSrc = Jsoup.parse(iframeHtml).selectFirst("iframe")?.attr("src")
-                if (iframeSrc.isNullOrBlank()) return@apmap
-
-                val serverName = server.text()
-                println("Processing server: $serverName with iframe: $iframeSrc")
-
-                // استخدام loadExtractor بشكل صحيح
-                loadExtractor(iframeSrc, data, subtitleCallback, callback)
-                foundLinks = true
-
-            } catch (e: Exception) {
-                println("Error processing server: ${e.message}")
-                e.printStackTrace()
+        if (watchButton != null) {
+            // إذا كان هناك نموذج مخفي، نحتاج إلى إرسال طلب POST
+            val form = watchButton.closest("form")
+            if (form != null) {
+                try {
+                    val action = form.attr("action").takeIf { it.isNotBlank() } ?: data
+                    val inputs = form.select("input")
+                    val formData = mutableMapOf<String, String>()
+                    
+                    inputs.forEach { input ->
+                        val name = input.attr("name")
+                        val value = input.attr("value")
+                        if (name.isNotBlank()) {
+                            formData[name] = value
+                        }
+                    }
+                    
+                    // إضافة قيمة الزر إذا كانت موجودة
+                    formData["View"] = "1"
+                    
+                    val response = app.post(
+                        action,
+                        data = formData,
+                        referer = data,
+                        headers = customHeaders + mapOf(
+                            "X-Requested-With" to "XMLHttpRequest",
+                            "Content-Type" to "application/x-www-form-urlencoded"
+                        )
+                    ).text
+                    
+                    // محاولة استخراج iframe من الاستجابة
+                    val iframeSrc = Jsoup.parse(response).selectFirst("iframe")?.attr("src")
+                    if (!iframeSrc.isNullOrBlank()) {
+                        loadExtractor(iframeSrc, data, subtitleCallback, callback)
+                        foundLinks = true
+                    }
+                    
+                } catch (e: Exception) {
+                    println("Error processing video form: ${e.message}")
+                }
             }
         }
+        
+        // إذا لم نجد عبر النموذج، نحاول البحث عن iframes مباشرة
+        if (!foundLinks) {
+            val iframes = document.select("iframe")
+            iframes.forEach { iframe ->
+                val src = iframe.attr("src")
+                if (src.isNotBlank()) {
+                    loadExtractor(src, data, subtitleCallback, callback)
+                    foundLinks = true
+                }
+            }
+        }
+        
         return foundLinks
     }
 
