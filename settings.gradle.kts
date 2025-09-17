@@ -8,3 +8,4 @@ pluginManagement {
 
 rootProject.name = "CSX"
 include(":FaselHDS")
+include(":EgyDead")
