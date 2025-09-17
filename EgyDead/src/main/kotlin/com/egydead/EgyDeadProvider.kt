@@ -49,7 +49,7 @@ class EgyDeadProvider : MainAPI() {
     private fun Element.toSearchResult(): SearchResponse? {
         val title = this.selectFirst("h2, h3, .title, .name")?.text()?.trim() ?: return null
         val href = fixUrl(this.selectFirst("a")?.attr("href") ?: return null)
-        val posterUrl = fixUrl(this.selectFirst("img")?.attr("src"))
+        val posterUrl = fixUrl(this.selectFirst("img")?.attr("src") ?: "")
         val quality = this.selectFirst(".quality")?.text()?.trim()
 
         val type = when {
@@ -92,8 +92,8 @@ class EgyDeadProvider : MainAPI() {
 
         val title = document.selectFirst("h1.entry-title, h1.title")?.text()?.trim() ?: "No Title"
         val description = document.selectFirst(".description, .content, .story")?.text()?.trim()
-        val poster = fixUrl(document.selectFirst(".poster img, .thumbnail img")?.attr("src"))
-        val background = fixUrl(document.selectFirst(".backdrop")?.attr("src"))
+        val poster = fixUrl(document.selectFirst(".poster img, .thumbnail img")?.attr("src") ?: "")
+        val background = fixUrl(document.selectFirst(".backdrop")?.attr("src") ?: "")
         val year = document.selectFirst(".year, .date")?.text()?.toIntOrNull()
         val rating = document.selectFirst(".rating, .score")?.text()?.toRatingInt()
         val tags = document.select(".genre a, .tags a").map { it.text() }
@@ -107,7 +107,7 @@ class EgyDeadProvider : MainAPI() {
             val episodeTitle = li.selectFirst(".title, .name")?.text()?.trim() ?: "الحلقة"
             val episodeHref = fixUrl(li.selectFirst("a")?.attr("href") ?: return@map null)
             val episodeNumber = li.selectFirst(".number, .ep")?.text()?.toIntOrNull()
-            val episodePoster = fixUrl(li.selectFirst("img")?.attr("src"))
+            val episodePoster = fixUrl(li.selectFirst("img")?.attr("src") ?: "")
 
             newEpisode(episodeHref) {
                 this.name = episodeTitle
@@ -157,21 +157,4 @@ class EgyDeadProvider : MainAPI() {
         val videoSources = document.select("source[src], video source[src]")
         videoSources.forEach { source ->
             val src = source.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
-            loadExtractor(src, data, subtitleCallback, callback)
-        }
-        
-        // محاولة استخراج من الروابط المباشرة
-        val links = document.select("a[href*='.m3u8'], a[href*='.mp4']")
-        links.forEach { link ->
-            val href = link.attr("href").takeIf { it.isNotBlank() } ?: return@forEach
-            loadExtractor(href, data, subtitleCallback, callback)
-        }
-        
-        return iframes.isNotEmpty() || videoSources.isNotEmpty() || links.isNotEmpty()
-    }
-
-    private fun String.encodeToUrl(): String = java.net.URLEncoder.encode(this, "UTF-8")
-    
-    private val headers = mapOf(
-        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-        "Accept" to "text/html,application/xhtml+xml,application
+            loadExtractor(src, data
