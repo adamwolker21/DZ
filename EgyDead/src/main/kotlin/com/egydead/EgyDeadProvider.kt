@@ -103,10 +103,9 @@ class EgyDeadProvider : MainAPI() {
 
         detailsContainer?.select("ul.mb-2 li")?.forEach { li ->
             val text = li.text()
-            if (text.contains("البلد المنتج")) {
-                country = li.selectFirst("a")?.text()?.trim()
-            } else if (text.contains("عدد الحلقات")) {
-                totalEpisodes = li.ownText().trim().removePrefix(": ")
+            when {
+                text.contains("البلد المنتج") -> country = li.selectFirst("a")?.text()?.trim()
+                text.contains("عدد الحلقات") -> totalEpisodes = li.ownText().trim().removePrefix(": ")
             }
         }
 
@@ -126,7 +125,7 @@ class EgyDeadProvider : MainAPI() {
         }
 
         val episodes = document.select("div.box-loop-episode a").mapNotNull { a ->
-            val href = a.attr("href") ?: return@mapNotNull null
+            val href = fixUrlNull(a.attr("href")) ?: return@mapNotNull null
             val epNumText = a.selectFirst(".titlepisode")?.text()?.replace(Regex("[^0-9]"), "")
             val epNum = epNumText?.toIntOrNull()
 
@@ -191,16 +190,15 @@ class EgyDeadProvider : MainAPI() {
                 if (iframeSrc.isNullOrBlank()) return@apmap
 
                 val serverName = server.text()
-                println("DEBUG: Processing server: $serverName")
-                println("DEBUG: Iframe URL: $iframeSrc")
+                println("Processing server: $serverName with iframe: $iframeSrc")
 
-                // استخدام loadExtractor مع newExtractorLink
+                // استخدام loadExtractor بشكل صحيح مع newExtractorLink
                 loadExtractor(iframeSrc, data, subtitleCallback) { link ->
                     callback.invoke(newExtractorLink(
                         source = name,
                         name = serverName,
                         url = link.url,
-                        referer = link.referer,
+                        referer = link.referer ?: data,
                         quality = link.quality,
                         isM3u8 = link.isM3u8
                     ))
@@ -208,7 +206,7 @@ class EgyDeadProvider : MainAPI() {
                 }
 
             } catch (e: Exception) {
-                println("DEBUG: Error processing server: ${e.message}")
+                println("Error processing server: ${e.message}")
                 e.printStackTrace()
             }
         }
