@@ -34,16 +34,28 @@ class EgyDeadProvider : MainAPI() {
     private fun Element.toSearchResponse(): SearchResponse? {
         val linkElement = this.selectFirst("a") ?: return null
         val href = fixUrlNull(linkElement.attr("href")) ?: return null
+        
+        // استخراج العنوان من h1.BottomTitle
         val title = linkElement.selectFirst("h1.BottomTitle")?.text() ?: return null
 
-        val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("src"))
+        // استخراج صورة البوستر
+        val posterUrl = fixUrlNull(linkElement.selectFirst("img")?.attr("src"))
 
-        val isMovie = this.selectFirst("span.cat_name")?.text()?.contains("أفلام", true) == true
+        // تحديد نوع المحتوى (فيلم أم مسلسل) بناءً على span.cat_name
+        val category = linkElement.selectFirst("span.cat_name")?.text() ?: ""
+        val isMovie = category.contains("أفلام", true) || 
+                     category.contains("فيلم", true) ||
+                     href.contains("/movie/", true) ||
+                     href.contains("/film/", true)
 
         return if (isMovie) {
-            newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = posterUrl }
+            newMovieSearchResponse(title, href, TvType.Movie) { 
+                this.posterUrl = posterUrl
+            }
         } else {
-            newTvSeriesSearchResponse(title, href, TvType.TvSeries) { this.posterUrl = posterUrl }
+            newTvSeriesSearchResponse(title, href, TvType.TvSeries) { 
+                this.posterUrl = posterUrl
+            }
         }
     }
 
@@ -64,9 +76,9 @@ class EgyDeadProvider : MainAPI() {
         
         val document = app.get(url, headers = customHeaders).document
 
-        val items = document.select("li.movieItem").mapNotNull {
-            it.toSearchResponse()
-        }
+        // استخدام selector أكثر تحديدًا للعناصر
+        val items = document.select("ul.posts-list li.movieItem, .catHolder li.movieItem, li.movieItem")
+            .mapNotNull { it.toSearchResponse() }
 
         val hasNext = document.selectFirst("a.next.page-numbers") != null
         return newHomePageResponse(request.name, items, hasNext)
@@ -76,15 +88,20 @@ class EgyDeadProvider : MainAPI() {
         val url = "$mainUrl/?s=$query"
         val document = app.get(url, headers = customHeaders).document
 
-        return document.select("li.movieItem").mapNotNull { it.toSearchResponse() }
+        return document.select("ul.posts-list li.movieItem, .catHolder li.movieItem, li.movieItem")
+            .mapNotNull { it.toSearchResponse() }
     }
 
     override suspend fun load(url: String): LoadResponse {
         val document = app.get(url, headers = customHeaders).document
 
-        val title = document.selectFirst("h1.entry-title")?.text()?.trim() ?: "No Title"
+        // استخراج العنوان من h1.entry-title أو singleTitle
+        val title = document.selectFirst("h1.entry-title, div.singleTitle span em")?.text()?.trim() ?: "No Title"
+        
+        // استخراج القصة من div.extra-content
         var plot = document.selectFirst("div.extra-content p")?.text()?.trim()
 
+        // استخراج البوستر من div.single-thumbnail img
         val posterUrl = fixUrlNull(document.selectFirst("div.single-thumbnail img")?.attr("src"))
 
         // استخراج المعلومات من الجدول
@@ -109,7 +126,8 @@ class EgyDeadProvider : MainAPI() {
                 }
                 text.contains("التقييم") -> {
                     val ratingText = li.text().replace(Regex("[^0-9.]"), "")
-                    rating = (ratingText.toFloatOrNull() ?: 0f).times(100).toInt()
+                    val ratingFloat = ratingText.toFloatOrNull() ?: 0f
+                    rating = (ratingFloat * 100).toInt()
                 }
                 text.contains("الحاله") || text.contains("الحالة") -> {
                     status = getStatus(li)
@@ -117,7 +135,7 @@ class EgyDeadProvider : MainAPI() {
             }
         }
 
-        // الحصول على الحلقات
+        // الحصول على الحلقات - هذه للمسلسلات فقط
         val episodes = document.select("div.episodeList a, div.episodes a").mapNotNull { a ->
             val href = fixUrlNull(a.attr("href")) ?: return@mapNotNull null
             val epNumText = a.selectFirst("span.epNum")?.text() ?: a.text()
@@ -218,9 +236,4 @@ class EgyDeadProvider : MainAPI() {
         
         return foundLinks
     }
-
-    data class NewPlayerAjaxResponse(
-        val status: Boolean,
-        val codeplay: String
-    )
 }
