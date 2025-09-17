@@ -32,13 +32,15 @@ class EgyDeadProvider : MainAPI() {
     }
 
     private fun Element.toSearchResponse(): SearchResponse? {
-        val titleElement = this.selectFirst("h1.BottomTitle") ?: return null
-        val href = fixUrlNull(this.selectFirst("a")?.attr("href")) ?: return null
-        val title = titleElement.text()
+        val linkElement = this.selectFirst("a") ?: return null
+        val href = fixUrlNull(linkElement.attr("href")) ?: return null
+        val title = linkElement.selectFirst("h1.BottomTitle")?.text() ?: return null
 
-        val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("src"))
+        val posterUrl = fixUrlNull(linkElement.selectFirst("img")?.attr("src"))
 
-        val isMovie = href.contains("/movie/") || this.selectFirst("span.cat_name")?.text()?.contains("فيلم") == true
+        // تحديد النوع بناءً على القسم
+        val category = linkElement.selectFirst("span.cat_name")?.text() ?: ""
+        val isMovie = category.contains("افلام", true) || category.contains("أفلام", true)
 
         return if (isMovie) {
             newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = posterUrl }
@@ -48,10 +50,12 @@ class EgyDeadProvider : MainAPI() {
     }
 
     override val mainPage = mainPageOf(
-        "/" to "أحدث المسلسلات",
-        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-%d8%a7%d9%88%d9%86%d9%84%d8%a7%d9%8a%d9%86/" to "أحدث الأفلام",
-        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات آسيوية",
-        "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات آسيوية"
+        "/" to "أحدث الإضافات",
+        "/movies/" to "الأفلام",
+        "/series/" to "المسلسلات",
+        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-%d8%a7%d9%88%d9%86%d9%84%d8%a7%d9%8a%d9%86/" to "أفلام أجنبية",
+        "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-1/" to "مسلسلات أجنبية",
+        "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d9%83%d8%b1%d8%aa%d9%88%d9%86/" to "مسلسلات كرتون"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -63,7 +67,7 @@ class EgyDeadProvider : MainAPI() {
         
         val document = app.get(url, headers = customHeaders).document
 
-        val items = document.select("li.movieItem, div.postItem").mapNotNull {
+        val items = document.select("li.movieItem").mapNotNull {
             it.toSearchResponse()
         }
 
@@ -75,7 +79,7 @@ class EgyDeadProvider : MainAPI() {
         val url = "$mainUrl/?s=$query"
         val document = app.get(url, headers = customHeaders).document
 
-        return document.select("li.movieItem, div.postItem").mapNotNull { it.toSearchResponse() }
+        return document.select("li.movieItem").mapNotNull { it.toSearchResponse() }
     }
 
     override suspend fun load(url: String): LoadResponse {
@@ -97,7 +101,7 @@ class EgyDeadProvider : MainAPI() {
         details.forEach { li ->
             val text = li.text()
             when {
-                text.contains("السنه") -> {
+                text.contains("السنه") || text.contains("سنة") -> {
                     year = li.selectFirst("a")?.text()?.toIntOrNull()
                 }
                 text.contains("البلد") -> {
@@ -107,22 +111,24 @@ class EgyDeadProvider : MainAPI() {
                     tags.addAll(li.select("a").map { it.text().trim() })
                 }
                 text.contains("التقييم") -> {
-                    rating = li.selectFirst("span")?.text()?.toFloatOrNull()?.times(10)?.toInt()
+                    val ratingText = li.text().replace(Regex("[^0-9.]"), "")
+                    rating = (ratingText.toFloatOrNull() ?: 0.0).times(10).toInt()
                 }
-                text.contains("الحاله") -> {
+                text.contains("الحاله") || text.contains("الحالة") -> {
                     status = getStatus(li)
                 }
             }
         }
 
-        // الحصول على الحلقات
-        val episodes = document.select("div.episodeList a, div.episodes a").mapNotNull { a ->
+        // الحصول على الحلقات (للمسلسلات)
+        val episodes = document.select("div.episodeList a, div.episodes a, table.episodes_list a").mapNotNull { a ->
             val href = fixUrlNull(a.attr("href")) ?: return@mapNotNull null
             val epNumText = a.selectFirst("span.epNum")?.text() ?: a.text()
             val epNum = epNumText.replace(Regex("[^0-9]"), "").toIntOrNull()
+            val epTitle = a.selectFirst("span.epTitle")?.text() ?: "الحلقة ${epNum ?: ""}"
 
             newEpisode(href) {
-                name = a.selectFirst("span.epTitle")?.text() ?: "الحلقة ${epNum ?: ""}"
+                name = epTitle
                 episode = epNum
             }
         }
@@ -156,7 +162,7 @@ class EgyDeadProvider : MainAPI() {
         val document = app.get(data, headers = customHeaders).document
         
         // البحث عن زر المشاهدة ونموذج الفيديو
-        val watchButton = document.selectFirst("button:contains(المشاهده), button:contains(المشاهدة)")
+        val watchButton = document.selectFirst("button:contains(المشاهده), button:contains(المشاهدة), input[value*=المشاهدة]")
         var foundLinks = false
         
         if (watchButton != null) {
@@ -209,6 +215,27 @@ class EgyDeadProvider : MainAPI() {
                 val src = iframe.attr("src")
                 if (src.isNotBlank()) {
                     loadExtractor(src, data, subtitleCallback, callback)
+                    foundLinks = true
+                }
+            }
+        }
+        
+        // إذا لم نجد iframes، نبحث عن فيديوهات مضمنة
+        if (!foundLinks) {
+            val videos = document.select("video source")
+            videos.forEach { video ->
+                val src = video.attr("src")
+                if (src.isNotBlank()) {
+                    callback.invoke(
+                        ExtractorLink(
+                            source = name,
+                            name = name,
+                            url = src,
+                            referer = data,
+                            quality = Qualities.Unknown.value,
+                            isM3u8 = src.contains(".m3u8")
+                        )
+                    )
                     foundLinks = true
                 }
             }
