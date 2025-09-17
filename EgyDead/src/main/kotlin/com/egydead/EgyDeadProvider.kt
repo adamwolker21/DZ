@@ -1,6 +1,5 @@
 package com.egydead
 
-import android.content.Context
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
@@ -127,98 +126,4 @@ class EgyDeadProvider : MainAPI() {
         val episodes = document.select("div.box-loop-episode a").mapNotNull { a ->
             val href = fixUrlNull(a.attr("href")) ?: return@mapNotNull null
             val epNumText = a.selectFirst(".titlepisode")?.text()?.replace(Regex("[^0-9]"), "")
-            val epNum = epNumText?.toIntOrNull()
-
-            newEpisode(href) {
-                name = a.selectFirst(".titlepisode")?.text()?.trim()
-                episode = epNum
-            }
-        }.reversed()
-
-        return if (episodes.isNotEmpty()) {
-            newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-                this.posterUrl = posterUrl
-                this.year = year
-                this.plot = plot
-                this.tags = tags
-                this.rating = rating
-                this.showStatus = status
-            }
-        } else {
-            newMovieLoadResponse(title, url, TvType.Movie, url) {
-                this.posterUrl = posterUrl
-                this.year = year
-                this.plot = plot
-                this.tags = tags
-                this.rating = rating
-            }
-        }
-    }
-    
-    override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        val document = app.get(data, headers = customHeaders).document
-        
-        val servers = document.select("ul.dropdown-menu li a")
-        var foundLinks = false
-        
-        servers.apmap { server ->
-            try {
-                val code = server.attr("data-code")
-                if (code.isBlank()) return@apmap
-
-                val ajaxUrl = "$mainUrl/ajaxGetRequest"
-                val response = app.post(
-                    ajaxUrl,
-                    data = mapOf("action" to "iframe_server", "code" to code),
-                    referer = data,
-                    headers = customHeaders + mapOf(
-                        "X-Requested-With" to "XMLHttpRequest",
-                        "Origin" to mainUrl
-                    )
-                ).text
-
-                val jsonResponse = parseJson<NewPlayerAjaxResponse>(response)
-                if (!jsonResponse.status) return@apmap
-
-                val iframeHtml = jsonResponse.codeplay
-                val iframeSrc = Jsoup.parse(iframeHtml).selectFirst("iframe")?.attr("src")
-                if (iframeSrc.isNullOrBlank()) return@apmap
-
-                val serverName = server.text()
-                println("Processing server: $serverName with iframe: $iframeSrc")
-
-                // استخدام loadExtractor بشكل صحيح مع newExtractorLink
-                loadExtractor(iframeSrc, data, subtitleCallback) { link ->
-                    callback.invoke(newExtractorLink(
-                        source = name,
-                        name = serverName,
-                        url = link.url,
-                        referer = link.referer ?: data,
-                        quality = link.quality,
-                        isM3u8 = link.isM3u8
-                    ))
-                    foundLinks = true
-                }
-
-            } catch (e: Exception) {
-                println("Error processing server: ${e.message}")
-                e.printStackTrace()
-            }
-        }
-        return foundLinks
-    }
-
-    data class NewPlayerAjaxResponse(
-        val status: Boolean,
-        val codeplay: String
-    )
-}
-
-class EgyDeadPlugin : CloudstreamPlugin() {
-    override fun load(context: Context) = EgyDeadProvider()
-}
+            val epNum = epNumText
