@@ -2,7 +2,6 @@ package com.egydead
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 
@@ -263,8 +262,4 @@ class EgyDeadProvider : MainAPI() {
 
     // دالة مساعدة للترميز
     private fun String.encodeToUrl(): String = java.net.URLEncoder.encode(this, "UTF-8")
-}
-
-class EgyDeadPlugin : CloudstreamPlugin() {
-    override fun load(context: Context) = EgyDeadProvider()
 }
