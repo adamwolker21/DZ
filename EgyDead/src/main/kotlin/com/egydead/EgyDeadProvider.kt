@@ -8,7 +8,7 @@ import org.jsoup.nodes.Element
 
 class EgyDeadProvider : MainAPI() {
     override var name = "EgyDead"
-    override var mainUrl = "https://egydead.com"
+    override var mainUrl = "https://tv5.egydead.live/"
     override var lang = "ar"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
@@ -50,9 +50,9 @@ class EgyDeadProvider : MainAPI() {
     }
 
     override val mainPage = mainPageOf(
-        "/newepisode" to "الحلقات الجديدة",
-        "/status/live" to "يبث حاليا",
-        "/status/coming-soon" to "الأعمال القادمة",
+        "/category/افلام-اجنبي-اونلاين/" to "أفلام",
+        "/category/افلام-اسيوية/" to "يبث حاليا",
+        "/series-category/مسلسلات-تركية-ا/" to "الأعمال القادمة",
         "/status/complete" to "أعمال مكتملة",
         "/series" to "المسلسلات",
         "/movies" to "الأفلام"
