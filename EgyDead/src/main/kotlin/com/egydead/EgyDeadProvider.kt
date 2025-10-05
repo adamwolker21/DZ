@@ -40,15 +40,12 @@ class EgyDeadProvider : MainAPI() {
     private fun Element.toSearchResult(): SearchResponse? {
         val linkTag = this.selectFirst("a") ?: return null
         val href = linkTag.attr("href")
-        // Title from main page items
+        // Title from main page items -> <h1 class="BottomTitle">
         val title = this.selectFirst("h1.BottomTitle")?.text() ?: return null
         val posterUrl = this.selectFirst("img")?.attr("src")
 
-        val cleanedTitle = title.replace("مشاهدة", "")
-            .replace("فيلم", "")
-            .replace("مسلسل", "")
-            .replace("مترجم", "")
-            .trim()
+        val cleanedTitle = title.replace("مشاهدة", "").trim()
+            .replace(Regex("^(فيلم|مسلسل)"), "").trim()
 
         val isSeries = title.contains("مسلسل") || title.contains("الموسم")
 
@@ -74,7 +71,7 @@ class EgyDeadProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         
-        // Title from movie/episode page
+        // Title from movie/episode page -> <div class="singleTitle"><em>...</em></div>
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterImage = document.selectFirst("div.single-thumbnail img")
         val posterUrl = posterImage?.attr("src")
@@ -89,7 +86,7 @@ class EgyDeadProvider : MainAPI() {
         val country = document.selectFirst("li:has(span:contains(البلد)) a")?.text()
         val channel = document.select("li:has(span:contains(القناه)) a").joinToString(", ") { it.text() }
 
-        // Format plot appendix without bold tags and on a new line
+        // Format plot appendix with HTML line breaks
         var plotAppendix = ""
         if (!country.isNullOrBlank()) {
             plotAppendix += "البلد: $country"
@@ -99,7 +96,8 @@ class EgyDeadProvider : MainAPI() {
             plotAppendix += "القناه: $channel"
         }
         if(plotAppendix.isNotEmpty()) {
-            plot = "$plot\n\n$plotAppendix"
+            // Using <br> for a guaranteed new line in HTML-supported views
+            plot = "$plot<br><br>$plotAppendix"
         }
 
         // Reliable classification based on "القسم"
@@ -123,7 +121,6 @@ class EgyDeadProvider : MainAPI() {
                 }
             }.sortedBy { it.episode }
 
-            // If on a single episode page with no episode list, create a single episode item
             if (episodes.isEmpty()) {
                 val epNumFromTitle = pageTitle.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
                 episodes = listOf(newEpisode(url) {
@@ -140,11 +137,7 @@ class EgyDeadProvider : MainAPI() {
                 this.tags = tags
             }
         } else {
-             val movieTitle = pageTitle
-                .replace("مشاهدة", "")
-                .replace("فيلم", "")
-                .replace("مترجم", "")
-                .trim()
+             val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
 
             return newMovieLoadResponse(movieTitle, url, TvType.Movie, url) {
                 this.posterUrl = posterUrl
