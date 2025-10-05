@@ -2,6 +2,7 @@ package com.egydead
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 
 class EgyDeadProvider : MainAPI() {
@@ -75,9 +76,19 @@ class EgyDeadProvider : MainAPI() {
 
     // Load movie/series details
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url).document
+        // First, get the initial page to see if we need to make a POST request
+        val initialDoc = app.get(url).document
 
-        // Use the new, more reliable selector for the title
+        // If the "Watch and Download" button is present, it means the content is hidden.
+        // We must perform a POST request to the same URL to reveal it.
+        val watchButton = initialDoc.selectFirst("button input[name=View]")
+        val document = if (watchButton != null) {
+            app.post(url, data = mapOf("View" to "1")).document
+        } else {
+            initialDoc // Use the initial document if the button isn't there (e.g., series main page)
+        }
+
+        // Now parse the correct document which contains all the info
         val rawTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val title = rawTitle.replace("مشاهدة", "")
             .replace("فيلم", "")
@@ -88,7 +99,6 @@ class EgyDeadProvider : MainAPI() {
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
         var plot = document.selectFirst("div.extra-content p")?.text()?.trim()
 
-        // Find details from the info list
         val infoList = document.select("div.single-content > ul > li")
         val year = infoList.find { it.text().contains("السنه") }
             ?.selectFirst("a")?.text()?.toIntOrNull()
@@ -99,12 +109,10 @@ class EgyDeadProvider : MainAPI() {
         val country = infoList.find { it.text().contains("البلد") }
             ?.selectFirst("a")?.text()
         
-        // Prepend country to the plot if it exists
         if (country != null) {
             plot = "البلد: $country\n\n$plot"
         }
 
-        // Check if it is a series by looking for the episodes list
         val episodesList = document.select("div.EpsList li a")
         if (episodesList.isNotEmpty()) {
             val episodes = episodesList.mapNotNull { epElement ->
@@ -115,7 +123,7 @@ class EgyDeadProvider : MainAPI() {
                 newEpisode(epHref) {
                     name = epElement.text().trim()
                     episode = epNum
-                    season = 1 // Assuming single season
+                    season = 1
                 }
             }.sortedBy { it.episode }
 
@@ -124,11 +132,8 @@ class EgyDeadProvider : MainAPI() {
                 this.plot = plot
                 this.year = year
                 this.tags = tags
-                // Duration in series is usually per episode
-                // this.duration = duration 
             }
         } else {
-            // It's a Movie
             return newMovieLoadResponse(title, url, TvType.Movie, url) {
                 this.posterUrl = posterUrl
                 this.plot = plot
@@ -139,13 +144,13 @@ class EgyDeadProvider : MainAPI() {
         }
     }
 
-    // Placeholder for loading video links
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        // To be implemented next
         return false
     }
 }
