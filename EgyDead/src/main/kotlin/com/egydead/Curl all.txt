@@ -1,0 +1,1384 @@
+curl 'https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'authority: tv6.egydead.live' \
+  -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cache-control: max-age=0' \
+  -H 'content-type: application/x-www-form-urlencoded' \
+  -H 'cookie: _ga=GA1.1.945206421.1759681664; _ga_Q2XZ3ZSWDY=GS2.1.s1759697078$o3$g1$t1759699147$j39$l0$h0' \
+  -H 'origin: https://tv6.egydead.live' \
+  -H 'referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: document' \
+  -H 'sec-fetch-mode: navigate' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'sec-fetch-user: ?1' \
+  -H 'upgrade-insecure-requests: 1' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --data-raw 'View=1' \
+  --compressed ;
+curl 'https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'authority: tv6.egydead.live' \
+  -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cookie: _ga=GA1.1.945206421.1759681664; _ga_Q2XZ3ZSWDY=GS2.1.s1759697078$o3$g1$t1759699127$j59$l0$h0' \
+  -H 'referer: https://tv6.egydead.live/season/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-2025-%d9%85%d8%aa%d8%b1%d8%ac%d9%85-%d9%83%d8%a7%d9%85%d9%84/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: document' \
+  -H 'sec-fetch-mode: navigate' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'sec-fetch-user: ?1' \
+  -H 'upgrade-insecure-requests: 1' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://www.youtube.com/youtubei/v1/log_event?alt=json' \
+  -H 'authority: www.youtube.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'content-type: application/json' \
+  -H 'cookie: YSC=yIrq3wp-5EM; VISITOR_INFO1_LIVE=xwyI25FGlpA; VISITOR_PRIVACY_METADATA=CgJEWhIEGgAgGw%3D%3D; __Secure-ROLLOUT_TOKEN=CL3_s8jnw-GvchC-1Lrvwo2QAxj21tqTw42QAw%3D%3D' \
+  -H 'origin: https://www.youtube.com' \
+  -H 'referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'x-goog-request-time: 1759699146219' \
+  -H 'x-goog-visitor-id: Cgt4d3lJMjVGR2xwQSi4wYvHBjIKCgJEWhIEGgAgGw%3D%3D' \
+  -H 'x-youtube-ad-signals: dt=1759699128030&flash=0&frm=2&u_tz=60&u_his=36&u_h=915&u_w=412&u_ah=915&u_aw=412&u_cd=24&bc=31&bih=-12245933&biw=-12245933&brdim=0%2C0%2C0%2C0%2C412%2C0%2C412%2C810%2C0%2C0&vis=1&wgl=true&ca_type=image' \
+  -H 'x-youtube-client-name: 56' \
+  -H 'x-youtube-client-version: 2.20250930.02.00' \
+  -H 'x-youtube-device: cbr=Chrome+Mobile&cbrand=generic&cbrver=137.0.0.0&ceng=WebKit&cengver=537.36&cmodel=android+10.0&cos=Android&cosver=10&cplatform=MOBILE' \
+  -H 'x-youtube-page-cl: 813518696' \
+  -H 'x-youtube-page-label: youtube.player.web_20250930_02_RC00' \
+  -H 'x-youtube-time-zone: Africa/Algiers' \
+  -H 'x-youtube-utc-offset: 60' \
+  --data-raw '{"context":{"client":{"hl":"en","gl":"DZ","clientName":56,"clientVersion":"2.20250930.02.00","configInfo":{"appInstallData":"CLjBi8cGELj2zxwQ3bPPHBDE9M8cEODpzxwQ9quwBRDJ968FEK3vzxwQpvnPHBCphtAcEIzpzxwQmZixBRCd0LAFEKnozxwQgc3OHBDFw88cEPeqgBMQgufPHBDEgtAcELfq_hIQ3rzOHBCV988cEL22rgUQr_jPHBC9mbAFEJi5zxwQu9nOHBD6idAcEN7pzxwQuOTOHBDM364FEImwzhwQlbGAExCIh7AFELargBMQmY2xBRCJ688cEIv3zxwQ2vfOHBCU8s8cEIeszhwQvamAExCaiNAcEPHozxwQlP6wBRCB988cEPyyzhwQt-TPHBCW288cENqF0BwQvoqwBRC--s8cELnZzhwQndfPHBDT4a8FEK7WzxwQ6vbPHBCP3M8cEMOtgBMqOENBTVNKUlVtLVpxLURMaVVFdndFMXdYbjFmQUxNcUNzQkFQTl93V1FVLUUyeWkyallvd3hIUWM9MAA%3D"},"userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36","screenDensityFloat":"2.8860480785369873","connectionType":"CONN_WIFI","browserName":"Chrome Mobile","deviceMake":"generic","browserVersion":"137.0.0.0","deviceModel":"android 10.0","osName":"Android","osVersion":"10","platform":"MOBILE"},"thirdParty":{"embedUrl":"https://tv6.egydead.live/"}},"events":[{"eventTimeMs":1759699145039,"latencyActionTicked":{"tickName":"vc","clientActionNonce":"D3G4BaL7ZjutAyNj"},"context":{"lastActivityMs":"16266"}},{"eventTimeMs":1759699146216,"finalPayload":{"csn":"HrobR6WW7QQA5AvC"},"context":{"lastActivityMs":"17442"}}],"serializedClientEventId":{"serializedEventId":"uODiaI7JL9W_p-oP3o21oQ8","clientCounter":"32183"}}' \
+  --compressed ;
+curl 'https://www.google-analytics.com/g/collect?v=2&tid=G-Q2XZ3ZSWDY&gtm=45je5a11v9115855826za200zd9115855826&_p=1759699127033&gcd=13l3l3l3l1l1&npa=0&dma=0&cid=945206421.1759681664&ul=en-us&sr=412x915&uaa=&uab=&uafvl=Chromium%3B137.0.7337.0%7CNot%252FA)Brand%3B24.0.0.0&uamb=1&uam=SM-A515F&uap=Android&uapv=13.0.0&uaw=0&are=1&frm=0&pscdl=noapi&_eu=AAAAAAQ&_s=2&tag_exp=101509157~103116026~103200004~103233427~104527907~104528500~104684208~104684211~104948813~115480710~115616986~115834636~115834638&sid=1759697078&sct=3&seg=1&dl=https%3A%2F%2Ftv6.egydead.live%2Fseason%2F%D9%85%D8%B3%D9%84%D8%B3%D9%84-%D8%A7%D9%84%D8%B9%D8%A7%D8%B5%D9%81%D8%A9-tempest-2025-%D9%85%D8%AA%D8%B1%D8%AC%D9%85-%D9%83%D8%A7%D9%85%D9%84%2F&dr=https%3A%2F%2Ftv6.egydead.live%2Fepisode%2F%D9%85%D8%B3%D9%84%D8%B3%D9%84-%D9%85%D8%A7%D8%B1%D8%AF-%D8%A7%D9%84%D8%A7%D9%85%D9%86%D9%8A%D8%A7%D8%AA-genie-make-a-wish-%D8%A7%D9%84%D8%AD%D9%84%D9%82%D8%A9-13-%D9%85%D8%AA%D8%B1%D8%AC%D9%85%D8%A9%2F&dt=%D9%85%D8%B3%D9%84%D8%B3%D9%84%20%D8%A7%D9%84%D8%B9%D8%A7%D8%B5%D9%81%D8%A9%20Tempest%202025%20%D9%85%D8%AA%D8%B1%D8%AC%D9%85%20%D9%83%D8%A7%D9%85%D9%84%20%7C%20%D8%A7%D9%8A%D8%AC%D9%8A%20%D8%AF%D9%8A%D8%AF&en=user_engagement&_et=9776&tfd=20260' \
+  -X 'POST' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.youtube.com/api/stats/atr?ns=yt&el=embedded&cpn=tbBnZOYsSQmMxxRl&ver=2&cmt=0&fs=0&rt=0.002&euri=https%3A%2F%2Ftv6.egydead.live%2F&lact=17972&cl=813518696&mos=0&volume=100&cbrand=generic&cbr=Chrome%20Mobile&cbrver=137.0.0.0&c=WEB_EMBEDDED_PLAYER&cver=2.20250930.02.00&cplayer=UNIPLAYER&cmodel=android%2010.0&cos=Android&cosver=10&cplatform=MOBILE&epm=1&hl=en_US&cr=DZ&len=120&fexp=v1%2C24004644%2C27005591%2C53408%2C34656%2C106030%2C18644%2C14869%2C102820%2C9252%2C3479%2C4042%2C40%2C8948%2C6257%2C16949%2C15179%2C2%2C79412%2C6109%2C9720%2C5385%2C18967%2C3317%2C1675%2C1100%2C4174%2C1059%2C10118%2C3869%2C4724%2C5948%2C3927%2C801%2C1258%2C1710%2C4772%2C9188%2C671%2C853%2C59%2C195%2C727%2C1007%2C300%2C261%2C1818%2C4776%2C1005%2C247%2C3211%2C2374%2C4233%2C817%2C189%2C472%2C137%2C2393%2C3962%2C1632%2C1684%2C3382%2C994%2C606%2C1017%2C1780%2C1191%2C1340%2C197%2C2873%2C818%2C3705&muted=0&conn=3&docid=YEz4SuMI1-Q' \
+  -H 'authority: www.youtube.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'content-type: application/x-www-form-urlencoded' \
+  -H 'cookie: YSC=yIrq3wp-5EM; VISITOR_INFO1_LIVE=xwyI25FGlpA; VISITOR_PRIVACY_METADATA=CgJEWhIEGgAgGw%3D%3D; __Secure-ROLLOUT_TOKEN=CL3_s8jnw-GvchC-1Lrvwo2QAxj21tqTw42QAw%3D%3D' \
+  -H 'origin: https://www.youtube.com' \
+  -H 'referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'x-goog-visitor-id: Cgt4d3lJMjVGR2xwQSi4wYvHBjIKCgJEWhIEGgAgGw%3D%3D' \
+  -H 'x-youtube-ad-signals: dt=1759699128519&flash=0&frm=2&u_tz=60&u_his=36&u_h=915&u_w=412&u_ah=915&u_aw=412&u_cd=24&bc=31&bih=-12245933&biw=-12245933&brdim=0%2C0%2C0%2C0%2C412%2C0%2C412%2C810%2C0%2C0&vis=1&wgl=true&ca_type=image' \
+  -H 'x-youtube-client-name: 56' \
+  -H 'x-youtube-client-version: 2.20250930.02.00' \
+  -H 'x-youtube-device: cbr=Chrome+Mobile&cbrand=generic&cbrver=137.0.0.0&ceng=WebKit&cengver=537.36&cmodel=android+10.0&cos=Android&cosver=10&cplatform=MOBILE' \
+  -H 'x-youtube-page-cl: 813518696' \
+  -H 'x-youtube-page-label: youtube.player.web_20250930_02_RC00' \
+  -H 'x-youtube-time-zone: Africa/Algiers' \
+  -H 'x-youtube-utc-offset: 60' \
+  --data-raw 'atr=a%3D6%26a2%3D10%26c%3D1759699128%26d%3D56%26t%3D7200%26c1a%3D1%26c6a%3D1%26c6b%3D1%26hh%3DH3wlqRNUjz5sM3hSD6_FassDTfRU5D4UBWPBGfP0RBI%26r1a%3D%24A5w5nMRRAAaFnnrvpZ7eJ_gkZ--XSkCnADQBEArZ1CB2XFv-0mZm14ohx2Mubvyds3n9K9g76h4CQmOiUOtwVNE9OuPCC3E4rOaZWVBxngAAB-vOAAAAUvQBB-IAU-ZN04AYqGVPWlH84zZrjKnhFaOKn-7Tq7qxt86oFUVIJl6fyNiJFPz2VVvElzBHccOUraKGdove90BNPtsmfnD-mOEh542LP7xhULxLtcZdrmKrBQSGjgEGHK7a5VAz1J_V2p2A1NNxpxjMqKbWg_qIiUDOlWwmWyicPeMitcsswl3M7OiYLVm9zogXqydymAnE8xb4a1iCLW-wL1IMHEu_owlWqu2kPGCqv4AVRx9fhD8t0PXJWv__Dj2Fgfabai_WknwSitSW5MKes7i8W_nHbiyF94LR0OpqbodFEuCZOwxrPc9GTXCxKWR_fRr32ZRsUrdpuzUt9Q6nSoTViBZkf16xUHCcnu2N6dbipAvRq5gK1WLImQ5R46UeqpHmU1TBDS-WiOqz3m_FwLmKehLd5h2Q6tH8NTgCcEbDiAobZWhawsQH3eQfNzl8b0WcdR1yQ2hvzkqV8goSpkYkuH90gZUbZCQJAxYOXHhlvIw3AGaQAqnetB4q73V4_0kUW94zALl4Nkl34ndkj0phIdpUejpCzOHD-oAdHNyMa093n4SQBlLtATZIHpfvs5A_RQLvk59Wx0c4OCYgvqeYTiN836-TDjjuM3EZElRXQaeRvUBck_Xy4V9z5Tiez0dglm4JdEyPqtojwh05h5Zr7te6uR8s6BCcbD4pm2R31KjDqlEg2Vt1zizSjbjUTRUzIAzbL_MPTt4Usu1BqXfYv7ITgQ-Lg-zO0ro3x0nWTE2j1zOeZjEwaqZA3dzSPEB1WUcYt62SZcwk5hTGK5ft7HMJhS6ec07g8GEPw6PRpzjOKD6WTyUr3gQbNxQ2dwOA0kYc_cQoczO-sF5XsbiWi1t_4J8VjQ2kgRADyNBgLeOHx-KsUDtQ7bHZnv8qTijGHChAQK7elbbtKCaju13xhM0Q2bDFVk6ONUnYyuE_6Wq26tTaS-PpjYXB-uiQBBmir5Bzc6xaS4zhDmfrnxdqR0V0qHQ-zw3ZD8OpAPnYfB_BJKlgFMTIW-K57LVEAxQMgC4sXhyMGw31pHEkNJq927konPOQPJRX1mAB9u-hvwx8we-09p0t7GCA6OP-F-WVa5O0ggTKQ2sUQXgkt0EXC0ZjxePwc9YkX2wzIXlki28D43tLb9F9A5ozrRbBQFfdi2ho9fEqojZJ4K9vN2sKQKvpePnPFXiPKUnK2eLOySpUSaAPTqZX1-WyfYH2K1nBKsn_emxalWxn0UsjmxJz-Y29hKNI-eADp7jdoTumzTh-Sax6-0EATqvrWAWyPNbDi4gqZ6iLG84ui2862e6hDpjCmLjTKjO0lpr5ujqq_CAPgdVKS17nab5A2toFcZagRBlSkCEjKo9HrXsYIJaxuJQLZXBxFDJXMhFQtgPxQ8M4m6t8heu8OLQhWPcEQb27MZJ50CVXHSWCqmcwyOatLSeeazrXTRgX2s06_kAfLiA6EIl60TmPboP0xhh3YdpDPa6O46O52PVfGX4DdpS2XicJu-uhVVK5eBaqqApNmd04LgNbVuvB4uxoEav4uGunkzVr5Vrz9HwLOgteWE4gzAyCwB9RouR4853yo9Xuyk_SETqrLLFOXaL7C-5SL_YF33k6CemJcExmDb7q_Rjp-4690QUrBbRkjzwKfoL-PNvXPpYOvapuIK9RfUkn%26r6a%3D1759699128%26r6b%3D1759699128&session_token=QUFFLUhqbnJiZUZ5RTAyZFFMYlpJYV94bTdCa0NlakFTQXxBQ3Jtc0tsNmtqZkp6eDJzTXdqQkpqYm56bzFIazdQRHhGenpSQTRCMmxVQm5HMXVxdmFWWTRTZUNSa3NCQk1kOU9abDN4UGMtV3Q5ZGRjOUhWX1Y3OFV6NmJsS1BaRlNKMG5HMXJVRklEVEpIdmpSVUxZRXV2VQ%3D%3D' \
+  --compressed ;
+curl 'https://www.youtube.com/youtubei/v1/log_event?alt=json' \
+  -H 'authority: www.youtube.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'content-type: application/json' \
+  -H 'cookie: YSC=yIrq3wp-5EM; VISITOR_INFO1_LIVE=xwyI25FGlpA; VISITOR_PRIVACY_METADATA=CgJEWhIEGgAgGw%3D%3D; __Secure-ROLLOUT_TOKEN=CL3_s8jnw-GvchC-1Lrvwo2QAxj21tqTw42QAw%3D%3D' \
+  -H 'origin: https://www.youtube.com' \
+  -H 'referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'x-goog-request-time: 1759699146863' \
+  -H 'x-goog-visitor-id: Cgt4d3lJMjVGR2xwQSi4wYvHBjIKCgJEWhIEGgAgGw%3D%3D' \
+  -H 'x-youtube-ad-signals: dt=1759699128030&flash=0&frm=2&u_tz=60&u_his=36&u_h=915&u_w=412&u_ah=915&u_aw=412&u_cd=24&bc=31&bih=-12245933&biw=-12245933&brdim=0%2C0%2C0%2C0%2C412%2C0%2C412%2C810%2C0%2C0&vis=1&wgl=true&ca_type=image' \
+  -H 'x-youtube-client-name: 56' \
+  -H 'x-youtube-client-version: 2.20250930.02.00' \
+  -H 'x-youtube-device: cbr=Chrome+Mobile&cbrand=generic&cbrver=137.0.0.0&ceng=WebKit&cengver=537.36&cmodel=android+10.0&cos=Android&cosver=10&cplatform=MOBILE' \
+  -H 'x-youtube-page-cl: 813518696' \
+  -H 'x-youtube-page-label: youtube.player.web_20250930_02_RC00' \
+  -H 'x-youtube-time-zone: Africa/Algiers' \
+  -H 'x-youtube-utc-offset: 60' \
+  --data-raw '{"context":{"client":{"hl":"en","gl":"DZ","clientName":56,"clientVersion":"2.20250930.02.00","configInfo":{"appInstallData":"CLjBi8cGELj2zxwQ3bPPHBDE9M8cEODpzxwQ9quwBRDJ968FEK3vzxwQpvnPHBCphtAcEIzpzxwQmZixBRCd0LAFEKnozxwQgc3OHBDFw88cEPeqgBMQgufPHBDEgtAcELfq_hIQ3rzOHBCV988cEL22rgUQr_jPHBC9mbAFEJi5zxwQu9nOHBD6idAcEN7pzxwQuOTOHBDM364FEImwzhwQlbGAExCIh7AFELargBMQmY2xBRCJ688cEIv3zxwQ2vfOHBCU8s8cEIeszhwQvamAExCaiNAcEPHozxwQlP6wBRCB988cEPyyzhwQt-TPHBCW288cENqF0BwQvoqwBRC--s8cELnZzhwQndfPHBDT4a8FEK7WzxwQ6vbPHBCP3M8cEMOtgBMqOENBTVNKUlVtLVpxLURMaVVFdndFMXdYbjFmQUxNcUNzQkFQTl93V1FVLUUyeWkyallvd3hIUWM9MAA%3D"},"userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36","screenDensityFloat":"2.8860480785369873","connectionType":"CONN_WIFI","browserName":"Chrome Mobile","deviceMake":"generic","browserVersion":"137.0.0.0","deviceModel":"android 10.0","osName":"Android","osVersion":"10","platform":"MOBILE"},"thirdParty":{"embedUrl":"https://tv6.egydead.live/"}},"events":[{"eventTimeMs":1759699146730,"latencyActionTicked":{"tickName":"mesv_s","clientActionNonce":"D3G4BaL7ZjutAyNj"},"context":{"lastActivityMs":"17957"}},{"eventTimeMs":1759699146748,"latencyActionTicked":{"tickName":"qoes","clientActionNonce":"D3G4BaL7ZjutAyNj"},"context":{"lastActivityMs":"17975"}},{"eventTimeMs":1759699146861,"finalPayload":{"csn":"HrobR6WW7QQA5AvC"},"context":{"lastActivityMs":"18087"}}],"serializedClientEventId":{"serializedEventId":"uODiaI7JL9W_p-oP3o21oQ8","clientCounter":"32184"}}' \
+  --compressed ;
+curl 'https://www.googletagmanager.com/gtag/js?id=G-Q2XZ3ZSWDY' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/css/fontawesome.min.css' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/css/fontawesome-all.min.css' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/css/themify-icons.css' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/css/jquery-confirm.min.css' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/css/bar-ui.css' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/style.css' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/css/mobileStyle.css' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/js/jquery.min.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/js/plugins.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-includes/css/dist/block-library/style-rtl.min.css?ver=6.8.3' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-includes/js/jquery/jquery.min.js?ver=3.7.1' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-includes/js/jquery/jquery-migrate.min.js?ver=3.4.1' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/js/ajax-login-script.js?ver=6.8.3' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/uploads/2021/07/EgyDead-Logo.png' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://pj.pinturaanglers.com/tv2NM2P61bmK5Y/21945' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/uploads/2025/09/%D9%85%D8%B3%D9%84%D8%B3%D9%84-Tempest-2025-%D9%85%D8%AA%D8%B1%D8%AC%D9%85.jpg' \
+  -H 'authority: tv6.egydead.live' \
+  -H 'accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cookie: _ga=GA1.1.945206421.1759681664; _ga_Q2XZ3ZSWDY=GS2.1.s1759697078$o3$g1$t1759699146$j40$l0$h0' \
+  -H 'referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: image' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/uploads/2022/12/%D9%85%D8%B3%D9%84%D8%B3%D9%84-%D8%A8%D8%A7%D9%84%D9%88%D9%86-%D8%A7%D8%AD%D9%85%D8%B1-Red-Balloon-2022-%D9%85%D8%AA%D8%B1%D8%AC%D9%85-207x280.jpg' \
+  -H 'authority: tv6.egydead.live' \
+  -H 'accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cookie: _ga=GA1.1.945206421.1759681664; _ga_Q2XZ3ZSWDY=GS2.1.s1759697078$o3$g1$t1759699146$j40$l0$h0' \
+  -H 'referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: image' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/uploads/2022/11/Behind-Every-Star-2022-225x280.jpg' \
+  -H 'authority: tv6.egydead.live' \
+  -H 'accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cookie: _ga=GA1.1.945206421.1759681664; _ga_Q2XZ3ZSWDY=GS2.1.s1759697078$o3$g1$t1759699146$j40$l0$h0' \
+  -H 'referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: image' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/uploads/2023/02/The-Origin-of-Eternity-2023-199x280.jpg' \
+  -H 'authority: tv6.egydead.live' \
+  -H 'accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cookie: _ga=GA1.1.945206421.1759681664; _ga_Q2XZ3ZSWDY=GS2.1.s1759697078$o3$g1$t1759699146$j40$l0$h0' \
+  -H 'referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: image' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/uploads/2023/02/The-Heavenly-Idol-187x280.jpg' \
+  -H 'authority: tv6.egydead.live' \
+  -H 'accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cookie: _ga=GA1.1.945206421.1759681664; _ga_Q2XZ3ZSWDY=GS2.1.s1759697078$o3$g1$t1759699146$j40$l0$h0' \
+  -H 'referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: image' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/uploads/2023/05/%D9%85%D8%B3%D9%84%D8%B3%D9%84-Agency-%D9%83%D8%A7%D9%85%D9%84-209x280.jpg' \
+  -H 'authority: tv6.egydead.live' \
+  -H 'accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cookie: _ga=GA1.1.945206421.1759681664; _ga_Q2XZ3ZSWDY=GS2.1.s1759697078$o3$g1$t1759699146$j40$l0$h0' \
+  -H 'referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: image' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/uploads/2022/10/%D9%85%D8%B3%D9%84%D8%B3%D9%84-Glitch-%D8%A7%D9%84%D9%85%D9%88%D8%B3%D9%85-%D8%A7%D9%84%D8%A7%D9%88%D9%84-211x280.jpg' \
+  -H 'authority: tv6.egydead.live' \
+  -H 'accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cookie: _ga=GA1.1.945206421.1759681664; _ga_Q2XZ3ZSWDY=GS2.1.s1759697078$o3$g1$t1759699146$j40$l0$h0' \
+  -H 'referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: image' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/uploads/2025/05/%D9%85%D8%B3%D9%84%D8%B3%D9%84-Second-Shot-at-Love-2025-210x280.jpg' \
+  -H 'authority: tv6.egydead.live' \
+  -H 'accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cookie: _ga=GA1.1.945206421.1759681664; _ga_Q2XZ3ZSWDY=GS2.1.s1759697078$o3$g1$t1759699146$j40$l0$h0' \
+  -H 'referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: image' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/uploads/2025/02/%D9%85%D8%B3%D9%84%D8%B3%D9%84-Queen-Woo-%D8%A7%D9%84%D9%85%D9%88%D8%B3%D9%85-%D8%A7%D9%84%D8%A7%D9%88%D9%84-%D9%85%D8%AA%D8%B1%D8%AC%D9%85-205x280.jpg' \
+  -H 'authority: tv6.egydead.live' \
+  -H 'accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cookie: _ga=GA1.1.945206421.1759681664; _ga_Q2XZ3ZSWDY=GS2.1.s1759697078$o3$g1$t1759699146$j40$l0$h0' \
+  -H 'referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: image' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/uploads/2022/11/Warm-and-Cozy-250x264.png' \
+  -H 'authority: tv6.egydead.live' \
+  -H 'accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cookie: _ga=GA1.1.945206421.1759681664; _ga_Q2XZ3ZSWDY=GS2.1.s1759697078$o3$g1$t1759699146$j40$l0$h0' \
+  -H 'referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: image' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/uploads/2022/09/The-Rise-of-Phoenixes-191x280.jpg' \
+  -H 'authority: tv6.egydead.live' \
+  -H 'accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cookie: _ga=GA1.1.945206421.1759681664; _ga_Q2XZ3ZSWDY=GS2.1.s1759697078$o3$g1$t1759699146$j40$l0$h0' \
+  -H 'referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: image' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/uploads/2025/06/%D9%85%D8%B3%D9%84%D8%B3%D9%84-%D9%84%D8%B9%D8%A8%D8%A9-%D8%A7%D9%84%D8%AD%D8%A8%D8%A7%D8%B1-%D8%A7%D9%84%D8%AC%D8%B2%D8%A1-%D8%A7%D9%84%D8%A7%D9%88%D9%84-225x280.jpg' \
+  -H 'authority: tv6.egydead.live' \
+  -H 'accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cookie: _ga=GA1.1.945206421.1759681664; _ga_Q2XZ3ZSWDY=GS2.1.s1759697078$o3$g1$t1759699146$j40$l0$h0' \
+  -H 'referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: image' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/uploads/2024/04/%D9%85%D8%B3%D9%84%D8%B3%D9%84-%D9%81%D9%8A%D9%86%D8%AA%D8%B4%D9%86%D8%B2%D9%88-Vincenzo-2023-%D9%85%D8%AA%D8%B1%D8%AC%D9%85-225x280.jpg' \
+  -H 'authority: tv6.egydead.live' \
+  -H 'accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cookie: _ga=GA1.1.945206421.1759681664; _ga_Q2XZ3ZSWDY=GS2.1.s1759697078$o3$g1$t1759699146$j40$l0$h0' \
+  -H 'referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: image' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/js/bootstrap.min.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/js/user-login.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/webfonts/fa-brands-400.woff2' \
+  -H 'Referer;' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/webfonts/fa-solid-900.woff2' \
+  -H 'Referer;' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/fonts/sky.ttf' \
+  -H 'Referer;' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/fonts/Cairo-Regular.ttf' \
+  -H 'Referer;' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/fonts/filmIcons.ttf' \
+  -H 'Referer;' \
+  --compressed ;
+curl 'https://bvtpk.com/tag.min.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'authority: www.youtube.com' \
+  -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cookie: YSC=yIrq3wp-5EM; VISITOR_INFO1_LIVE=xwyI25FGlpA; VISITOR_PRIVACY_METADATA=CgJEWhIEGgAgGw%3D%3D; __Secure-ROLLOUT_TOKEN=CL3_s8jnw-GvchC-1Lrvwo2QAxj21tqTw42QAw%3D%3D' \
+  -H 'referer: https://tv6.egydead.live/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: iframe' \
+  -H 'sec-fetch-mode: navigate' \
+  -H 'sec-fetch-site: cross-site' \
+  -H 'upgrade-insecure-requests: 1' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://www.youtube.com/s/player/29a37ef6/www-player.css' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.youtube.com/s/player/29a37ef6/embed_ui_css.css' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.youtube.com/s/player/29a37ef6/player_ias.vflset/en_US/embed.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.youtube.com/s/player/29a37ef6/www-embed-player-pc.vflset/www-embed-player-pc.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.youtube.com/s/player/29a37ef6/player_ias.vflset/en_US/base.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://fonts.gstatic.com/s/roboto/v18/KFOlCnqEu92Fr1MmEU9fBBc4AMP6lQ.woff2' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/' \
+  -H 'Origin: https://www.youtube.com' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://googleads.g.doubleclick.net/pagead/id' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://static.doubleclick.net/instream/ad_status.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://i.ytimg.com/vi_webp/YEz4SuMI1-Q/default.webp' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/uploads/2019/01/cropped-yXYdE2f-192x192.png' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/uploads/2019/01/cropped-yXYdE2f-180x180.png' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.google.com/js/th/P3NktEWjGvmQ-OQTun7QCKALwony29EdqRphg62i-yo.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.youtube.com/generate_204?KJ_BeQ' \
+  -H 'authority: www.youtube.com' \
+  -H 'accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cookie: YSC=yIrq3wp-5EM; VISITOR_INFO1_LIVE=xwyI25FGlpA; VISITOR_PRIVACY_METADATA=CgJEWhIEGgAgGw%3D%3D; __Secure-ROLLOUT_TOKEN=CL3_s8jnw-GvchC-1Lrvwo2QAxj21tqTw42QAw%3D%3D' \
+  -H 'referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: image' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://jnn-pa.googleapis.com/$rpc/google.internal.waa.v1.Waa/GenerateIT' \
+  -H 'authority: jnn-pa.googleapis.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'content-type: application/json+protobuf' \
+  -H 'origin: https://www.youtube.com' \
+  -H 'referer: https://www.youtube.com/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: cross-site' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'x-goog-api-key: AIzaSyDyT5W0Jh49F30Pqqtyfdf7pDLFKLJoAnw' \
+  --data-raw '["O43z0dpjhgX20SCx4KAo","$rzA5MGhRAAaFnnrvpZ7eiJSgNbUmdl-nADQBEArZ1OnDNdxdHwYY5Uvnj1IBWpHAtGv-FTwXVCMCTQUxjy-xhHS4sXVU2hU0dlrs3IwzngAABJPOAAAApPQBB-IAVvGMBNP53HY_EdrZRt4-l3QTJ4RmguKVyGxcfr-A6ODLDtooAf4uqTwKJQGouEsCYAAiEgREif9A97QNl_VgWHiZgm_YvElXtCjCPDqGrYNE7CTk2ifwBQSGvg82BhUabjQ3E6dKjYo9jGaX0b_ysfRnBkg_LbST74MmnfklOJHBMUjHpxlqHtQVpZFDIrl1IdoD186HQ8JWknHr7_vAgyitisCNJ1KnhX6xlF79Hz5iMxw8lkiKiAcaO0w7tZ8d6gLJdDs6tsCMAHdnXanKW9AKMB3yN_MM0OQvaJsbIQsoMQ-_WRD9-15kiLIi12bjgnAULu_szIgKltWt6XBdaXyeYLnqnRjodGAADhBoNB5w6vWQwt7DTdGbT0gNKq3S9eIMjkzCp9l0cbUk71sbY3Sg282VCcxRt3qs4MmQT1KdH6OaZdr1V9wXjg_WgjXZBLEJDL3xJwOvdcGDCXQlt4NODZddUQR5FOtcR2zSPfdx76MN_aZ60arXQH98uiYVUl4UwrOffTJcUJLaLVoptBa995CJsS0EfX7fBkBjpTIMleG94QDsWpCkWh9F7XdVi37jQfLCtPAPeY5xvv87tufiFBEwk-GgRAvoAAJT9-X_-Myl8OLHUAFWNxrmhr0mfWKd1cNIl2kxacIvrp3cedz_T7z-qNpeG0k_OFM8y6eaNkq41dJJ2RW9O3v2WHSQ8_dwzkR74NvReiFKBc0niW4tWUsSLDEeta85yi4IQ7QcQ5eoPliBfDT7aKFACyAgcvJFVJSbMXoOcxl3kO2P6lua_5m1Beil0hNmLwh5Gmb-FEFJfIvrRfKc3-86rkod9lTL8iAMfxY9aG9yHj3k__4-xI2coiVuaWxzSHE8Wu_bvQa9H7m6DZOrc2vlMRjtmRve6dC_CljD-WIDF-MrM50wYJw_mOXL9Ls8mBvwqHRDHnO9kVU-ckGe4bKyH0XlA84r_2e3M8KfFQAUi8BwkfHFwN8CQ02rF2SJAGjAMP7VcQrULMgV24OgkYLeVbHTuSo0onDh4W-DZNqNQ5UhmNWB454d_IYDU3wrQrI8Vxns7eN2bQXs6IRFgT2HjhRm7As9vHEu-Fpi3Ykd1ZhoxZtiBgEXJVEbdNI6BHxZxQXu3Uqu-9NG7n7XbDckKZgJIRPBK4cXtmUoXomiaSuAsEeb1N59De1XnsaC9acGaZ5qNIIuAiuXkk3JeamsNiY_igyNLp3FpAr8NwWb2doNCSfqP1AHYnj1CKDlfuQyOA5owQ_TwXoqf4DMDPFW9lBH-SrETvjSDgjTJfe3DWrAvkvAQkbX7Blrhabf4GhcejY125sk0OG1CYYDTRSoQdK9Ua--_XN3Znt2hO71SvzyF3YETe9HdpKgDWA2V7HUZgh-J6nxCZac4UXyj8MBF-C1EzqG9-Ug38FMBQWVk_XPLvst17AQzNKDbdiyEdfgy0Vqa5AQOXHTH0nm3z7zkpn3lPXlmiPDV3dIU6R11jtQhVLM42tN2PtFTYCP27StkQ0ZBZAIumyLwVpif2khQJDRjaTN8gCGsM5yIHBU-BYBCGB5KiKO8p_VemWp5E__hS7ZCJ-P-9ogGNNx2oT2hemoN7hL25Jddlnpio9pL1tpKwxB5_-wetbSO_9NIzNjUuUkxhAE_kJoHZwShoXgcqPw"]' \
+  --compressed ;
+curl 'https://www.google-analytics.com/g/collect?v=2&tid=G-Q2XZ3ZSWDY&gtm=45je5a11v9115855826za200zd9115855826&_p=1759699146961&gcd=13l3l3l3l1l1&npa=0&dma=0&cid=945206421.1759681664&ul=en-us&sr=412x915&uaa=&uab=&uafvl=Chromium%3B137.0.7337.0%7CNot%252FA)Brand%3B24.0.0.0&uamb=1&uam=SM-A515F&uap=Android&uapv=13.0.0&uaw=0&are=1&frm=0&pscdl=noapi&_eu=AAAAAAQ&_s=1&tag_exp=101509157~103116026~103200004~103233427~104527907~104528500~104684208~104684211~104948813~105322302~115480709~115616985~115834636~115834638&sid=1759697078&sct=3&seg=1&dl=https%3A%2F%2Ftv6.egydead.live%2Fepisode%2F%D9%85%D8%B3%D9%84%D8%B3%D9%84-%D8%A7%D9%84%D8%B9%D8%A7%D8%B5%D9%81%D8%A9-tempest-%D8%A7%D9%84%D8%AD%D9%84%D9%82%D8%A9-1-%D9%85%D8%AA%D8%B1%D8%AC%D9%85%D8%A9%2F&dr=https%3A%2F%2Ftv6.egydead.live%2Fseason%2F%D9%85%D8%B3%D9%84%D8%B3%D9%84-%D8%A7%D9%84%D8%B9%D8%A7%D8%B5%D9%81%D8%A9-tempest-2025-%D9%85%D8%AA%D8%B1%D8%AC%D9%85-%D9%83%D8%A7%D9%85%D9%84%2F&dt=%D9%85%D8%B3%D9%84%D8%B3%D9%84%20%D8%A7%D9%84%D8%B9%D8%A7%D8%B5%D9%81%D8%A9%20Tempest%20%D8%A7%D9%84%D8%AD%D9%84%D9%82%D8%A9%201%20%D9%85%D8%AA%D8%B1%D8%AC%D9%85%D8%A9%20%7C%20%D8%A7%D9%8A%D8%AC%D9%8A%20%D8%AF%D9%8A%D8%AF&en=page_view&_ee=1&tfd=6929' \
+  -X 'POST' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.youtube.com/youtubei/v1/log_event?alt=json' \
+  -H 'authority: www.youtube.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'content-type: application/json' \
+  -H 'cookie: YSC=yIrq3wp-5EM; VISITOR_INFO1_LIVE=xwyI25FGlpA; VISITOR_PRIVACY_METADATA=CgJEWhIEGgAgGw%3D%3D; __Secure-ROLLOUT_TOKEN=CL3_s8jnw-GvchC-1Lrvwo2QAxj21tqTw42QAw%3D%3D' \
+  -H 'origin: https://www.youtube.com' \
+  -H 'referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'x-goog-request-time: 1759699153200' \
+  -H 'x-goog-visitor-id: Cgt4d3lJMjVGR2xwQSjMwYvHBjIKCgJEWhIEGgAgGw%3D%3D' \
+  -H 'x-youtube-ad-signals: dt=1759699147853&flash=0&frm=2&u_tz=60&u_his=37&u_h=915&u_w=412&u_ah=915&u_aw=412&u_cd=24&bc=31&bih=-12245933&biw=-12245933&brdim=0%2C0%2C0%2C0%2C412%2C0%2C412%2C810%2C0%2C0&vis=2&wgl=true&ca_type=image' \
+  -H 'x-youtube-client-name: 56' \
+  -H 'x-youtube-client-version: 2.20250930.02.00' \
+  -H 'x-youtube-device: cbr=Chrome+Mobile&cbrand=generic&cbrver=137.0.0.0&ceng=WebKit&cengver=537.36&cmodel=android+10.0&cos=Android&cosver=10&cplatform=MOBILE' \
+  -H 'x-youtube-page-cl: 813518696' \
+  -H 'x-youtube-page-label: youtube.player.web_20250930_02_RC00' \
+  -H 'x-youtube-time-zone: Africa/Algiers' \
+  -H 'x-youtube-utc-offset: 60' \
+  --data-raw '{"context":{"client":{"hl":"en","gl":"DZ","clientName":56,"clientVersion":"2.20250930.02.00","configInfo":{"appInstallData":"CMzBi8cGEN2zzxwQmLnPHBDFw88cEJX3zxwQzN-uBRDE9M8cEParsAUQndfPHBC9tq4FEIv3zxwQtquAExDe6c8cELfkzxwQndCwBRC52c4cEK_4zxwQgc3OHBC36v4SEPHozxwQxILQHBDahdAcEIiHsAUQpvnPHBCphtAcELjkzhwQ_LLOHBC-irAFEK3vzxwQlbGAExC--s8cEILnzxwQrtbPHBC72c4cEMn3rwUQmZixBRCW288cEN68zhwQvamAExC9mbAFEImwzhwQuPbPHBCZjbEFEPeqgBMQjOnPHBCU_rAFEJqI0BwQh6zOHBCU8s8cEIH3zxwQqejPHBCJ688cENPhrwUQ4OnPHBDa984cEOr2zxwQw62AExCP3M8cKjRDQU1TSXhVWS1acS1ETGlVRXZ3RTF3WG4xZkFMTXFDc0JBUE5fd1dRVS1FMnlpMmpZaDBIMAA%3D"},"userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36","screenDensityFloat":"2.8860480785369873","connectionType":"CONN_WIFI","browserName":"Chrome Mobile","deviceMake":"generic","browserVersion":"137.0.0.0","deviceModel":"android 10.0","osName":"Android","osVersion":"10","platform":"MOBILE"},"thirdParty":{"embedUrl":"https://tv6.egydead.live/"}},"events":[{"eventTimeMs":1759699147784,"latencyActionTicked":{"tickName":"ep_init_cus","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147786,"latencyActionTicked":{"tickName":"ep_init_eps","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147787,"latencyActionTicked":{"tickName":"ep_init_epe","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147788,"latencyActionTicked":{"tickName":"ep_init_cue","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147891,"latencyActionTicked":{"tickName":"pe","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147921,"latencyActionTicked":{"tickName":"ep_init_wes","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147328,"latencyActionTicked":{"tickName":"srt","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147201,"latencyActionBaselined":{"clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147209,"latencyActionTicked":{"tickName":"nreqs","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147328,"latencyActionTicked":{"tickName":"nress","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147353,"latencyActionTicked":{"tickName":"nrese","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147435,"latencyActionTicked":{"tickName":"rsf_pj","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147435,"latencyActionTicked":{"tickName":"rse_pj","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147432,"latencyActionTicked":{"tickName":"rsf_pej","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147432,"latencyActionTicked":{"tickName":"rse_pej","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147431,"latencyActionTicked":{"tickName":"rsf_pc","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147431,"latencyActionTicked":{"tickName":"rse_pc","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147434,"latencyActionTicked":{"tickName":"rsf_ecj","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147434,"latencyActionTicked":{"tickName":"rse_ecj","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147432,"latencyActionTicked":{"tickName":"rsf_ecc","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147432,"latencyActionTicked":{"tickName":"rse_ecc","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699147969,"latencyActionInfo":{"isNavigation":true,"actionType":"LATENCY_ACTION_VIDEO_PREVIEW","httpProtocol":"h3","transportProtocol":"quic","isVisible":true,"loadType":"cold","resourceInfo":[{"resourceCache":"pj"},{"resourceCache":"pej"},{"resourceCache":"pc"},{"resourceCache":"ecj"},{"resourceCache":"ecc"}],"clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699148002,"latencyActionTicked":{"tickName":"ep_init_wee","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699148003,"latencyActionTicked":{"tickName":"ep_init_ijs","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699148007,"latencyActionTicked":{"tickName":"ep_init_ije","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699148013,"latencyActionTicked":{"tickName":"ep_init_rs","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699148037,"latencyActionTicked":{"tickName":"ep_init_re","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699148187,"screenCreated":{"csn":"g-bI0CPwRdmlxnM-","pageVe":{"veType":16623,"youtubeData":{"servletData":{"serializedServletEventId":"zODiaPf8JMysi9oPr47WkAs"}}}},"context":{"lastActivityMs":"69"}},{"eventTimeMs":1759699148189,"latencyActionInfo":{"clientScreenNonce":"g-bI0CPwRdmlxnM-","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"71"}},{"eventTimeMs":1759699148190,"screenCreated":{"csn":"hxa9Wl5B_QQEOezz","pageVe":{"veType":32594},"implicitGesture":{"parentCsn":"g-bI0CPwRdmlxnM-","gesturedVe":{"veType":16623},"gestureType":"INTERACTION_LOGGING_GESTURE_TYPE_AUTOMATED"}},"context":{"lastActivityMs":"72"}},{"eventTimeMs":1759699148191,"visualElementHidden":{"csn":"g-bI0CPwRdmlxnM-","ve":{"veType":16623},"eventType":16},"context":{"lastActivityMs":"73"}},{"eventTimeMs":1759699148191,"latencyActionInfo":{"clientScreenNonce":"hxa9Wl5B_QQEOezz","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"73"}},{"eventTimeMs":1759699148192,"visualElementAttached":{"csn":"hxa9Wl5B_QQEOezz","parentVe":{"veType":32594},"childVes":[{"trackingParams":"CAAQru4BIhMIx4-plf6NkAMVU9VCBR13Dx33"}]},"context":{"lastActivityMs":"74"}},{"eventTimeMs":1759699148214,"latencyActionTicked":{"tickName":"fs","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"96"}},{"eventTimeMs":1759699148267,"latencyActionTicked":{"tickName":"ep_init_pr","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"149"}},{"eventTimeMs":1759699148314,"visualElementAttached":{"csn":"hxa9Wl5B_QQEOezz","parentVe":{"veType":32594},"childVes":[{"veType":28572,"veCounter":1,"elementIndex":0}]},"context":{"lastActivityMs":"196"}},{"eventTimeMs":1759699148315,"visualElementShown":{"csn":"hxa9Wl5B_QQEOezz","ve":{"veType":28572,"veCounter":1,"elementIndex":0},"eventType":1},"context":{"lastActivityMs":"197"}},{"eventTimeMs":1759699148423,"latencyActionTicked":{"tickName":"ftr","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"305"}},{"eventTimeMs":1759699148490,"latencyActionInfo":{"serverTimeMs":50,"clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"372"}},{"eventTimeMs":1759699148577,"latencyActionInfo":{"clientPlaybackNonce":"vl9SGGzYZ9xMG_T5","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"459"}},{"eventTimeMs":1759699148884,"latencyActionTicked":{"tickName":"vc","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"766"}},{"eventTimeMs":1759699149176,"latencyActionTicked":{"tickName":"pot_ist","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"1058"}},{"eventTimeMs":1759699150620,"streamzIncremented":{"serializedIncrementBatch":"ChUvY2xpZW50X3N0cmVhbXovYmcvZWMSEAoOCghib3RndWFyZBICNTEaAmVuGgJtayIRCgMKAW8KBgoEYUdJZhICCAEiEQoDCgF0CgYKBGFHSWYSAggB"},"context":{"lastActivityMs":"2502"}},{"eventTimeMs":1759699150625,"streamzIncremented":{"serializedIncrementBatch":"ChUvY2xpZW50X3N0cmVhbXovYmcvZWwSEAoOCghib3RndWFyZBICNTEaAmVuGgJtayIYCgMKAXQKBgoEYUdJZhIJEQAANDMzE5RA"},"context":{"lastActivityMs":"2507"}},{"eventTimeMs":1759699150932,"latencyActionTicked":{"tickName":"pot_if","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"2814"}},{"eventTimeMs":1759699150935,"latencyActionTicked":{"tickName":"pot_cms","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"2817"}},{"eventTimeMs":1759699150953,"latencyActionTicked":{"tickName":"pot_cmf","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"2835"}},{"eventTimeMs":1759699152173,"streamzIncremented":{"serializedIncrementBatch":"ChYvY2xpZW50X3N0cmVhbXovYmcvZnJzEhAKDgoIYm90Z3VhcmQSAjUxGgJtayITCgYKBGFHSWYSCREAAAAAAPSbQA=="},"context":{"lastActivityMs":"4055"}},{"eventTimeMs":1759699152177,"streamzIncremented":{"serializedIncrementBatch":"ChUvY2xpZW50X3N0cmVhbXovYmcvZWMSEAoOCghib3RndWFyZBICNTEaAmVuGgJtayIRCgMKAW4KBgoEYUdJZhICCAEiEQoDCgFtCgYKBGFHSWYSAggB"},"context":{"lastActivityMs":"4059"}},{"eventTimeMs":1759699152183,"streamzIncremented":{"serializedIncrementBatch":"ChUvY2xpZW50X3N0cmVhbXovYmcvZWwSEAoOCghib3RndWFyZBICNTEaAmVuGgJtayIYCgMKAW4KBgoEYUdJZhIJEQAAcGZmdmVAIhgKAwoBaQoGCgRhR0lmEgkRAAAAmpkZM0AiGAoDCgFvCgYKBGFHSWYSCREAAJqZmfuaQCIYCgMKAWMKBgoEYUdJZhIJEQAAAAAAAOA/IhgKAwoBQwoGCgRhR0lmEgkRAAAAZ2ZmIkAiGAoDCgF4CgYKBGFHSWYSCREAAACAmZnZPyIYCgMKAW0KBgoEYUdJZhIJEQAAAM3MzChA"},"context":{"lastActivityMs":"4064"}}],"serializedClientEventId":{"serializedEventId":"zODiaPf8JMysi9oPr47WkAs","clientCounter":"9588"}}' \
+  --compressed ;
+curl 'https://www.youtube.com/youtubei/v1/log_event?alt=json' \
+  -H 'authority: www.youtube.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'content-type: application/json' \
+  -H 'cookie: YSC=yIrq3wp-5EM; VISITOR_INFO1_LIVE=xwyI25FGlpA; VISITOR_PRIVACY_METADATA=CgJEWhIEGgAgGw%3D%3D; __Secure-ROLLOUT_TOKEN=CL3_s8jnw-GvchC-1Lrvwo2QAxj21tqTw42QAw%3D%3D' \
+  -H 'origin: https://www.youtube.com' \
+  -H 'referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'x-goog-request-time: 1759699208187' \
+  -H 'x-goog-visitor-id: Cgt4d3lJMjVGR2xwQSjMwYvHBjIKCgJEWhIEGgAgGw%3D%3D' \
+  -H 'x-youtube-ad-signals: dt=1759699147748&flash=0&frm=2&u_tz=60&u_his=37&u_h=915&u_w=412&u_ah=915&u_aw=412&u_cd=24&bc=31&bih=-12245933&biw=-12245933&brdim=0%2C0%2C0%2C0%2C412%2C0%2C412%2C810%2C0%2C0&vis=1&wgl=true&ca_type=image' \
+  -H 'x-youtube-client-name: 56' \
+  -H 'x-youtube-client-version: 2.20250930.02.00' \
+  -H 'x-youtube-device: cbr=Chrome+Mobile&cbrand=generic&cbrver=137.0.0.0&ceng=WebKit&cengver=537.36&cmodel=android+10.0&cos=Android&cosver=10&cplatform=MOBILE' \
+  -H 'x-youtube-page-cl: 813518696' \
+  -H 'x-youtube-page-label: youtube.player.web_20250930_02_RC00' \
+  -H 'x-youtube-time-zone: Africa/Algiers' \
+  -H 'x-youtube-utc-offset: 60' \
+  --data-raw '{"context":{"client":{"hl":"en","gl":"DZ","clientName":56,"clientVersion":"2.20250930.02.00","configInfo":{"appInstallData":"CMzBi8cGEN2zzxwQmLnPHBDFw88cEJX3zxwQzN-uBRDE9M8cEParsAUQndfPHBC9tq4FEIv3zxwQtquAExDe6c8cELfkzxwQndCwBRC52c4cEK_4zxwQgc3OHBC36v4SEPHozxwQxILQHBDahdAcEIiHsAUQpvnPHBCphtAcELjkzhwQ_LLOHBC-irAFEK3vzxwQlbGAExC--s8cEILnzxwQrtbPHBC72c4cEMn3rwUQmZixBRCW288cEN68zhwQvamAExC9mbAFEImwzhwQuPbPHBCZjbEFEPeqgBMQjOnPHBCU_rAFEJqI0BwQh6zOHBCU8s8cEIH3zxwQqejPHBCJ688cENPhrwUQ4OnPHBDa984cEOr2zxwQw62AExCP3M8cKjRDQU1TSXhVWS1acS1ETGlVRXZ3RTF3WG4xZkFMTXFDc0JBUE5fd1dRVS1FMnlpMmpZaDBIMAA%3D"},"userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36","screenDensityFloat":"2.8860480785369873","connectionType":"CONN_WIFI","browserName":"Chrome Mobile","deviceMake":"generic","browserVersion":"137.0.0.0","deviceModel":"android 10.0","osName":"Android","osVersion":"10","platform":"MOBILE"},"thirdParty":{"embedUrl":"https://tv6.egydead.live/"}},"events":[{"eventTimeMs":1759699192394,"latencyActionTicked":{"tickName":"vc","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"44276"}}],"serializedClientEventId":{"serializedEventId":"zODiaPf8JMysi9oPr47WkAs","clientCounter":"9589"}}' \
+  --compressed ;
+curl 'https://www.youtube.com/youtubei/v1/log_event?alt=json' \
+  -H 'authority: www.youtube.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'content-type: application/json' \
+  -H 'cookie: YSC=yIrq3wp-5EM; VISITOR_INFO1_LIVE=xwyI25FGlpA; VISITOR_PRIVACY_METADATA=CgJEWhIEGgAgGw%3D%3D; __Secure-ROLLOUT_TOKEN=CL3_s8jnw-GvchC-1Lrvwo2QAxj21tqTw42QAw%3D%3D' \
+  -H 'origin: https://www.youtube.com' \
+  -H 'referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'x-goog-request-time: 1759699216403' \
+  -H 'x-goog-visitor-id: Cgt4d3lJMjVGR2xwQSjMwYvHBjIKCgJEWhIEGgAgGw%3D%3D' \
+  -H 'x-youtube-ad-signals: dt=1759699147748&flash=0&frm=2&u_tz=60&u_his=37&u_h=915&u_w=412&u_ah=915&u_aw=412&u_cd=24&bc=31&bih=-12245933&biw=-12245933&brdim=0%2C0%2C0%2C0%2C412%2C0%2C412%2C810%2C0%2C0&vis=1&wgl=true&ca_type=image' \
+  -H 'x-youtube-client-name: 56' \
+  -H 'x-youtube-client-version: 2.20250930.02.00' \
+  -H 'x-youtube-device: cbr=Chrome+Mobile&cbrand=generic&cbrver=137.0.0.0&ceng=WebKit&cengver=537.36&cmodel=android+10.0&cos=Android&cosver=10&cplatform=MOBILE' \
+  -H 'x-youtube-page-cl: 813518696' \
+  -H 'x-youtube-page-label: youtube.player.web_20250930_02_RC00' \
+  -H 'x-youtube-time-zone: Africa/Algiers' \
+  -H 'x-youtube-utc-offset: 60' \
+  --data-raw '{"context":{"client":{"hl":"en","gl":"DZ","clientName":56,"clientVersion":"2.20250930.02.00","configInfo":{"appInstallData":"CMzBi8cGEN2zzxwQmLnPHBDFw88cEJX3zxwQzN-uBRDE9M8cEParsAUQndfPHBC9tq4FEIv3zxwQtquAExDe6c8cELfkzxwQndCwBRC52c4cEK_4zxwQgc3OHBC36v4SEPHozxwQxILQHBDahdAcEIiHsAUQpvnPHBCphtAcELjkzhwQ_LLOHBC-irAFEK3vzxwQlbGAExC--s8cEILnzxwQrtbPHBC72c4cEMn3rwUQmZixBRCW288cEN68zhwQvamAExC9mbAFEImwzhwQuPbPHBCZjbEFEPeqgBMQjOnPHBCU_rAFEJqI0BwQh6zOHBCU8s8cEIH3zxwQqejPHBCJ688cENPhrwUQ4OnPHBDa984cEOr2zxwQw62AExCP3M8cKjRDQU1TSXhVWS1acS1ETGlVRXZ3RTF3WG4xZkFMTXFDc0JBUE5fd1dRVS1FMnlpMmpZaDBIMAA%3D"},"userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36","screenDensityFloat":"2.8860480785369873","connectionType":"CONN_WIFI","browserName":"Chrome Mobile","deviceMake":"generic","browserVersion":"137.0.0.0","deviceModel":"android 10.0","osName":"Android","osVersion":"10","platform":"MOBILE"},"thirdParty":{"embedUrl":"https://tv6.egydead.live/"}},"events":[{"eventTimeMs":1759699208574,"latencyActionTicked":{"tickName":"vc","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"60456"}},{"eventTimeMs":1759699213626,"latencyActionTicked":{"tickName":"vc","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"65508"}},{"eventTimeMs":1759699216398,"finalPayload":{"csn":"hxa9Wl5B_QQEOezz"},"context":{"lastActivityMs":"68280"}}],"serializedClientEventId":{"serializedEventId":"zODiaPf8JMysi9oPr47WkAs","clientCounter":"9590"}}' \
+  --compressed ;
+curl 'https://www.google-analytics.com/g/collect?v=2&tid=G-Q2XZ3ZSWDY&gtm=45je5a11v9115855826za200zd9115855826&_p=1759699146961&gcd=13l3l3l3l1l1&npa=0&dma=0&cid=945206421.1759681664&ul=en-us&sr=412x915&uaa=&uab=&uafvl=Chromium%3B137.0.7337.0%7CNot%252FA)Brand%3B24.0.0.0&uamb=1&uam=SM-A515F&uap=Android&uapv=13.0.0&uaw=0&are=1&frm=0&pscdl=noapi&_eu=AAAAAAQ&_s=2&tag_exp=101509157~103116026~103200004~103233427~104527907~104528500~104684208~104684211~104948813~105322302~115480709~115616985~115834636~115834638&sid=1759697078&sct=3&seg=1&dl=https%3A%2F%2Ftv6.egydead.live%2Fepisode%2F%D9%85%D8%B3%D9%84%D8%B3%D9%84-%D8%A7%D9%84%D8%B9%D8%A7%D8%B5%D9%81%D8%A9-tempest-%D8%A7%D9%84%D8%AD%D9%84%D9%82%D8%A9-1-%D9%85%D8%AA%D8%B1%D8%AC%D9%85%D8%A9%2F&dr=https%3A%2F%2Ftv6.egydead.live%2Fseason%2F%D9%85%D8%B3%D9%84%D8%B3%D9%84-%D8%A7%D9%84%D8%B9%D8%A7%D8%B5%D9%81%D8%A9-tempest-2025-%D9%85%D8%AA%D8%B1%D8%AC%D9%85-%D9%83%D8%A7%D9%85%D9%84%2F&dt=%D9%85%D8%B3%D9%84%D8%B3%D9%84%20%D8%A7%D9%84%D8%B9%D8%A7%D8%B5%D9%81%D8%A9%20Tempest%20%D8%A7%D9%84%D8%AD%D9%84%D9%82%D8%A9%201%20%D9%85%D8%AA%D8%B1%D8%AC%D9%85%D8%A9%20%7C%20%D8%A7%D9%8A%D8%AC%D9%8A%20%D8%AF%D9%8A%D8%AF&en=user_engagement&_et=19888&tfd=70647' \
+  -X 'POST' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.youtube.com/api/stats/atr?ns=yt&el=embedded&cpn=vl9SGGzYZ9xMG_T5&ver=2&cmt=0&fs=0&rt=0.001&euri=https%3A%2F%2Ftv6.egydead.live%2F&lact=68834&cl=813518696&mos=0&volume=100&cbrand=generic&cbr=Chrome%20Mobile&cbrver=137.0.0.0&c=WEB_EMBEDDED_PLAYER&cver=2.20250930.02.00&cplayer=UNIPLAYER&cmodel=android%2010.0&cos=Android&cosver=10&cplatform=MOBILE&epm=1&hl=en_US&cr=DZ&len=120&fexp=v1%2C24004644%2C27005591%2C53408%2C34656%2C106030%2C18644%2C14869%2C102820%2C9252%2C3479%2C4042%2C40%2C8948%2C23206%2C15179%2C2%2C79412%2C6109%2C9720%2C5385%2C18967%2C3317%2C1675%2C1100%2C4174%2C1059%2C10118%2C3869%2C4724%2C5948%2C3927%2C801%2C1258%2C1710%2C4772%2C9188%2C671%2C853%2C59%2C195%2C727%2C1007%2C300%2C261%2C1818%2C4776%2C1005%2C247%2C3211%2C2374%2C4233%2C817%2C189%2C472%2C137%2C2393%2C3962%2C1632%2C1684%2C3382%2C994%2C606%2C1017%2C1780%2C1191%2C1537%2C2873%2C818%2C3705&muted=0&conn=3&docid=YEz4SuMI1-Q' \
+  -H 'authority: www.youtube.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'content-type: application/x-www-form-urlencoded' \
+  -H 'cookie: YSC=yIrq3wp-5EM; VISITOR_INFO1_LIVE=xwyI25FGlpA; VISITOR_PRIVACY_METADATA=CgJEWhIEGgAgGw%3D%3D; __Secure-ROLLOUT_TOKEN=CL3_s8jnw-GvchC-1Lrvwo2QAxj21tqTw42QAw%3D%3D' \
+  -H 'origin: https://www.youtube.com' \
+  -H 'referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'x-goog-visitor-id: Cgt4d3lJMjVGR2xwQSjMwYvHBjIKCgJEWhIEGgAgGw%3D%3D' \
+  -H 'x-youtube-ad-signals: dt=1759699147853&flash=0&frm=2&u_tz=60&u_his=37&u_h=915&u_w=412&u_ah=915&u_aw=412&u_cd=24&bc=31&bih=-12245933&biw=-12245933&brdim=0%2C0%2C0%2C0%2C412%2C0%2C412%2C810%2C0%2C0&vis=1&wgl=true&ca_type=image' \
+  -H 'x-youtube-client-name: 56' \
+  -H 'x-youtube-client-version: 2.20250930.02.00' \
+  -H 'x-youtube-device: cbr=Chrome+Mobile&cbrand=generic&cbrver=137.0.0.0&ceng=WebKit&cengver=537.36&cmodel=android+10.0&cos=Android&cosver=10&cplatform=MOBILE' \
+  -H 'x-youtube-page-cl: 813518696' \
+  -H 'x-youtube-page-label: youtube.player.web_20250930_02_RC00' \
+  -H 'x-youtube-time-zone: Africa/Algiers' \
+  -H 'x-youtube-utc-offset: 60' \
+  --data-raw 'atr=a%3D6%26a2%3D10%26c%3D1759699148%26d%3D56%26t%3D7200%26c1a%3D1%26c6a%3D1%26c6b%3D1%26hh%3D98UWvbVK9tRUsi_hgy8tnOQvMD12IuHJsaPAZQxfEm8%26r1a%3D%24N6g5qPBRAAaFnnrvpZ7eiJSgNbUmdl-nADQBEArZ1OnDNdxdHwYY5Uvnj1IBWpHAtGv-FTwXVCMCTQUxjy-xhHS4sXVU2hU0dlrs3IwzngAABJPOAAAATPQBB-IAVvGMBNP53HY_EdrZRt4-l3QTJ4RmguKVyGxcfr-A6ODLDtooAf4uqTwKJQGouEsCYAAiEgREif9A97QNl_VgWHiZgm_YvElXtCjCPDqGrYNE7CTk2ifwBQSavg82BhUabjQ3E6dKjYo9jGaX0b_ysfRnBkg_LbST74MmnfklOJHBMUjHpxlqHtQVpZFDIrl1IdoD186HQ8JWknHr7_vAgyitisCNJ1KnhX6xlF79Hz5iMxw8lkiKiAcaO0w7tZ8d6gLJdDs6tsCMAHdnXanKW9AKMB3yN_MM0OQvaJsbIQsoMQ-_WRD9-15kiLIi12bjgnAULu_szIgKltWt6XBdaXyeYLnqnRjodGAADhBoNB5w6vWQwt7DTdGbT0gNKq3S9eIMjkzCp9l0cbUk71sbY3Sg282VCcxRt3qs4MmQT1KdH6OaZdr1V9wXjg_WgjXZBLEJDL3xJwOvdcGDCXQlt4NODZddUQR5FOtcR2zSPfdx76MN_aZ60arXQH98uiYVUl4UwrOffTJcUJLaLVoptBa995CJsS0EfX7fBkBjpTIMleG94QDsWpCkWh9F7XdVi37jQfLCtPAPeY5xvv87tufiFBEwk-GgRAvoAAJT9-X_-Myl8OLHUAFWNxrmhr0mfWKd1cNIl2kxacIvrp3cedz_T7z-qNpeG0k_OFM8y6eaNkq41dJJ2RW9O3v2WHSQ8_dwzkR74NvReiFKBc0niW4tWUsSLDEeta85yi4IQ7QcQ5eoPliBfDT7aKFACyAgcvJFVJSbMXoOcxl3kO2P6lua_5m1Beil0hNmLwh5Gmb-FEFJfIvrRfKc3-86rkod9lTL8iAMfxY9aG9yHj3k__4-xI2coiVuaWxzSHE8Wu_bvQa9H7m6DZOrc2vlMRjtmRve6dC_CljD-WIDF-MrM50wYJw_mOXL9Ls8mBvwqHRDHnO9kVU-ckGe4bKyH0XlA84r_2e3M8KfFQAUi8BwkfHFwN8CQ02rF2SJAGjAMP7VcQrULMgV24OgkYLeVbHTuSo0onDh4W-DZNqNQ5UhmNWB454d_IYDU3wrQrI8Vxns7eN2bQXs6IRFgT2HjhRm7As9vHEu-Fpi3Ykd1ZhoxZtiBgEXJVEbdNI6BHxZxQXvh_OUHjCmM7as1MVlVdeeYarpxO0M55HUfFtf-F1qh1aIoYV1UG0hsRY__SIWriVbXJ6iPPUHpLmTvxELhKeBGXIfJKUv5BkXN1c9mUd_9VYZZ9JDchnyVGr0h8i225EOWSQgKD46T6sCyKUFq81Y9vLWoBmeVOwIuGXEAOWoiqCnnwuu4WKG0YnZwSvLnqN9T6DcONDEbIoJ_FYBgyolbPFxlSTIMUzvY5tGi6lVtRGEUV0xuYjelL2Nm_QRhMNO_0N1hl1BAycG9GMzbj5dFyozCQC4H77UNELWH22qOvXhoAyTdxJCEsr7Nda7Erym32qQ7Uz-PSn526ytFapfCNfq5fCqUb74kyd4upNzZHiZbd1oKsCQx5boKf3rqNYtE3e0x3hXm8sXTx0jzbDUP7ToVXREmLGx52UUCoHc4AuHRNyGs95VjrRGdrdA2JDv5Spw9stXAbUl6CkZT2-CQ8pfWNiy3kMHW5m949p8AsFAZvmBJ2GKQXmOsz5JixiZoWEkWq6Lw-8ChTSLywA8kF8W1kP-LcyH-EsMh4_qwaV4skw%26r6a%3D1759699148%26r6b%3D1759699148&session_token=QUFFLUhqbHlCRnFKNVZRNFdCMjNGRTJETjhwQnJTTEFzUXxBQ3Jtc0tucTd4NVNDQWdIUktOWldBX3lnajJQNG1OQUdxeml5Mk1pQno1U3VieU1hWjZCNW50WE5iS2dNcHBxQTFLVHp3ZDdFeEVGOWNZZXphZTRlSFQzQVZvV3o5T1FEbjNwUFJGcHFMN29PenpvSzZpS05EQQ%3D%3D' \
+  --compressed ;
+curl 'https://www.youtube.com/youtubei/v1/log_event?alt=json' \
+  -H 'authority: www.youtube.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'content-type: application/json' \
+  -H 'cookie: YSC=yIrq3wp-5EM; VISITOR_INFO1_LIVE=xwyI25FGlpA; VISITOR_PRIVACY_METADATA=CgJEWhIEGgAgGw%3D%3D; __Secure-ROLLOUT_TOKEN=CL3_s8jnw-GvchC-1Lrvwo2QAxj21tqTw42QAw%3D%3D' \
+  -H 'origin: https://www.youtube.com' \
+  -H 'referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'x-goog-request-time: 1759699217051' \
+  -H 'x-goog-visitor-id: Cgt4d3lJMjVGR2xwQSjMwYvHBjIKCgJEWhIEGgAgGw%3D%3D' \
+  -H 'x-youtube-ad-signals: dt=1759699147748&flash=0&frm=2&u_tz=60&u_his=37&u_h=915&u_w=412&u_ah=915&u_aw=412&u_cd=24&bc=31&bih=-12245933&biw=-12245933&brdim=0%2C0%2C0%2C0%2C412%2C0%2C412%2C810%2C0%2C0&vis=1&wgl=true&ca_type=image' \
+  -H 'x-youtube-client-name: 56' \
+  -H 'x-youtube-client-version: 2.20250930.02.00' \
+  -H 'x-youtube-device: cbr=Chrome+Mobile&cbrand=generic&cbrver=137.0.0.0&ceng=WebKit&cengver=537.36&cmodel=android+10.0&cos=Android&cosver=10&cplatform=MOBILE' \
+  -H 'x-youtube-page-cl: 813518696' \
+  -H 'x-youtube-page-label: youtube.player.web_20250930_02_RC00' \
+  -H 'x-youtube-time-zone: Africa/Algiers' \
+  -H 'x-youtube-utc-offset: 60' \
+  --data-raw '{"context":{"client":{"hl":"en","gl":"DZ","clientName":56,"clientVersion":"2.20250930.02.00","configInfo":{"appInstallData":"CMzBi8cGEN2zzxwQmLnPHBDFw88cEJX3zxwQzN-uBRDE9M8cEParsAUQndfPHBC9tq4FEIv3zxwQtquAExDe6c8cELfkzxwQndCwBRC52c4cEK_4zxwQgc3OHBC36v4SEPHozxwQxILQHBDahdAcEIiHsAUQpvnPHBCphtAcELjkzhwQ_LLOHBC-irAFEK3vzxwQlbGAExC--s8cEILnzxwQrtbPHBC72c4cEMn3rwUQmZixBRCW288cEN68zhwQvamAExC9mbAFEImwzhwQuPbPHBCZjbEFEPeqgBMQjOnPHBCU_rAFEJqI0BwQh6zOHBCU8s8cEIH3zxwQqejPHBCJ688cENPhrwUQ4OnPHBDa984cEOr2zxwQw62AExCP3M8cKjRDQU1TSXhVWS1acS1ETGlVRXZ3RTF3WG4xZkFMTXFDc0JBUE5fd1dRVS1FMnlpMmpZaDBIMAA%3D"},"userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36","screenDensityFloat":"2.8860480785369873","connectionType":"CONN_WIFI","browserName":"Chrome Mobile","deviceMake":"generic","browserVersion":"137.0.0.0","deviceModel":"android 10.0","osName":"Android","osVersion":"10","platform":"MOBILE"},"thirdParty":{"embedUrl":"https://tv6.egydead.live/"}},"events":[{"eventTimeMs":1759699216936,"latencyActionTicked":{"tickName":"mesv_s","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"68818"}},{"eventTimeMs":1759699216955,"latencyActionTicked":{"tickName":"qoes","clientActionNonce":"dGKNqNDzvxW_Wdf7"},"context":{"lastActivityMs":"68837"}},{"eventTimeMs":1759699217049,"finalPayload":{"csn":"hxa9Wl5B_QQEOezz"},"context":{"lastActivityMs":"68931"}}],"serializedClientEventId":{"serializedEventId":"zODiaPf8JMysi9oPr47WkAs","clientCounter":"9591"}}' \
+  --compressed ;
+curl 'https://www.googletagmanager.com/gtag/js?id=G-Q2XZ3ZSWDY' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/css/fontawesome.min.css' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/css/fontawesome-all.min.css' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/css/themify-icons.css' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/css/jquery-confirm.min.css' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/css/bar-ui.css' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/style.css' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/css/mobileStyle.css' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/js/jquery.min.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/js/plugins.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-includes/css/dist/block-library/style-rtl.min.css?ver=6.8.3' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-includes/js/jquery/jquery.min.js?ver=3.7.1' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-includes/js/jquery/jquery-migrate.min.js?ver=3.4.1' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/js/ajax-login-script.js?ver=6.8.3' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/uploads/2021/07/EgyDead-Logo.png' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://pj.pinturaanglers.com/tv2NM2P61bmK5Y/21945' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/js/bootstrap.min.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/js/user-login.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/webfonts/fa-brands-400.woff2' \
+  -H 'Referer;' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/webfonts/fa-solid-900.woff2' \
+  -H 'Referer;' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/fonts/sky.ttf' \
+  -H 'Referer;' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/fonts/Cairo-Regular.ttf' \
+  -H 'Referer;' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/themes/egydeadc-taq/Interface/fonts/filmIcons.ttf' \
+  -H 'Referer;' \
+  --compressed ;
+curl 'https://bvtpk.com/tag.min.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'authority: www.youtube.com' \
+  -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cookie: YSC=yIrq3wp-5EM; VISITOR_INFO1_LIVE=xwyI25FGlpA; VISITOR_PRIVACY_METADATA=CgJEWhIEGgAgGw%3D%3D; __Secure-ROLLOUT_TOKEN=CL3_s8jnw-GvchC-1Lrvwo2QAxj21tqTw42QAw%3D%3D' \
+  -H 'referer: https://tv6.egydead.live/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: iframe' \
+  -H 'sec-fetch-mode: navigate' \
+  -H 'sec-fetch-site: cross-site' \
+  -H 'upgrade-insecure-requests: 1' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://hglink.to/e/0y9poa4tqxa2' \
+  -H 'authority: hglink.to' \
+  -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'referer: https://tv6.egydead.live/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: iframe' \
+  -H 'sec-fetch-mode: navigate' \
+  -H 'sec-fetch-site: cross-site' \
+  -H 'upgrade-insecure-requests: 1' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://www.youtube.com/s/player/29a37ef6/www-player.css' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.youtube.com/s/player/29a37ef6/embed_ui_css.css' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://fonts.gstatic.com/s/roboto/v18/KFOlCnqEu92Fr1MmEU9fBBc4AMP6lQ.woff2' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/' \
+  -H 'Origin: https://www.youtube.com' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.youtube.com/s/player/29a37ef6/player_ias.vflset/en_US/embed.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.youtube.com/s/player/29a37ef6/www-embed-player-pc.vflset/www-embed-player-pc.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://hglink.to/style.css' \
+  -H 'authority: hglink.to' \
+  -H 'accept: text/css,*/*;q=0.1' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'referer: https://hglink.to/e/0y9poa4tqxa2' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: style' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://hglink.to/main.js?v=1.1.2' \
+  -H 'authority: hglink.to' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'referer: https://hglink.to/e/0y9poa4tqxa2' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: script' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://www.youtube.com/s/player/29a37ef6/player_ias.vflset/en_US/base.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://googleads.g.doubleclick.net/pagead/id' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://static.doubleclick.net/instream/ad_status.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://dumbalag.com/e/0y9poa4tqxa2' \
+  -H 'authority: dumbalag.com' \
+  -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'referer: https://hglink.to/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: iframe' \
+  -H 'sec-fetch-mode: navigate' \
+  -H 'sec-fetch-site: cross-site' \
+  -H 'upgrade-insecure-requests: 1' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://i.ytimg.com/vi_webp/YEz4SuMI1-Q/default.webp' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://dumbalag.com/css/main.css' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://dumbalag.com/e/0y9poa4tqxa2' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://dumbalag.com/js/jquery.min.js' \
+  -H 'authority: dumbalag.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'referer: https://dumbalag.com/e/0y9poa4tqxa2' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: script' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://dumbalag.com/js/xupload.js' \
+  -H 'authority: dumbalag.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'referer: https://dumbalag.com/e/0y9poa4tqxa2' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: script' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://dumbalag.com/js/jquery.cookie.js' \
+  -H 'authority: dumbalag.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'referer: https://dumbalag.com/e/0y9poa4tqxa2' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: script' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://www.googletagmanager.com/gtag/js?id=G-2TL7NH453R' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://dumbalag.com/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.googletagmanager.com/gtag/js?id=G-E2BG6CPV2J' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://dumbalag.com/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://dumbalag.com/player/jw8/jwplayer.js?v=7' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://dumbalag.com/e/0y9poa4tqxa2' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://dumbalag.com/js/localstorage-slim.js' \
+  -H 'authority: dumbalag.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'referer: https://dumbalag.com/e/0y9poa4tqxa2' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: script' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://pixoraa.cc/0y9poa4tqxa2_xt.jpg' \
+  -H 'authority: pixoraa.cc' \
+  -H 'accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'referer: https://dumbalag.com/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: image' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: cross-site' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://dumbalag.com/assets/jquery/plugin.js?type=mainstream&u=15&v=1.2' \
+  -H 'authority: dumbalag.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'referer: https://dumbalag.com/e/0y9poa4tqxa2' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: script' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://mc.yandex.ru/metrika/tag.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://dumbalag.com/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.googletagmanager.com/gtag/js?id=G-E2BG6CPV2J&cx=c&gtm=4e5a11' \
+  -H 'authority: www.googletagmanager.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'referer: https://dumbalag.com/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: script' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: cross-site' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://dumbalag.com/player/jw8/vast.js?v=32' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://dumbalag.com/e/0y9poa4tqxa2' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://dumbalag.com/player/jw8/jwplayer.core.controls.js?v=42' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://dumbalag.com/e/0y9poa4tqxa2' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://dumbalag.com/player/jw8/provider.hlsjs.js?v=42' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://dumbalag.com/e/0y9poa4tqxa2' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="%23191919"/><line stroke="%23CCC" stroke-width="6" x1="32" y1="20" x2="32" y2="44"/><line stroke="%23CCC" stroke-width="6" x1="20" y1="32" x2="44" y2="32"/></svg>' \
+  -H 'Referer;' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://dumbalag.com/upload-data/logo_15.jpg' \
+  -H 'authority: dumbalag.com' \
+  -H 'accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'referer: https://dumbalag.com/e/0y9poa4tqxa2' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: image' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://dumbalag.com/dl?op=get_slides&length=3093&url=https://pixoraa.cc/0y9poa4tqxa20000.jpg' \
+  -H 'authority: dumbalag.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'referer: https://dumbalag.com/e/0y9poa4tqxa2' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://dumbalag.com/stream/kBnIcJpqnh9_STBhbU-v3A/kjhhiuahiuhgihdf/1759742421/59033162/master.m3u8' \
+  -X 'HEAD' \
+  -H 'authority: dumbalag.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'referer: https://dumbalag.com/e/0y9poa4tqxa2' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://dumbalag.com/player/jw8/provider.cast.js?v=42' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://dumbalag.com/e/0y9poa4tqxa2' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://bvtpk.com/5/9615227' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://dumbalag.com/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://dumbalag.com/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.youtube.com/youtubei/v1/log_event?alt=json' \
+  -H 'authority: www.youtube.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'content-type: application/json' \
+  -H 'cookie: YSC=yIrq3wp-5EM; VISITOR_INFO1_LIVE=xwyI25FGlpA; VISITOR_PRIVACY_METADATA=CgJEWhIEGgAgGw%3D%3D; __Secure-ROLLOUT_TOKEN=CL3_s8jnw-GvchC-1Lrvwo2QAxj21tqTw42QAw%3D%3D' \
+  -H 'origin: https://www.youtube.com' \
+  -H 'referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'x-goog-request-time: 1759699221439' \
+  -H 'x-goog-visitor-id: Cgt4d3lJMjVGR2xwQSiSwovHBjIKCgJEWhIEGgAgGw%3D%3D' \
+  -H 'x-youtube-ad-signals: dt=1759699217883&flash=0&frm=2&u_tz=60&u_his=38&u_h=915&u_w=412&u_ah=915&u_aw=412&u_cd=24&bc=31&bih=-12245933&biw=-12245933&brdim=0%2C0%2C0%2C0%2C412%2C0%2C412%2C810%2C0%2C0&vis=1&wgl=true&ca_type=image' \
+  -H 'x-youtube-client-name: 56' \
+  -H 'x-youtube-client-version: 2.20250930.02.00' \
+  -H 'x-youtube-device: cbr=Chrome+Mobile&cbrand=generic&cbrver=137.0.0.0&ceng=WebKit&cengver=537.36&cmodel=android+10.0&cos=Android&cosver=10&cplatform=MOBILE' \
+  -H 'x-youtube-page-cl: 813518696' \
+  -H 'x-youtube-page-label: youtube.player.web_20250930_02_RC00' \
+  -H 'x-youtube-time-zone: Africa/Algiers' \
+  -H 'x-youtube-utc-offset: 60' \
+  --data-raw '{"context":{"client":{"hl":"en","gl":"DZ","clientName":56,"clientVersion":"2.20250930.02.00","configInfo":{"appInstallData":"CJLCi8cGEILnzxwQ8ujPHBCm-c8cELjkzhwQievPHBCphtAcEJ3XzxwQlffPHBDEgtAcEMzfrgUQibDOHBC49s8cEL6KsAUQgffPHBD2q7AFEODpzxwQ3bPPHBDJ968FEK3vzxwQ3rzOHBC--s8cEL22rgUQudnOHBCZjbEFEJ3QsAUQrtbPHBCU8s8cENPhrwUQ_LLOHBCZmLEFEIv3zxwQmojQHBCp6M8cEIzpzxwQxPTPHBDe6c8cENr3zhwQt-TPHBCW288cEJi5zxwQu9nOHBDahdAcEJWxgBMQtquAExCU_rAFELfq_hIQxcPPHBCIh7AFEK_4zxwQvZmwBRC9qYATEIHNzhwQ96qAExCHrM4cEOr2zxwQj9zPHBDDrYATKjRDQU1TSXhVWS1acS1ETGlVRXZ3RTF3WG4xZkFMTXFDc0JBUE5fd1dRVS1FMnlpMmpZaDBIMAA%3D"},"userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36","screenDensityFloat":"2.8860480785369873","connectionType":"CONN_WIFI","browserName":"Chrome Mobile","deviceMake":"generic","browserVersion":"137.0.0.0","deviceModel":"android 10.0","osName":"Android","osVersion":"10","platform":"MOBILE"},"thirdParty":{"embedUrl":"https://tv6.egydead.live/"}},"events":[{"eventTimeMs":1759699217914,"latencyActionTicked":{"tickName":"ep_init_cus","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699217918,"latencyActionTicked":{"tickName":"ep_init_eps","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699217921,"latencyActionTicked":{"tickName":"ep_init_epe","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699217922,"latencyActionTicked":{"tickName":"ep_init_cue","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699218042,"latencyActionTicked":{"tickName":"pe","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699218052,"latencyActionTicked":{"tickName":"ep_init_wes","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699217620,"latencyActionTicked":{"tickName":"srt","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699217472,"latencyActionBaselined":{"clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699217500,"latencyActionTicked":{"tickName":"nreqs","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699217620,"latencyActionTicked":{"tickName":"nress","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699217704,"latencyActionTicked":{"tickName":"nrese","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699217946,"latencyActionTicked":{"tickName":"rsf_pj","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699217946,"latencyActionTicked":{"tickName":"rse_pj","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699217724,"latencyActionTicked":{"tickName":"rsf_pej","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699217724,"latencyActionTicked":{"tickName":"rse_pej","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699217668,"latencyActionTicked":{"tickName":"rsf_pc","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699217668,"latencyActionTicked":{"tickName":"rse_pc","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699217855,"latencyActionTicked":{"tickName":"rsf_ecj","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699217855,"latencyActionTicked":{"tickName":"rse_ecj","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699217670,"latencyActionTicked":{"tickName":"rsf_ecc","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699217670,"latencyActionTicked":{"tickName":"rse_ecc","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699218079,"latencyActionInfo":{"isNavigation":true,"actionType":"LATENCY_ACTION_VIDEO_PREVIEW","httpProtocol":"h3","transportProtocol":"quic","isVisible":true,"loadType":"cold","resourceInfo":[{"resourceCache":"pj"},{"resourceCache":"pej"},{"resourceCache":"pc"},{"resourceCache":"ecj"},{"resourceCache":"ecc"}],"clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699218103,"latencyActionTicked":{"tickName":"ep_init_wee","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699218104,"latencyActionTicked":{"tickName":"ep_init_ijs","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699218107,"latencyActionTicked":{"tickName":"ep_init_ije","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699218110,"latencyActionTicked":{"tickName":"ep_init_rs","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699218124,"latencyActionTicked":{"tickName":"ep_init_re","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"-1"}},{"eventTimeMs":1759699218744,"screenCreated":{"csn":"kq1fOrAkE-eMoshA","pageVe":{"veType":16623,"youtubeData":{"servletData":{"serializedServletEventId":"EuHiaJHCNtCvsvQPiefW-A8"}}}},"context":{"lastActivityMs":"81"}},{"eventTimeMs":1759699218748,"latencyActionInfo":{"clientScreenNonce":"kq1fOrAkE-eMoshA","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"85"}},{"eventTimeMs":1759699218749,"screenCreated":{"csn":"aTM04FQKhdP6tu2l","pageVe":{"veType":32594},"implicitGesture":{"parentCsn":"kq1fOrAkE-eMoshA","gesturedVe":{"veType":16623},"gestureType":"INTERACTION_LOGGING_GESTURE_TYPE_AUTOMATED"}},"context":{"lastActivityMs":"86"}},{"eventTimeMs":1759699218750,"visualElementHidden":{"csn":"kq1fOrAkE-eMoshA","ve":{"veType":16623},"eventType":16},"context":{"lastActivityMs":"87"}},{"eventTimeMs":1759699218750,"latencyActionInfo":{"clientScreenNonce":"aTM04FQKhdP6tu2l","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"87"}},{"eventTimeMs":1759699218752,"visualElementAttached":{"csn":"aTM04FQKhdP6tu2l","parentVe":{"veType":32594},"childVes":[{"trackingParams":"CAAQru4BIhMIvJfrtv6NkAMVOhJzCR3YcBJF"}]},"context":{"lastActivityMs":"89"}},{"eventTimeMs":1759699218774,"latencyActionTicked":{"tickName":"fs","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"111"}},{"eventTimeMs":1759699218826,"latencyActionTicked":{"tickName":"ep_init_pr","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"163"}},{"eventTimeMs":1759699218870,"visualElementAttached":{"csn":"aTM04FQKhdP6tu2l","parentVe":{"veType":32594},"childVes":[{"veType":28572,"veCounter":1,"elementIndex":0}]},"context":{"lastActivityMs":"207"}},{"eventTimeMs":1759699218871,"visualElementShown":{"csn":"aTM04FQKhdP6tu2l","ve":{"veType":28572,"veCounter":1,"elementIndex":0},"eventType":1},"context":{"lastActivityMs":"208"}},{"eventTimeMs":1759699219082,"latencyActionTicked":{"tickName":"ftr","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"419"}},{"eventTimeMs":1759699219109,"latencyActionInfo":{"serverTimeMs":45,"clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"445"}},{"eventTimeMs":1759699219157,"latencyActionInfo":{"clientPlaybackNonce":"sOYcyczBXmMx1g4o","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"494"}}],"serializedClientEventId":{"serializedEventId":"EuHiaJHCNtCvsvQPiefW-A8","clientCounter":"26098"}}' \
+  --compressed ;
+curl 'https://www.gstatic.com/cast/sdk/libs/sender/1.0/cast_framework.js' \
+  -H 'authority: www.gstatic.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'if-modified-since: Mon, 14 Nov 2022 23:58:00 GMT' \
+  -H 'referer: https://dumbalag.com/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: script' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: cross-site' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://www.gstatic.com/eureka/clank/137/cast_sender.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://dumbalag.com/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/uploads/2019/01/cropped-yXYdE2f-192x192.png' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://tv6.egydead.live/wp-content/uploads/2019/01/cropped-yXYdE2f-180x180.png' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/episode/%d9%85%d8%b3%d9%84%d8%b3%d9%84-%d8%a7%d9%84%d8%b9%d8%a7%d8%b5%d9%81%d8%a9-tempest-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.google-analytics.com/g/collect?v=2&tid=G-Q2XZ3ZSWDY&gtm=45je5a11v9115855826za200zd9115855826&_p=1759699217144&gcd=13l3l3l3l1l1&npa=0&dma=0&cid=945206421.1759681664&ul=en-us&sr=412x915&uaa=&uab=&uafvl=Chromium%3B137.0.7337.0%7CNot%252FA)Brand%3B24.0.0.0&uamb=1&uam=SM-A515F&uap=Android&uapv=13.0.0&uaw=0&are=1&frm=0&pscdl=noapi&_eu=AAAAAAQ&_s=1&tag_exp=101509157~103116026~103200004~103233427~104527907~104528501~104684208~104684211~104948813~115480710~115616986~115834636~115834638&sid=1759697078&sct=3&seg=1&dl=https%3A%2F%2Ftv6.egydead.live%2Fepisode%2F%D9%85%D8%B3%D9%84%D8%B3%D9%84-%D8%A7%D9%84%D8%B9%D8%A7%D8%B5%D9%81%D8%A9-tempest-%D8%A7%D9%84%D8%AD%D9%84%D9%82%D8%A9-1-%D9%85%D8%AA%D8%B1%D8%AC%D9%85%D8%A9%2F&dr=https%3A%2F%2Ftv6.egydead.live%2Fepisode%2F%D9%85%D8%B3%D9%84%D8%B3%D9%84-%D8%A7%D9%84%D8%B9%D8%A7%D8%B5%D9%81%D8%A9-tempest-%D8%A7%D9%84%D8%AD%D9%84%D9%82%D8%A9-1-%D9%85%D8%AA%D8%B1%D8%AC%D9%85%D8%A9%2F&dt=%D9%85%D8%B3%D9%84%D8%B3%D9%84%20%D8%A7%D9%84%D8%B9%D8%A7%D8%B5%D9%81%D8%A9%20Tempest%20%D8%A7%D9%84%D8%AD%D9%84%D9%82%D8%A9%201%20%D9%85%D8%AA%D8%B1%D8%AC%D9%85%D8%A9%20%7C%20%D8%A7%D9%8A%D8%AC%D9%8A%20%D8%AF%D9%8A%D8%AF&en=page_view&_ee=1&tfd=6014' \
+  -X 'POST' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://tv6.egydead.live/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.google.com/js/th/P3NktEWjGvmQ-OQTun7QCKALwony29EdqRphg62i-yo.js' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://www.youtube.com/generate_204?927-YA' \
+  -H 'authority: www.youtube.com' \
+  -H 'accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'cookie: YSC=yIrq3wp-5EM; VISITOR_INFO1_LIVE=xwyI25FGlpA; VISITOR_PRIVACY_METADATA=CgJEWhIEGgAgGw%3D%3D; __Secure-ROLLOUT_TOKEN=CL3_s8jnw-GvchC-1Lrvwo2QAxj21tqTw42QAw%3D%3D' \
+  -H 'referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: image' \
+  -H 'sec-fetch-mode: no-cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  --compressed ;
+curl 'https://jnn-pa.googleapis.com/$rpc/google.internal.waa.v1.Waa/GenerateIT' \
+  -H 'authority: jnn-pa.googleapis.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'content-type: application/json+protobuf' \
+  -H 'origin: https://www.youtube.com' \
+  -H 'referer: https://www.youtube.com/' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: cross-site' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'x-goog-api-key: AIzaSyDyT5W0Jh49F30Pqqtyfdf7pDLFKLJoAnw' \
+  --data-raw '["O43z0dpjhgX20SCx4KAo","$hxg5GEBRAAaFnnrvpZ7e19p5l_ycBV6nADQBEArZ1FC2dH_Md_tEGlzO5ZR2bmv3DAFMScieIcQUvh343RIfGKo5XaVBtDUDxgrtrDOGngAABb7OAAAAwvQBB-IAU8n9xeLmXZVLLJUYTAp25F_YTB_bRtbr9Atsl_fqlCMaHaWF9FRIYMq-KaQHh0eji40zLa8_NCYzA06J_CBgTtpP4hCBOcxYUOrjPJNnjii2w-2WBQR7dvLSLHm3ENu6X8OSAC97lPUvimFRdfPoW6kNreYpVK8Abd3Did9SWkfmG4dgzuFK3wjAgC-KCgcoBx5iMKQIhXIreWq4DEs73Q2JUywU4j6IwZRAzeGIKr-iMd9HyxGlkCQaXhvCjbLOdphO09qDONMs4rC-hSVhi90ya3OyMWsgFGFpq3LBFXlaFmbOMOHfHB8D1c4E7D5O-UdRPfvA4_gCiSbNwiFLElOORGyTjC6o4UaHyFWu2xrT2iPZ9BJwLscVEyJK9PsZm2qcWCK6zMNzRvkZN37MeizRDs3dyCmA4ygcFZvwPRAKN_F4fGvqFM_ybAwrARkpylI1ZAOrC6VTnZwcymuPwQXDIa5XUJoEk4JtyxQvgXkIWAXr1tjBX94KwkBozMc1ckYd31XvjW1ChyqRw4z05yKVOhskOP-qVtwzZliy39s-2cUJNGug-5k5R4bpkEKdJjHcjBJC_etOREwyVtqG7PVYSUmN4FuAQRl0tJ9UMM5-Ig1I1h0xk4UM3jerc4XUiE5fpsLvHsdCAe_VfFR0QEGX7VZ4W20xiAIT-xeydeSMh21tKVRB8WkIfyAxXm3brH-n3MH8x9kuj71w2Oq3h_b_X5xunQnDONrYoN0KJiDQNs003xDmrVaugwW8dO4eUSvgby7wywDVZNsijoDBjxc5R_9VNoE8ku2tBeOo29XlQMnzs5kCrIlnK10YO-f0xCvZIG6jsO6ag-bYbBCkujTSut4Z8aeFAzAelfZdi4TVe-M56whwYlYq0Xh90G7MPBODnP9RaYMmvdPDekGRUpQ6zg6WoSh7XnYX9QLZ6uvfcttSd8rLeDSnBsuMr2VAQFA6MykwYHuCTvugoCB_KHbE94t51Fy9APUdYSxmpg8wNmLlKroX0O__gcZGtbh1ZdZnrW70S_0tBFz-KyhT1JLbrYw0l3urux1teQh3qcN_ThZkyvh6--er7J871WeqK-iD7R59FsFrYFgOr8ObL7ErvVzQFG3kJ-Nfh1LgOikY6S1BFMHbiZFzqHR1lpeFgfC1gk7av9IkdtHgguBIm2oEEadLjP5COMhdgYkyJ31L_61FvmmfkXT9zjH9PQqZo6_hdE0BhVZ3xlFKYJd4btoFjIki60ZQLVMvKl1emw80cQHxZrhszYQZYIO3Uh3YdUZCp9wv6fy9tq4FgIfTSTPz4om4W-Tez4AWYZT_nsfTieERyoyPuqWah1URiIEncNc5Qgs7JSWF7Dd-7IORRzgCzL5qIUjDv2Zbcazhb0H2GZMlIznN-flzK-hA16SFpTIyTE2SOnnWN72YShgAqUG8GQa_mwMjjS69aPxtsKwerRdCahdxSO4oHjI9Oh2jS58DHBpAbUgcQbkVX4Ll6h_uh3xTPxpBUva6wO71bZAPI_y61y_vTMFR8NdJvPfOAAY-dX0_PWQRgk1vG5BhUuVVoHOrwq3sSzgws81bU_ONgFZIgrGQJnHGWtesxQcyKPw3gb79MYbLhGO6xCCn5aJdJ5jZNgLUtMKYzOhA57f0SA"]' \
+  --compressed ;
+curl 'https://www.youtube.com/youtubei/v1/log_event?alt=json' \
+  -H 'authority: www.youtube.com' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'content-type: application/json' \
+  -H 'cookie: YSC=yIrq3wp-5EM; VISITOR_INFO1_LIVE=xwyI25FGlpA; VISITOR_PRIVACY_METADATA=CgJEWhIEGgAgGw%3D%3D; __Secure-ROLLOUT_TOKEN=CL3_s8jnw-GvchC-1Lrvwo2QAxj21tqTw42QAw%3D%3D' \
+  -H 'origin: https://www.youtube.com' \
+  -H 'referer: https://www.youtube.com/embed/YEz4SuMI1-Q' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'x-goog-request-time: 1759699228181' \
+  -H 'x-goog-visitor-id: Cgt4d3lJMjVGR2xwQSiSwovHBjIKCgJEWhIEGgAgGw%3D%3D' \
+  -H 'x-youtube-ad-signals: dt=1759699218005&flash=0&frm=2&u_tz=60&u_his=38&u_h=915&u_w=412&u_ah=915&u_aw=412&u_cd=24&bc=31&bih=-12245933&biw=-12245933&brdim=0%2C0%2C0%2C0%2C412%2C0%2C412%2C810%2C0%2C0&vis=2&wgl=true&ca_type=image' \
+  -H 'x-youtube-client-name: 56' \
+  -H 'x-youtube-client-version: 2.20250930.02.00' \
+  -H 'x-youtube-device: cbr=Chrome+Mobile&cbrand=generic&cbrver=137.0.0.0&ceng=WebKit&cengver=537.36&cmodel=android+10.0&cos=Android&cosver=10&cplatform=MOBILE' \
+  -H 'x-youtube-page-cl: 813518696' \
+  -H 'x-youtube-page-label: youtube.player.web_20250930_02_RC00' \
+  -H 'x-youtube-time-zone: Africa/Algiers' \
+  -H 'x-youtube-utc-offset: 60' \
+  --data-raw '{"context":{"client":{"hl":"en","gl":"DZ","clientName":56,"clientVersion":"2.20250930.02.00","configInfo":{"appInstallData":"CJLCi8cGEILnzxwQ8ujPHBCm-c8cELjkzhwQievPHBCphtAcEJ3XzxwQlffPHBDEgtAcEMzfrgUQibDOHBC49s8cEL6KsAUQgffPHBD2q7AFEODpzxwQ3bPPHBDJ968FEK3vzxwQ3rzOHBC--s8cEL22rgUQudnOHBCZjbEFEJ3QsAUQrtbPHBCU8s8cENPhrwUQ_LLOHBCZmLEFEIv3zxwQmojQHBCp6M8cEIzpzxwQxPTPHBDe6c8cENr3zhwQt-TPHBCW288cEJi5zxwQu9nOHBDahdAcEJWxgBMQtquAExCU_rAFELfq_hIQxcPPHBCIh7AFEK_4zxwQvZmwBRC9qYATEIHNzhwQ96qAExCHrM4cEOr2zxwQj9zPHBDDrYATKjRDQU1TSXhVWS1acS1ETGlVRXZ3RTF3WG4xZkFMTXFDc0JBUE5fd1dRVS1FMnlpMmpZaDBIMAA%3D"},"userAgent":"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36","screenDensityFloat":"2.8860480785369873","connectionType":"CONN_WIFI","browserName":"Chrome Mobile","deviceMake":"generic","browserVersion":"137.0.0.0","deviceModel":"android 10.0","osName":"Android","osVersion":"10","platform":"MOBILE"},"thirdParty":{"embedUrl":"https://tv6.egydead.live/"}},"events":[{"eventTimeMs":1759699222645,"latencyActionTicked":{"tickName":"vc","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"3982"}},{"eventTimeMs":1759699223180,"latencyActionTicked":{"tickName":"pot_ist","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"4516"}},{"eventTimeMs":1759699225082,"streamzIncremented":{"serializedIncrementBatch":"ChUvY2xpZW50X3N0cmVhbXovYmcvZWMSEAoOCghib3RndWFyZBICNTEaAmVuGgJtayIRCgMKAW8KBgoEYUdJZhICCAEiEQoDCgF0CgYKBGFHSWYSAggB"},"context":{"lastActivityMs":"6419"}},{"eventTimeMs":1759699225090,"streamzIncremented":{"serializedIncrementBatch":"ChUvY2xpZW50X3N0cmVhbXovYmcvZWwSEAoOCghib3RndWFyZBICNTEaAmVuGgJtayIYCgMKAXQKBgoEYUdJZhIJEQAAMjMz95lA"},"context":{"lastActivityMs":"6426"}},{"eventTimeMs":1759699225504,"latencyActionTicked":{"tickName":"pot_if","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"6841"}},{"eventTimeMs":1759699225511,"latencyActionTicked":{"tickName":"pot_cms","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"6847"}},{"eventTimeMs":1759699225529,"latencyActionTicked":{"tickName":"pot_cmf","clientActionNonce":"9vA91svlYyIyDYVJ"},"context":{"lastActivityMs":"6866"}},{"eventTimeMs":1759699226191,"streamzIncremented":{"serializedIncrementBatch":"ChYvY2xpZW50X3N0cmVhbXovYmcvZnJzEhAKDgoIYm90Z3VhcmQSAjUxGgJtayITCgYKBGFHSWYSCREAAAAAAKybQA=="},"context":{"lastActivityMs":"7528"}},{"eventTimeMs":1759699226196,"streamzIncremented":{"serializedIncrementBatch":"ChUvY2xpZW50X3N0cmVhbXovYmcvZWMSEAoOCghib3RndWFyZBICNTEaAmVuGgJtayIRCgMKAW4KBgoEYUdJZhICCAEiEQoDCgFtCgYKBGFHSWYSAggB"},"context":{"lastActivityMs":"7533"}},{"eventTimeMs":1759699226201,"streamzIncremented":{"serializedIncrementBatch":"ChUvY2xpZW50X3N0cmVhbXovYmcvZWwSEAoOCghib3RndWFyZBICNTEaAmVuGgJtayIYCgMKAW4KBgoEYUdJZhIJEQAAAAAAMGpAIhgKAwoBaQoGCgRhR0lmEgkRAAAAAAAAGkAiGAoDCgFvCgYKBGFHSWYSCREAAJqZmcuhQCIYCgMKAWMKBgoEYUdJZhIJEQAAACAzM9M/IhgKAwoBQwoGCgRhR0lmEgkRAAAAZ2ZmJkAiGAoDCgF4CgYKBGFHSWYSCREAAAAAAADgPyIYCgMKAW0KBgoEYUdJZhIJEQAAAMzMzCxA"},"context":{"lastActivityMs":"7538"}}],"serializedClientEventId":{"serializedEventId":"EuHiaJHCNtCvsvQPiefW-A8","clientCounter":"26099"}}' \
+  --compressed ;
+curl 'https://gd.orlcloop.com/gwF3keOX1dkEyzFR3/40913' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://dumbalag.com/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://googleads.g.doubleclick.net/pagead/id' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed ;
+curl 'https://googleads.g.doubleclick.net/pagead/id' \
+  -H 'sec-ch-ua: "Chromium";v="137", "Not/A)Brand";v="24"' \
+  -H 'Referer: https://www.youtube.com/' \
+  -H 'sec-ch-ua-mobile: ?1' \
+  -H 'User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36' \
+  -H 'sec-ch-ua-platform: "Android"' \
+  --compressed
