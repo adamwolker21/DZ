@@ -2,7 +2,6 @@ package com.egydead
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.Qualities
 import org.jsoup.nodes.Element
 
 class EgyDeadProvider : MainAPI() {
@@ -47,7 +46,7 @@ class EgyDeadProvider : MainAPI() {
         val cleanedTitle = title.replace("مشاهدة", "").trim()
             .replace(Regex("^(فيلم|مسلسل)"), "").trim()
 
-        val isSeries = title.contains("مسلسل") || title.contains("الموسم") || href.contains("/series/")
+        val isSeries = title.contains("مسلسل") || title.contains("الموسم")
 
         return if (isSeries) {
             newTvSeriesSearchResponse(cleanedTitle, href, TvType.TvSeries) {
@@ -72,28 +71,18 @@ class EgyDeadProvider : MainAPI() {
         val initialResponse = app.get(url)
         var document = initialResponse.document
 
-        // إرسال طلب POST مع البيانات المطلوبة
-        val cookies = initialResponse.cookies
-        val headers = mapOf(
-            "Content-Type" to "application/x-www-form-urlencoded",
-            "Referer" to url,
-            "Origin" to mainUrl,
-            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
-            "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-            "Accept-Language" to "en-US,en;q=0.9",
-            "Cache-Control" to "max-age=0",
-            "Sec-Fetch-Dest" to "document",
-            "Sec-Fetch-Mode" to "navigate",
-            "Sec-Fetch-Site" to "same-origin",
-            "Upgrade-Insecure-Requests" to "1"
-        )
-
-        // إرسال طلب POST مع البيانات الصحيحة
-        val data = mapOf(
-            "View" to "1"
-        )
-
-        document = app.post(url, headers = headers, data = data, cookies = cookies).document
+        // Check if we need to "click" the button
+        if (document.select("div.EpsList li a").isEmpty() && document.selectFirst("div.watchNow form") != null) {
+            val cookies = initialResponse.cookies
+            val headers = mapOf(
+                "Content-Type" to "application/x-www-form-urlencoded",
+                "Referer" to url,
+                "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
+                "Origin" to mainUrl
+            )
+            val data = mapOf("View" to "1")
+            document = app.post(url, headers = headers, data = data, cookies = cookies).document
+        }
 
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterImage = document.selectFirst("div.single-thumbnail img")
@@ -121,35 +110,21 @@ class EgyDeadProvider : MainAPI() {
         }
 
         val categoryText = document.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: ""
-        val isSeries = categoryText.contains("مسلسلات") || url.contains("/series/") || document.select("div.EpsList li a").isNotEmpty()
+        val isSeries = categoryText.contains("مسلسلات")
 
         if (isSeries) {
             val seriesTitle = pageTitle
-                .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة|مشاهدة)"""), "")
+                .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
                 .trim()
 
             val episodes = document.select("div.EpsList li a").mapNotNull { epElement ->
                 val epHref = epElement.attr("href")
-                val epText = epElement.text().trim()
                 val epTitleAttr = epElement.attr("title")
-                
-                // استخراج رقم الحلقة من النص
-                val epNum = when {
-                    epText.contains(Regex("""الحلقة\s*(\d+)""")) -> {
-                        Regex("""الحلقة\s*(\d+)""").find(epText)?.groupValues?.get(1)?.toIntOrNull()
-                    }
-                    epTitleAttr.contains(Regex("""الحلقة\s*(\d+)""")) -> {
-                        Regex("""الحلقة\s*(\d+)""").find(epTitleAttr)?.groupValues?.get(1)?.toIntOrNull()
-                    }
-                    else -> {
-                        // محاولة استخراج الرقم من النص مباشرة
-                        Regex("""\d+""").find(epText)?.value?.toIntOrNull()
-                    }
-                }
+                val epNum = epTitleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
 
                 newEpisode(epHref) {
                     name = epElement.text().trim()
-                    episode = epNum ?: 1
+                    episode = epNum
                     season = 1 
                 }
             }.sortedBy { it.episode }
@@ -162,7 +137,7 @@ class EgyDeadProvider : MainAPI() {
                 this.duration = duration
             }
         } else {
-            val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
+             val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
 
             return newMovieLoadResponse(movieTitle, url, TvType.Movie, url) {
                 this.posterUrl = posterUrl
@@ -180,61 +155,7 @@ class EgyDeadProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val document = app.get(data).document
-
-        // البحث عن iframes أو مصادر الفيديو
-        val iframes = document.select("iframe[src]")
-        
-        iframes.forEach { iframe ->
-            val src = iframe.attr("src")
-            if (src.isNotBlank()) {
-                // إذا كان الرابط يحتوي على فيديو مباشر
-                if (src.contains(".mp4") || src.contains(".m3u8") || src.contains("youtube") || src.contains("stream")) {
-                    callback(
-                        ExtractorLink(
-                            name = "EgyDead",
-                            source = src,
-                            url = src,
-                            quality = Qualities.Unknown.value,
-                            referer = "$mainUrl/"
-                        )
-                    )
-                }
-            }
-        }
-
-        // البحث عن روابط الفيديو في scripts
-        val scriptTexts = document.select("script").map { it.html() }
-        scriptTexts.forEach { script ->
-            // البحث عن روابط m3u8
-            val m3u8Links = Regex("""(https?://[^"'\s]+\.m3u8[^"'\s]*)""").findAll(script)
-            m3u8Links.forEach { match ->
-                callback(
-                    ExtractorLink(
-                        name = "EgyDead",
-                        source = match.value,
-                        url = match.value,
-                        quality = Qualities.Unknown.value,
-                        referer = "$mainUrl/"
-                    )
-                )
-            }
-
-            // البحث عن روابط mp4
-            val mp4Links = Regex("""(https?://[^"'\s]+\.mp4[^"'\s]*)""").findAll(script)
-            mp4Links.forEach { match ->
-                callback(
-                    ExtractorLink(
-                        name = "EgyDead",
-                        source = match.value,
-                        url = match.value,
-                        quality = Qualities.Unknown.value,
-                        referer = "$mainUrl/"
-                    )
-                )
-            }
-        }
-
-        return iframes.isNotEmpty() || scriptTexts.isNotEmpty()
+        // To be implemented next
+        return false
     }
 }
