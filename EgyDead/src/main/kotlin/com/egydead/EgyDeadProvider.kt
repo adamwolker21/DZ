@@ -26,11 +26,9 @@ class EgyDeadProvider : MainAPI() {
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
-        // Construct the URL based on the page number
         val url = if (page == 1) {
             "$mainUrl${request.data}"
         } else {
-            // Corrected pagination URL format
             "$mainUrl${request.data}?page=$page/"
         }
 
@@ -48,14 +46,12 @@ class EgyDeadProvider : MainAPI() {
         val title = this.selectFirst("h1.BottomTitle")?.text() ?: return null
         val posterUrl = this.selectFirst("img")?.attr("src")
 
-        // Clean up the title from extra words
         val cleanedTitle = title.replace("مشاهدة", "")
             .replace("فيلم", "")
             .replace("مسلسل", "")
             .replace("مترجم", "")
             .trim()
 
-        // Determine if it's a TV series or a Movie based on title
         val isSeries = title.contains("مسلسل") || title.contains("الموسم")
 
         return if (isSeries) {
@@ -81,58 +77,40 @@ class EgyDeadProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
 
-        // Extract the base title, removing season and episode info
-        val rawTitle = document.selectFirst("h1.Title")?.text()?.trim() ?: return null
-        val title = rawTitle.substringBefore("الموسم").substringBefore("الحلقة").trim()
+        // Extract the main title from the page title or a heading
+        val title = document.selectFirst("div.Title > h1")?.text()?.trim() 
+            ?: document.title().substringBefore(" - ").trim()
 
-        val posterUrl = document.selectFirst("div.Poster img")?.attr("src")
-        val plot = document.selectFirst("div.Story")?.text()?.trim()
-        
-        // Extract details from the list
-        val detailsList = document.select("div.Details ul li")
-        val year = detailsList.find { it.text().contains("سنة الانتاج") }
-            ?.text()?.replace("سنة الانتاج", "")?.trim()?.toIntOrNull()
-        val tags = detailsList.find { it.text().contains("القسم") }
+        val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
+        val plot = document.selectFirst("div.extra-content p")?.text()?.trim()
+
+        // Find details from the info list
+        val infoList = document.select("div.single-content > ul > li")
+        val year = infoList.find { it.text().contains("السنه") }
+            ?.selectFirst("a")?.text()?.toIntOrNull()
+        val tags = infoList.find { it.text().contains("النوع") }
             ?.select("a")?.map { it.text() }
-        val rating = detailsList.find { it.text().contains("التقييم") }
-            ?.text()?.replace("التقييم", "")?.trim()
-            ?.let { it.toFloatOrNull()?.times(100)?.toInt() }
-        val duration = detailsList.find { it.text().contains("وقت الحلقة") }
-            ?.text()?.replace("وقت الحلقة", "")?.trim()
-            ?.filter { it.isDigit() }?.toIntOrNull()
 
-        // Check if it's a TV series by looking for seasons list
-        val seasonsList = document.select("div.List--Seasons--Episodes")
-        val isTvSeries = seasonsList.isNotEmpty()
-
-        if (isTvSeries) {
-            val episodes = mutableListOf<Episode>()
-            // Loop through each season tab
-            document.select("ul.List--Seasons li a").forEach { seasonTab ->
-                val seasonName = seasonTab.text()
-                val seasonNum = seasonName.filter { it.isDigit() }.toIntOrNull()
-                val seasonId = seasonTab.attr("data-season")
-
-                // Find the corresponding episodes list for the season
-                document.select("div#$seasonId ul.hoverable-list li a").forEach { epElement ->
-                    val epHref = epElement.attr("href")
-                    val epTitle = epElement.text()
-                    val epNum = epTitle.filter { it.isDigit() }.toIntOrNull()
-                    
-                    episodes.add(newEpisode(epHref) {
-                        name = epTitle
-                        season = seasonNum
-                        episode = epNum
-                    })
+        // Check if it is a series by looking for the episodes list
+        val episodesList = document.select("div.EpsList li a")
+        if (episodesList.isNotEmpty()) {
+            val episodes = episodesList.mapNotNull { epElement ->
+                val epHref = epElement.attr("href")
+                val epTitle = epElement.attr("title")
+                val epNum = epTitle.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
+                
+                newEpisode(epHref) {
+                    name = epElement.text().trim() // e.g., "حلقه 1"
+                    episode = epNum
+                    season = 1 // Assuming single season for now as there's no season selector
                 }
-            }
+            }.sortedBy { it.episode }
+
             return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
                 this.posterUrl = posterUrl
                 this.plot = plot
                 this.year = year
                 this.tags = tags
-                this.rating = rating
-                // duration is per episode, so we don't set it for the whole series
             }
         } else {
             // It's a Movie
@@ -141,8 +119,6 @@ class EgyDeadProvider : MainAPI() {
                 this.plot = plot
                 this.year = year
                 this.tags = tags
-                this.rating = rating
-                this.duration = duration
             }
         }
     }
