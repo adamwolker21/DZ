@@ -1,6 +1,7 @@
 package com.egydead
 
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.network.CloudflareKiller
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import org.jsoup.nodes.Element
 
@@ -13,6 +14,9 @@ class EgyDeadProvider : MainAPI() {
         TvType.Movie,
         TvType.TvSeries,
     )
+
+    // Add CloudflareKiller interceptor to handle potential Cloudflare protection
+    private val interceptor = CloudflareKiller()
 
     override val mainPage = mainPageOf(
         "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-%d8%a7%d9%88%d9%86%d9%84%d8%a7%d9%8a%d9%86/" to "أفلام أجنبي",
@@ -30,7 +34,7 @@ class EgyDeadProvider : MainAPI() {
             "$mainUrl${request.data}?page=$page/"
         }
 
-        val document = app.get(url).document
+        val document = app.get(url, interceptor = interceptor).document
         val home = document.select("li.movieItem").mapNotNull {
             it.toSearchResult()
         }
@@ -64,24 +68,23 @@ class EgyDeadProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "$mainUrl/?s=$query"
-        val document = app.get(searchUrl).document
+        val document = app.get(searchUrl, interceptor = interceptor).document
         return document.select("li.movieItem").mapNotNull {
             it.toSearchResult()
         }
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val initialDoc = app.get(url).document
+        val initialDoc = app.get(url, interceptor = interceptor).document
 
         val watchButton = initialDoc.selectFirst("button input[name=View]")
         val document = if (watchButton != null) {
-            // Use headers from the cURL command to make a successful POST request
             val headers = mapOf(
                 "Referer" to url,
                 "Origin" to mainUrl,
                 "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36"
             )
-            app.post(url, data = mapOf("View" to "1"), headers = headers).document
+            app.post(url, data = mapOf("View" to "1"), headers = headers, interceptor = interceptor).document
         } else {
             initialDoc
         }
@@ -109,7 +112,6 @@ class EgyDeadProvider : MainAPI() {
 
         val episodesList = document.select("div.EpsList li a")
         if (episodesList.isNotEmpty()) {
-            // It's a series
             val seriesTitle = (altTitle ?: pageTitle)
                 .replace("مشاهدة", "")
                 .replace(Regex("""(فيلم|مسلسل|مترجم|كامل|الحلقة \d+)"""), "")
@@ -134,7 +136,6 @@ class EgyDeadProvider : MainAPI() {
                 this.tags = tags
             }
         } else {
-            // It's a Movie
             val movieTitle = pageTitle
                 .replace("مشاهدة", "")
                 .replace("فيلم", "")
