@@ -1,160 +1,96 @@
-package com.egydead
+package com.example
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
-import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
-import org.jsoup.Jsoup
+import com.lagradost.cloudstream3.utils.ExtractorLink
 import org.jsoup.nodes.Element
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
     override var name = "EgyDead"
-    override val instantLinkLoading = true
-    override var lang = "ar"
     override val hasMainPage = true
-    override val hasQuickSearch = false
+    override var lang = "ar"
     override val supportedTypes = setOf(
         TvType.Movie,
         TvType.TvSeries,
     )
 
+    // Define the main page sections
     override val mainPage = mainPageOf(
-        "/series-category/مسلسلات-اسيوية/" to "مسلسلات آسيوية",
-        "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-1/" to "مسلسلات أجنبية",
-        "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%aa%d8%b1%d9%83%d9%8a%d8%a9-%d8%a7/" to "مسلسلات تركية",
-        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-%d8%a7%d9%88%d9%86%d9%84%d8%a7%d9%8a%d9%86/" to "أفلام أجنبي",
-        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "أفلام آسيوية"
+        "/category/%d8%a7%d9%81%d9%84%d8%a7%d8%a5%d9%85-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-%d8%a7%d9%88%d9%86%d9%84%d8%a7%d9%8a%d9%86/" to "أفلام أجنبي",
+        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "أفلام آسيوية",
+        "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
-    companion object {
-        private fun String?.toIntOrNull(): Int? {
-            return this?.toIntOrNull()
+    // Fetch and parse the main page content
+    override suspend fun getMainPage(
+        page: Int,
+        request: MainPageRequest
+    ): HomePageResponse {
+        // Construct the URL based on the page number
+        val url = if (page == 1) {
+            "$mainUrl${request.data}"
+        } else {
+            "$mainUrl${request.data}page/$page/"
         }
 
-        private fun String?.toRatingInt(): Int? {
-            return this?.replace("[^0-9.]".toRegex(), "")?.toFloatOrNull()?.times(1000)?.toInt()
-        }
-    }
-
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val url = if (page == 1) request.data else request.data + "page/$page/"
-        val document = app.get(mainUrl + url, headers = headers).document
-        val home = document.select("article.item, .movie, .post, .item").mapNotNull {
+        val document = app.get(url).document
+        val home = document.select("li.movieItem").mapNotNull {
             it.toSearchResult()
         }
-        return newHomePageResponse(request.name, home, hasNext = true)
+        return newHomePageResponse(request.name, home)
     }
 
+    // Helper function to parse an element into a SearchResponse
     private fun Element.toSearchResult(): SearchResponse? {
-        val title = this.selectFirst("h2, h3, .title, .name")?.text()?.trim() ?: return null
-        val href = fixUrl(this.selectFirst("a")?.attr("href") ?: return null)
-        val posterUrl = fixUrl(this.selectFirst("img")?.attr("src") ?: "")
-        val quality = this.selectFirst(".quality")?.text()?.trim()
+        val linkTag = this.selectFirst("a") ?: return null
+        val href = linkTag.attr("href")
+        val title = this.selectFirst("h1.BottomTitle")?.text() ?: return null
+        val posterUrl = this.selectFirst("img")?.attr("src")
 
-        val type = when {
-            href.contains("/movie/") || href.contains("/film/") -> TvType.Movie
-            else -> TvType.TvSeries
-        }
+        // Clean up the title from extra words
+        val cleanedTitle = title.replace("مشاهدة", "")
+            .replace("فيلم", "")
+            .replace("مسلسل", "")
+            .replace("مترجم", "")
+            .trim()
 
-        return if (type == TvType.Movie) {
-            newMovieSearchResponse(title, href, TvType.Movie) {
+        // Determine if it's a TV series or a Movie based on title
+        val isSeries = title.contains("مسلسل") || title.contains("الموسم")
+
+        return if (isSeries) {
+            newTvSeriesSearchResponse(cleanedTitle, href, TvType.TvSeries) {
                 this.posterUrl = posterUrl
-                this.quality = getQualityFromString(quality)
             }
         } else {
-            newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
+            newMovieSearchResponse(cleanedTitle, href, TvType.Movie) {
                 this.posterUrl = posterUrl
-                this.quality = getQualityFromString(quality)
             }
         }
     }
 
-    private fun getQualityFromString(quality: String?): Quality {
-        return when {
-            quality?.contains("1080") == true -> Quality.FullHDP
-            quality?.contains("720") == true -> Quality.HD
-            quality?.contains("480") == true -> Quality.SD
-            else -> Quality.Unknown
-        }
-    }
-
+    // Placeholder for search functionality
     override suspend fun search(query: String): List<SearchResponse> {
-        val url = "$mainUrl/?s=${query.encodeToUrl()}"
-        val document = app.get(url, headers = headers).document
-        return document.select("article.item, .movie, .post, .item").mapNotNull {
+        val searchUrl = "$mainUrl/?s=$query"
+        val document = app.get(searchUrl).document
+        return document.select("li.movieItem").mapNotNull {
             it.toSearchResult()
         }
     }
 
-    override suspend fun load(url: String): LoadResponse {
-        val document = app.get(url, headers = headers).document
-
-        val title = document.selectFirst("h1.entry-title, h1.title")?.text()?.trim() ?: "No Title"
-        val description = document.selectFirst(".description, .content, .story")?.text()?.trim()
-        val poster = fixUrl(document.selectFirst(".poster img, .thumbnail img")?.attr("src") ?: "")
-        val background = fixUrl(document.selectFirst(".backdrop")?.attr("src") ?: "")
-        val year = document.selectFirst(".year, .date")?.text()?.toIntOrNull()
-        val rating = document.selectFirst(".rating, .score")?.text()?.toRatingInt()
-        val tags = document.select(".genre a, .tags a").map { it.text() }
-        val status = when (document.selectFirst(".status")?.text()?.lowercase()) {
-            "مكتمل", "منتهي" -> ShowStatus.Completed
-            "مستمر", "يعرض" -> ShowStatus.Ongoing
-            else -> null
-        }
-
-        val episodes = document.select(".episodes li, .episode-list li").map { li ->
-            val episodeTitle = li.selectFirst(".title, .name")?.text()?.trim() ?: "الحلقة"
-            val episodeHref = fixUrl(li.selectFirst("a")?.attr("href") ?: return@map null)
-            val episodeNumber = li.selectFirst(".number, .ep")?.text()?.toIntOrNull()
-            val episodePoster = fixUrl(li.selectFirst("img")?.attr("src") ?: "")
-
-            newEpisode(episodeHref) {
-                this.name = episodeTitle
-                this.episode = episodeNumber
-                this.posterUrl = episodePoster
-            }
-        }.filterNotNull()
-
-        return if (episodes.isNotEmpty()) {
-            newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-                this.posterUrl = poster
-                this.backgroundPosterUrl = background
-                this.year = year
-                this.plot = description
-                this.rating = rating
-                this.tags = tags
-                this.showStatus = status
-            }
-        } else {
-            newMovieLoadResponse(title, url, TvType.Movie, url) {
-                this.posterUrl = poster
-                this.backgroundPosterUrl = background
-                this.year = year
-                this.plot = description
-                this.rating = rating
-                this.tags = tags
-            }
-        }
+    // Placeholder for loading movie/series details
+    override suspend fun load(url: String): LoadResponse? {
+        // To be implemented in the next steps
+        return null
     }
 
+    // Placeholder for loading video links
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val document = app.get(data, headers = headers).document
-        
-        // محاولة استخراج iframes أولاً
-        val iframes = document.select("iframe")
-        iframes.forEach { iframe ->
-            val src = iframe.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
-            loadExtractor(src, data, subtitleCallback, callback)
-        }
-        
-        // محاولة استخراج من مصادر أخرى
-        val videoSources = document.select("source[src], video source[src]")
-        videoSources.forEach { source ->
-            val src = source.attr("src").takeIf { it.isNotBlank() } ?: return@forEach
-            loadExtractor(src, data
+        // To be implemented in the next steps
+        return false
+    }
+}
