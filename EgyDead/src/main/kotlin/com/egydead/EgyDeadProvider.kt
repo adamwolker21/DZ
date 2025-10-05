@@ -71,10 +71,8 @@ class EgyDeadProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        // Back to simple GET request which worked in v3.
         val document = app.get(url).document
         
-        // Use the corrected selectors from v4 to parse all details.
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterImage = document.selectFirst("div.single-thumbnail img")
         val posterUrl = posterImage?.attr("src")
@@ -82,15 +80,12 @@ class EgyDeadProvider : MainAPI() {
 
         var plot = document.selectFirst("div.extra-content p")?.text()?.trim()
 
-        val infoList = document.select("div.single-content > ul > li")
-        val year = infoList.find { it.text().contains("السنه") }
-            ?.selectFirst("a")?.text()?.toIntOrNull()
-        val tags = infoList.find { it.text().contains("النوع") }
-            ?.select("a")?.map { it.text() }
-        val duration = infoList.find { it.text().contains("مده العرض") }
-            ?.selectFirst("a")?.text()?.filter { it.isDigit() }?.toIntOrNull()
-        val country = infoList.find { it.text().contains("البلد") }
-            ?.selectFirst("a")?.text()
+        // Using more specific selectors to ensure data is found reliably
+        val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
+        val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
+        val durationText = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()
+        val duration = durationText?.filter { it.isDigit() }?.toIntOrNull()
+        val country = document.selectFirst("li:has(span:contains(البلد)) a")?.text()
 
         if (country != null) {
             plot = "البلد: $country\n\n$plot"
@@ -98,7 +93,6 @@ class EgyDeadProvider : MainAPI() {
 
         val episodesList = document.select("div.EpsList li a")
         if (episodesList.isNotEmpty()) {
-            // This will be true for main series pages (/season/)
             val seriesTitle = (altTitle ?: pageTitle)
                 .replace("مشاهدة", "")
                 .replace(Regex("""(فيلم|مسلسل|مترجم|كامل|الحلقة \d+)"""), "")
@@ -123,7 +117,6 @@ class EgyDeadProvider : MainAPI() {
                 this.tags = tags
             }
         } else {
-            // This will be true for movies or single episode pages.
             val movieTitle = pageTitle
                 .replace("مشاهدة", "")
                 .replace("فيلم", "")
