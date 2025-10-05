@@ -77,12 +77,16 @@ class EgyDeadProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
 
-        // Extract the main title from the page title or a heading
-        val title = document.selectFirst("div.Title > h1")?.text()?.trim() 
-            ?: document.title().substringBefore(" - ").trim()
+        // Use the new, more reliable selector for the title
+        val rawTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
+        val title = rawTitle.replace("مشاهدة", "")
+            .replace("فيلم", "")
+            .replace("مسلسل", "")
+            .replace("مترجم", "")
+            .trim()
 
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
-        val plot = document.selectFirst("div.extra-content p")?.text()?.trim()
+        var plot = document.selectFirst("div.extra-content p")?.text()?.trim()
 
         // Find details from the info list
         val infoList = document.select("div.single-content > ul > li")
@@ -90,6 +94,15 @@ class EgyDeadProvider : MainAPI() {
             ?.selectFirst("a")?.text()?.toIntOrNull()
         val tags = infoList.find { it.text().contains("النوع") }
             ?.select("a")?.map { it.text() }
+        val duration = infoList.find { it.text().contains("مده العرض") }
+            ?.selectFirst("a")?.text()?.filter { it.isDigit() }?.toIntOrNull()
+        val country = infoList.find { it.text().contains("البلد") }
+            ?.selectFirst("a")?.text()
+        
+        // Prepend country to the plot if it exists
+        if (country != null) {
+            plot = "البلد: $country\n\n$plot"
+        }
 
         // Check if it is a series by looking for the episodes list
         val episodesList = document.select("div.EpsList li a")
@@ -100,9 +113,9 @@ class EgyDeadProvider : MainAPI() {
                 val epNum = epTitle.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
                 
                 newEpisode(epHref) {
-                    name = epElement.text().trim() // e.g., "حلقه 1"
+                    name = epElement.text().trim()
                     episode = epNum
-                    season = 1 // Assuming single season for now as there's no season selector
+                    season = 1 // Assuming single season
                 }
             }.sortedBy { it.episode }
 
@@ -111,6 +124,8 @@ class EgyDeadProvider : MainAPI() {
                 this.plot = plot
                 this.year = year
                 this.tags = tags
+                // Duration in series is usually per episode
+                // this.duration = duration 
             }
         } else {
             // It's a Movie
@@ -119,6 +134,7 @@ class EgyDeadProvider : MainAPI() {
                 this.plot = plot
                 this.year = year
                 this.tags = tags
+                this.duration = duration
             }
         }
     }
@@ -130,7 +146,6 @@ class EgyDeadProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // To be implemented in the next steps
         return false
     }
 }
