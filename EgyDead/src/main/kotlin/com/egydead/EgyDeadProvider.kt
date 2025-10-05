@@ -4,6 +4,8 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
+// We will use this later
+// import com.egydead.EgyDeadUtils.getPageWithEpisodes
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -100,11 +102,13 @@ class EgyDeadProvider : MainAPI() {
         val isSeries = categoryText.contains("مسلسلات")
 
         if (isSeries) {
+            // TODO: In the next step, we will call getPageWithEpisodes(url) here
+            // to get the full episode list.
+
             val seriesTitle = pageTitle
                 .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
                 .trim()
 
-            // In this stable version, we only load episodes if they are directly on the page
             val episodes = document.select("div.EpsList li a").mapNotNull { epElement ->
                 val epHref = epElement.attr("href")
                 val epTitleAttr = epElement.attr("title")
@@ -117,7 +121,7 @@ class EgyDeadProvider : MainAPI() {
                 }
             }.sortedBy { it.episode }
 
-            return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes) {
+            return newTvSeriesSearchResponse(seriesTitle, url, TvType.TvSeries, episodes) {
                 this.posterUrl = posterUrl
                 this.plot = plot
                 this.year = year
@@ -143,28 +147,12 @@ class EgyDeadProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // First, get the initial page to acquire cookies
-        val initialResponse = app.get(data)
-        var document = initialResponse.document
+        // TODO: In the next step, we will call getPageWithEpisodes(data) here
+        // to get the document that contains the server iframes.
         
-        // If the server list isn't present, perform the POST request to reveal it
-        if (document.select("div.servers-list iframe").isEmpty()) {
-            val cookies = initialResponse.cookies
-            val headers = mapOf(
-                "Content-Type" to "application/x-www-form-urlencoded",
-                "Referer" to data,
-                "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
-                "Origin" to mainUrl,
-                "sec-fetch-dest" to "document",
-                "sec-fetch-mode" to "navigate",
-                "sec-fetch-site" to "same-origin",
-                "sec-fetch-user" to "?1"
-            )
-            val postData = mapOf("View" to "1")
-            document = app.post(data, headers = headers, data = postData, cookies = cookies).document
-        }
+        // For now, it will only work if servers are directly on the page
+        val document = app.get(data).document
 
-        // Now, extract the iframe links from the (potentially new) document
         document.select("div.servers-list iframe").apmap {
             val link = it.attr("src")
             if (link.isNotBlank()) {
