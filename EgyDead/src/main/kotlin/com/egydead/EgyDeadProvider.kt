@@ -76,29 +76,40 @@ class EgyDeadProvider : MainAPI() {
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterImage = document.selectFirst("div.single-thumbnail img")
         val posterUrl = posterImage?.attr("src")
-        val altTitle = posterImage?.attr("alt")
+        
+        var plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
 
-        var plot = document.selectFirst("div.extra-content p")?.text()?.trim()
-
-        // Using more specific selectors to ensure data is found reliably
+        // Extract details
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
         val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
         val durationText = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()
         val duration = durationText?.filter { it.isDigit() }?.toIntOrNull()
         val country = document.selectFirst("li:has(span:contains(البلد)) a")?.text()
+        val channel = document.select("li:has(span:contains(القناه)) a").joinToString(", ") { it.text() }
 
-        if (country != null) {
-            plot = "البلد: $country\n\n$plot"
+        // Format plot appendix with HTML
+        var plotAppendix = ""
+        if (!country.isNullOrBlank()) {
+            plotAppendix += "<b>البلد:</b> $country"
+        }
+        if (channel.isNotBlank()) {
+            if (plotAppendix.isNotEmpty()) plotAppendix += " | "
+            plotAppendix += "<b>القناه:</b> $channel"
+        }
+        if(plotAppendix.isNotEmpty()) {
+            plot = "$plot\n\n$plotAppendix"
         }
 
-        val episodesList = document.select("div.EpsList li a")
-        if (episodesList.isNotEmpty()) {
-            val seriesTitle = (altTitle ?: pageTitle)
-                .replace("مشاهدة", "")
-                .replace(Regex("""(فيلم|مسلسل|مترجم|كامل|الحلقة \d+)"""), "")
+        // Reliable classification based on "القسم"
+        val categoryText = document.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: ""
+        val isSeries = categoryText.contains("مسلسلات")
+
+        if (isSeries) {
+            val seriesTitle = pageTitle
+                .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
                 .trim()
 
-            val episodes = episodesList.mapNotNull { epElement ->
+            var episodes = document.select("div.EpsList li a").mapNotNull { epElement ->
                 val epHref = epElement.attr("href")
                 val epTitleAttr = epElement.attr("title")
                 val epNum = epTitleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
@@ -110,6 +121,16 @@ class EgyDeadProvider : MainAPI() {
                 }
             }.sortedBy { it.episode }
 
+            // If on a single episode page with no episode list, create a single episode item
+            if (episodes.isEmpty()) {
+                val epNumFromTitle = pageTitle.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
+                episodes = listOf(newEpisode(url) {
+                    name = pageTitle.substringAfter(seriesTitle).trim()
+                    episode = epNumFromTitle
+                    season = 1
+                })
+            }
+
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes) {
                 this.posterUrl = posterUrl
                 this.plot = plot
@@ -117,7 +138,7 @@ class EgyDeadProvider : MainAPI() {
                 this.tags = tags
             }
         } else {
-            val movieTitle = pageTitle
+             val movieTitle = pageTitle
                 .replace("مشاهدة", "")
                 .replace("فيلم", "")
                 .replace("مترجم", "")
