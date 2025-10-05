@@ -1,7 +1,6 @@
 package com.egydead
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.network.CloudflareKiller
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import org.jsoup.nodes.Element
 
@@ -14,9 +13,6 @@ class EgyDeadProvider : MainAPI() {
         TvType.Movie,
         TvType.TvSeries,
     )
-
-    // Add CloudflareKiller interceptor to handle potential Cloudflare protection
-    private val interceptor = CloudflareKiller()
 
     override val mainPage = mainPageOf(
         "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-%d8%a7%d9%88%d9%86%d9%84%d8%a7%d9%8a%d9%86/" to "أفلام أجنبي",
@@ -34,7 +30,7 @@ class EgyDeadProvider : MainAPI() {
             "$mainUrl${request.data}?page=$page/"
         }
 
-        val document = app.get(url, interceptor = interceptor).document
+        val document = app.get(url).document
         val home = document.select("li.movieItem").mapNotNull {
             it.toSearchResult()
         }
@@ -68,27 +64,17 @@ class EgyDeadProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "$mainUrl/?s=$query"
-        val document = app.get(searchUrl, interceptor = interceptor).document
+        val document = app.get(searchUrl).document
         return document.select("li.movieItem").mapNotNull {
             it.toSearchResult()
         }
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val initialDoc = app.get(url, interceptor = interceptor).document
-
-        val watchButton = initialDoc.selectFirst("button input[name=View]")
-        val document = if (watchButton != null) {
-            val headers = mapOf(
-                "Referer" to url,
-                "Origin" to mainUrl,
-                "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36"
-            )
-            app.post(url, data = mapOf("View" to "1"), headers = headers, interceptor = interceptor).document
-        } else {
-            initialDoc
-        }
+        // Back to simple GET request which worked in v3.
+        val document = app.get(url).document
         
+        // Use the corrected selectors from v4 to parse all details.
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterImage = document.selectFirst("div.single-thumbnail img")
         val posterUrl = posterImage?.attr("src")
@@ -112,6 +98,7 @@ class EgyDeadProvider : MainAPI() {
 
         val episodesList = document.select("div.EpsList li a")
         if (episodesList.isNotEmpty()) {
+            // This will be true for main series pages (/season/)
             val seriesTitle = (altTitle ?: pageTitle)
                 .replace("مشاهدة", "")
                 .replace(Regex("""(فيلم|مسلسل|مترجم|كامل|الحلقة \d+)"""), "")
@@ -125,7 +112,7 @@ class EgyDeadProvider : MainAPI() {
                 newEpisode(epHref) {
                     name = epElement.text().trim()
                     episode = epNum
-                    season = 1
+                    season = 1 
                 }
             }.sortedBy { it.episode }
 
@@ -136,6 +123,7 @@ class EgyDeadProvider : MainAPI() {
                 this.tags = tags
             }
         } else {
+            // This will be true for movies or single episode pages.
             val movieTitle = pageTitle
                 .replace("مشاهدة", "")
                 .replace("فيلم", "")
@@ -158,7 +146,7 @@ class EgyDeadProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // To be implemented
+        // To be implemented next
         return false
     }
 }
