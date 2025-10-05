@@ -2,6 +2,7 @@ package com.egydead
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
 
 class EgyDeadProvider : MainAPI() {
@@ -16,7 +17,7 @@ class EgyDeadProvider : MainAPI() {
 
     override val mainPage = mainPageOf(
         "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-%d8%a7%d9%88%d9%86%d9%84%d8%a7%d9%8a%d9%86/" to "أفلام أجنبي",
-        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "أفلام 20 آسيوية",
+        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "أفلام آسيوية",
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
@@ -68,27 +69,8 @@ class EgyDeadProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val initialResponse = app.get(url)
-        var document = initialResponse.document
-
-        // Check if we need to "click" the button
-        if (document.select("div.EpsList li a").isEmpty() && document.selectFirst("div.watchNow form") != null) {
-            val cookies = initialResponse.cookies
-            // Add navigation headers to simulate a real form submission
-            val headers = mapOf(
-                "Content-Type" to "application/x-www-form-urlencoded",
-                "Referer" to url,
-                "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
-                "Origin" to mainUrl,
-                "sec-fetch-dest" to "document",
-                "sec-fetch-mode" to "navigate",
-                "sec-fetch-site" to "same-origin",
-                "sec-fetch-user" to "?1"
-            )
-            val data = mapOf("View" to "1")
-            document = app.post(url, headers = headers, data = data, cookies = cookies).document
-        }
-
+        val document = app.get(url).document
+        
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterImage = document.selectFirst("div.single-thumbnail img")
         val posterUrl = posterImage?.attr("src")
@@ -122,6 +104,7 @@ class EgyDeadProvider : MainAPI() {
                 .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
                 .trim()
 
+            // In this stable version, we only load episodes if they are directly on the page
             val episodes = document.select("div.EpsList li a").mapNotNull { epElement ->
                 val epHref = epElement.attr("href")
                 val epTitleAttr = epElement.attr("title")
@@ -160,7 +143,35 @@ class EgyDeadProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // To be implemented next
-        return false
+        // First, get the initial page to acquire cookies
+        val initialResponse = app.get(data)
+        var document = initialResponse.document
+        
+        // If the server list isn't present, perform the POST request to reveal it
+        if (document.select("div.servers-list iframe").isEmpty()) {
+            val cookies = initialResponse.cookies
+            val headers = mapOf(
+                "Content-Type" to "application/x-www-form-urlencoded",
+                "Referer" to data,
+                "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
+                "Origin" to mainUrl,
+                "sec-fetch-dest" to "document",
+                "sec-fetch-mode" to "navigate",
+                "sec-fetch-site" to "same-origin",
+                "sec-fetch-user" to "?1"
+            )
+            val postData = mapOf("View" to "1")
+            document = app.post(data, headers = headers, data = postData, cookies = cookies).document
+        }
+
+        // Now, extract the iframe links from the (potentially new) document
+        document.select("div.servers-list iframe").apmap {
+            val link = it.attr("src")
+            if (link.isNotBlank()) {
+                loadExtractor(link, data, subtitleCallback, callback)
+            }
+        }
+
+        return true
     }
 }
