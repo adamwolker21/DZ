@@ -2,7 +2,6 @@ package com.egydead
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 
 class EgyDeadProvider : MainAPI() {
@@ -15,14 +14,12 @@ class EgyDeadProvider : MainAPI() {
         TvType.TvSeries,
     )
 
-    // Define the main page sections
     override val mainPage = mainPageOf(
         "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-%d8%a7%d9%88%d9%86%d9%84%d8%a7%d9%8a%d9%86/" to "أفلام أجنبي",
         "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "أفلام آسيوية",
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
-    // Fetch and parse the main page content
     override suspend fun getMainPage(
         page: Int,
         request: MainPageRequest
@@ -40,7 +37,6 @@ class EgyDeadProvider : MainAPI() {
         return newHomePageResponse(request.name, home)
     }
 
-    // Helper function to parse an element into a SearchResponse
     private fun Element.toSearchResult(): SearchResponse? {
         val linkTag = this.selectFirst("a") ?: return null
         val href = linkTag.attr("href")
@@ -74,29 +70,27 @@ class EgyDeadProvider : MainAPI() {
         }
     }
 
-    // Load movie/series details
     override suspend fun load(url: String): LoadResponse? {
-        // First, get the initial page to see if we need to make a POST request
         val initialDoc = app.get(url).document
 
-        // If the "Watch and Download" button is present, it means the content is hidden.
-        // We must perform a POST request to the same URL to reveal it.
         val watchButton = initialDoc.selectFirst("button input[name=View]")
         val document = if (watchButton != null) {
-            app.post(url, data = mapOf("View" to "1")).document
+            // Use headers from the cURL command to make a successful POST request
+            val headers = mapOf(
+                "Referer" to url,
+                "Origin" to mainUrl,
+                "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36"
+            )
+            app.post(url, data = mapOf("View" to "1"), headers = headers).document
         } else {
-            initialDoc // Use the initial document if the button isn't there (e.g., series main page)
+            initialDoc
         }
+        
+        val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
+        val posterImage = document.selectFirst("div.single-thumbnail img")
+        val posterUrl = posterImage?.attr("src")
+        val altTitle = posterImage?.attr("alt")
 
-        // Now parse the correct document which contains all the info
-        val rawTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
-        val title = rawTitle.replace("مشاهدة", "")
-            .replace("فيلم", "")
-            .replace("مسلسل", "")
-            .replace("مترجم", "")
-            .trim()
-
-        val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
         var plot = document.selectFirst("div.extra-content p")?.text()?.trim()
 
         val infoList = document.select("div.single-content > ul > li")
@@ -108,18 +102,24 @@ class EgyDeadProvider : MainAPI() {
             ?.selectFirst("a")?.text()?.filter { it.isDigit() }?.toIntOrNull()
         val country = infoList.find { it.text().contains("البلد") }
             ?.selectFirst("a")?.text()
-        
+
         if (country != null) {
             plot = "البلد: $country\n\n$plot"
         }
 
         val episodesList = document.select("div.EpsList li a")
         if (episodesList.isNotEmpty()) {
+            // It's a series
+            val seriesTitle = (altTitle ?: pageTitle)
+                .replace("مشاهدة", "")
+                .replace(Regex("""(فيلم|مسلسل|مترجم|كامل|الحلقة \d+)"""), "")
+                .trim()
+
             val episodes = episodesList.mapNotNull { epElement ->
                 val epHref = epElement.attr("href")
-                val epTitle = epElement.attr("title")
-                val epNum = epTitle.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
-                
+                val epTitleAttr = epElement.attr("title")
+                val epNum = epTitleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
+
                 newEpisode(epHref) {
                     name = epElement.text().trim()
                     episode = epNum
@@ -127,14 +127,21 @@ class EgyDeadProvider : MainAPI() {
                 }
             }.sortedBy { it.episode }
 
-            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+            return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes) {
                 this.posterUrl = posterUrl
                 this.plot = plot
                 this.year = year
                 this.tags = tags
             }
         } else {
-            return newMovieLoadResponse(title, url, TvType.Movie, url) {
+            // It's a Movie
+            val movieTitle = pageTitle
+                .replace("مشاهدة", "")
+                .replace("فيلم", "")
+                .replace("مترجم", "")
+                .trim()
+
+            return newMovieLoadResponse(movieTitle, url, TvType.Movie, url) {
                 this.posterUrl = posterUrl
                 this.plot = plot
                 this.year = year
@@ -150,7 +157,7 @@ class EgyDeadProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // To be implemented next
+        // To be implemented
         return false
     }
 }
