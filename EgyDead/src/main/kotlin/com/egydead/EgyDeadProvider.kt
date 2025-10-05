@@ -16,7 +16,7 @@ class EgyDeadProvider : MainAPI() {
 
     override val mainPage = mainPageOf(
         "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-%d8%a7%d9%88%d9%86%d9%84%d8%a7%d9%8a%d9%86/" to "أفلام أجنبي",
-        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "أفلام آسيوية",
+        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "أفلام 20 آسيوية",
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
@@ -74,11 +74,16 @@ class EgyDeadProvider : MainAPI() {
         // Check if we need to "click" the button
         if (document.select("div.EpsList li a").isEmpty() && document.selectFirst("div.watchNow form") != null) {
             val cookies = initialResponse.cookies
+            // Add navigation headers to simulate a real form submission
             val headers = mapOf(
                 "Content-Type" to "application/x-www-form-urlencoded",
                 "Referer" to url,
                 "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
-                "Origin" to mainUrl
+                "Origin" to mainUrl,
+                "sec-fetch-dest" to "document",
+                "sec-fetch-mode" to "navigate",
+                "sec-fetch-site" to "same-origin",
+                "sec-fetch-user" to "?1"
             )
             val data = mapOf("View" to "1")
             document = app.post(url, headers = headers, data = data, cookies = cookies).document
