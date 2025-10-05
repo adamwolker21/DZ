@@ -40,7 +40,6 @@ class EgyDeadProvider : MainAPI() {
     private fun Element.toSearchResult(): SearchResponse? {
         val linkTag = this.selectFirst("a") ?: return null
         val href = linkTag.attr("href")
-        // Title from main page items -> <h1 class="BottomTitle">
         val title = this.selectFirst("h1.BottomTitle")?.text() ?: return null
         val posterUrl = this.selectFirst("img")?.attr("src")
 
@@ -69,16 +68,25 @@ class EgyDeadProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url).document
-        
-        // Title from movie/episode page -> <div class="singleTitle"><em>...</em></div>
+        var document = app.get(url).document
+
+        // If on an episode page, "click" the button to reveal the episode list
+        if (document.select("div.EpsList li a").isEmpty() && document.selectFirst("div.watchNow form") != null) {
+            val headers = mapOf(
+                "Referer" to url,
+                "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36",
+                "Origin" to mainUrl
+            )
+            val data = mapOf("View" to "1")
+            document = app.post(url, headers = headers, data = data).document
+        }
+
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterImage = document.selectFirst("div.single-thumbnail img")
         val posterUrl = posterImage?.attr("src")
         
         var plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
 
-        // Extract details
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
         val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
         val durationText = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()
@@ -86,7 +94,6 @@ class EgyDeadProvider : MainAPI() {
         val country = document.selectFirst("li:has(span:contains(البلد)) a")?.text()
         val channel = document.select("li:has(span:contains(القناه)) a").joinToString(", ") { it.text() }
 
-        // Format plot appendix with HTML line breaks
         var plotAppendix = ""
         if (!country.isNullOrBlank()) {
             plotAppendix += "البلد: $country"
@@ -96,11 +103,9 @@ class EgyDeadProvider : MainAPI() {
             plotAppendix += "القناه: $channel"
         }
         if(plotAppendix.isNotEmpty()) {
-            // Using <br> for a guaranteed new line in HTML-supported views
             plot = "$plot<br><br>$plotAppendix"
         }
 
-        // Reliable classification based on "القسم"
         val categoryText = document.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: ""
         val isSeries = categoryText.contains("مسلسلات")
 
@@ -109,7 +114,7 @@ class EgyDeadProvider : MainAPI() {
                 .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
                 .trim()
 
-            var episodes = document.select("div.EpsList li a").mapNotNull { epElement ->
+            val episodes = document.select("div.EpsList li a").mapNotNull { epElement ->
                 val epHref = epElement.attr("href")
                 val epTitleAttr = epElement.attr("title")
                 val epNum = epTitleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
@@ -121,20 +126,12 @@ class EgyDeadProvider : MainAPI() {
                 }
             }.sortedBy { it.episode }
 
-            if (episodes.isEmpty()) {
-                val epNumFromTitle = pageTitle.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
-                episodes = listOf(newEpisode(url) {
-                    name = pageTitle.substringAfter(seriesTitle).trim()
-                    episode = epNumFromTitle
-                    season = 1
-                })
-            }
-
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes) {
                 this.posterUrl = posterUrl
                 this.plot = plot
                 this.year = year
                 this.tags = tags
+                this.duration = duration
             }
         } else {
              val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
