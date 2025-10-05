@@ -8,7 +8,7 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 
 class EgyDeadProvider : MainAPI() {
-    override var mainUrl = "https://tv5.egydead.live"
+    override var mainUrl = "https://tv6.egydead.live"
     override var name = "EgyDead"
     override val instantLinkLoading = true
     override var lang = "ar"
@@ -20,7 +20,7 @@ class EgyDeadProvider : MainAPI() {
     )
 
     override val mainPage = mainPageOf(
-        "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات آسيوية",
+        "/series-category/مسلسلات-اسيوية/" to "مسلسلات آسيوية",
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-1/" to "مسلسلات أجنبية",
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%aa%d8%b1%d9%83%d9%8a%d8%a9-%d8%a7/" to "مسلسلات تركية",
         "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-%d8%a7%d9%88%d9%86%d9%84%d8%a7%d9%8a%d9%86/" to "أفلام أجنبي",
