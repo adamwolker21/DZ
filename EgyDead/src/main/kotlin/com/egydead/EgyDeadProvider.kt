@@ -1,4 +1,4 @@
-package com.egydead // تم التعديل هنا
+package com.egydead
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
@@ -30,7 +30,8 @@ class EgyDeadProvider : MainAPI() {
         val url = if (page == 1) {
             "$mainUrl${request.data}"
         } else {
-            "$mainUrl${request.data}page/$page/"
+            // Corrected pagination URL format
+            "$mainUrl${request.data}?page=$page/"
         }
 
         val document = app.get(url).document
@@ -68,7 +69,6 @@ class EgyDeadProvider : MainAPI() {
         }
     }
 
-    // Placeholder for search functionality
     override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "$mainUrl/?s=$query"
         val document = app.get(searchUrl).document
@@ -77,10 +77,74 @@ class EgyDeadProvider : MainAPI() {
         }
     }
 
-    // Placeholder for loading movie/series details
+    // Load movie/series details
     override suspend fun load(url: String): LoadResponse? {
-        // To be implemented in the next steps
-        return null
+        val document = app.get(url).document
+
+        // Extract the base title, removing season and episode info
+        val rawTitle = document.selectFirst("h1.Title")?.text()?.trim() ?: return null
+        val title = rawTitle.substringBefore("الموسم").substringBefore("الحلقة").trim()
+
+        val posterUrl = document.selectFirst("div.Poster img")?.attr("src")
+        val plot = document.selectFirst("div.Story")?.text()?.trim()
+        
+        // Extract details from the list
+        val detailsList = document.select("div.Details ul li")
+        val year = detailsList.find { it.text().contains("سنة الانتاج") }
+            ?.text()?.replace("سنة الانتاج", "")?.trim()?.toIntOrNull()
+        val tags = detailsList.find { it.text().contains("القسم") }
+            ?.select("a")?.map { it.text() }
+        val rating = detailsList.find { it.text().contains("التقييم") }
+            ?.text()?.replace("التقييم", "")?.trim()
+            ?.let { it.toFloatOrNull()?.times(100)?.toInt() }
+        val duration = detailsList.find { it.text().contains("وقت الحلقة") }
+            ?.text()?.replace("وقت الحلقة", "")?.trim()
+            ?.filter { it.isDigit() }?.toIntOrNull()
+
+        // Check if it's a TV series by looking for seasons list
+        val seasonsList = document.select("div.List--Seasons--Episodes")
+        val isTvSeries = seasonsList.isNotEmpty()
+
+        if (isTvSeries) {
+            val episodes = mutableListOf<Episode>()
+            // Loop through each season tab
+            document.select("ul.List--Seasons li a").forEach { seasonTab ->
+                val seasonName = seasonTab.text()
+                val seasonNum = seasonName.filter { it.isDigit() }.toIntOrNull()
+                val seasonId = seasonTab.attr("data-season")
+
+                // Find the corresponding episodes list for the season
+                document.select("div#$seasonId ul.hoverable-list li a").forEach { epElement ->
+                    val epHref = epElement.attr("href")
+                    val epTitle = epElement.text()
+                    val epNum = epTitle.filter { it.isDigit() }.toIntOrNull()
+                    
+                    episodes.add(newEpisode(epHref) {
+                        name = epTitle
+                        season = seasonNum
+                        episode = epNum
+                    })
+                }
+            }
+            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+                this.posterUrl = posterUrl
+                this.plot = plot
+                this.year = year
+                this.tags = tags
+                this.rating = rating
+                // duration is per episode, so we don't set it for the whole series
+            }
+        } else {
+            // It's a Movie
+            return newMovieLoadResponse(title, url, TvType.Movie, url) {
+                this.posterUrl = posterUrl
+                this.plot = plot
+                this.year = year
+                this.tags = tags
+                this.rating = rating
+                this.duration = duration
+            }
+        }
     }
 
     // Placeholder for loading video links
