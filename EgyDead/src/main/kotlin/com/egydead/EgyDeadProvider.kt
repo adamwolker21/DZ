@@ -40,6 +40,7 @@ class EgyDeadProvider : MainAPI() {
     private fun Element.toSearchResult(): SearchResponse? {
         val linkTag = this.selectFirst("a") ?: return null
         val href = linkTag.attr("href")
+        // Title from main page items
         val title = this.selectFirst("h1.BottomTitle")?.text() ?: return null
         val posterUrl = this.selectFirst("img")?.attr("src")
 
@@ -73,6 +74,7 @@ class EgyDeadProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         
+        // Title from movie/episode page
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterImage = document.selectFirst("div.single-thumbnail img")
         val posterUrl = posterImage?.attr("src")
@@ -87,14 +89,14 @@ class EgyDeadProvider : MainAPI() {
         val country = document.selectFirst("li:has(span:contains(البلد)) a")?.text()
         val channel = document.select("li:has(span:contains(القناه)) a").joinToString(", ") { it.text() }
 
-        // Format plot appendix with HTML
+        // Format plot appendix without bold tags and on a new line
         var plotAppendix = ""
         if (!country.isNullOrBlank()) {
-            plotAppendix += "<b>البلد:</b> $country"
+            plotAppendix += "البلد: $country"
         }
         if (channel.isNotBlank()) {
             if (plotAppendix.isNotEmpty()) plotAppendix += " | "
-            plotAppendix += "<b>القناه:</b> $channel"
+            plotAppendix += "القناه: $channel"
         }
         if(plotAppendix.isNotEmpty()) {
             plot = "$plot\n\n$plotAppendix"
