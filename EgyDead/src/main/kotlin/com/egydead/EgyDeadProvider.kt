@@ -68,17 +68,19 @@ class EgyDeadProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        var document = app.get(url).document
+        val initialResponse = app.get(url)
+        var document = initialResponse.document
 
+        // Check if we need to "click" the button
         if (document.select("div.EpsList li a").isEmpty() && document.selectFirst("div.watchNow form") != null) {
+            val cookies = initialResponse.cookies
             val headers = mapOf(
                 "Content-Type" to "application/x-www-form-urlencoded",
                 "Referer" to url,
-                "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
-                "Origin" to mainUrl
+                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
             )
             val data = mapOf("View" to "1")
-            document = app.post(url, headers = headers, data = data).document
+            document = app.post(url, headers = headers, data = data, cookies = cookies).document
         }
 
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
