@@ -68,9 +68,9 @@ class EgyDeadProvider : MainAPI() {
 
     private fun Element.toSearchResult(): SearchResponse? {
         val linkTag = this.selectFirst("a") ?: return null
-        val href = linkTag.attr("href")
+        val href = fixUrl(linkTag.attr("href"))
         val title = this.selectFirst("h1.BottomTitle")?.text() ?: return null
-        val posterUrl = this.selectFirst("img")?.attr("src")
+        val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("src"))
 
         val cleanedTitle = title.replace("مشاهدة", "").trim()
             .replace(Regex("^(فيلم|مسلسل)"), "").trim()
@@ -100,7 +100,7 @@ class EgyDeadProvider : MainAPI() {
         val document = app.get(url).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         
-        val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
+        val posterUrl = fixUrlNull(document.selectFirst("div.single-thumbnail img")?.attr("src"))
         val plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
         val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
@@ -113,7 +113,7 @@ class EgyDeadProvider : MainAPI() {
             val episodesDoc = getWatchPage(url) ?: document
 
             val episodes = episodesDoc.select("div.EpsList li a").mapNotNull { epElement ->
-                val href = epElement.attr("href")
+                val href = fixUrl(epElement.attr("href"))
                 val titleAttr = epElement.attr("title")
                 val epNum = titleAttr.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
                 if (epNum == null) return@mapNotNull null
@@ -163,29 +163,9 @@ class EgyDeadProvider : MainAPI() {
         EarnVidsExtractor(),
         VidGuardExtractor()
     )
-
-    private suspend fun unpackJs(script: String?, callback: (ExtractorLink) -> Unit) {
-        if (script == null) return
-        val unpacked = getAndUnpack(script)
-        Regex("""sources:\s*\[\{file:"(.*?)"''').findAll(unpacked).forEach {
-            val link = it.groupValues[1]
-            if (link.isNotBlank()) {
-                 callback.invoke(
-                    ExtractorLink(
-                        this.name,
-                        this.name,
-                        httpsify(link),
-                        "",
-                        if (link.contains(".m3u8")) Qualities.Unknown.value else Qualities.P1080.value,
-                        link.contains(".m3u8")
-                    )
-                )
-            }
-        }
-    }
     
-    // Base class for all eval-based extractors
-    abstract class EvalExtractor : ExtractorApi() {
+    // Base class for all eval-based extractors, now corrected
+    abstract class BaseEvalExtractor : ExtractorApi() {
         override val requiresReferer = true
         override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
             val doc = app.get(url, referer = referer).document
@@ -208,12 +188,12 @@ class EgyDeadProvider : MainAPI() {
         }
     }
 
-    inner class StreamHGExtractor : EvalExtractor() {
+    inner class StreamHGExtractor : BaseEvalExtractor() {
         override var name = "StreamHG"
-        override var mainUrl = "hglink.to" // also handles davioad.com, etc.
+        override var mainUrl = "hglink.to"
     }
     
-    inner class EarnVidsExtractor : EvalExtractor() {
+    inner class EarnVidsExtractor : BaseEvalExtractor() {
         override var name = "EarnVids"
         override var mainUrl = "dingtezuni.com"
     }
@@ -257,14 +237,18 @@ class EgyDeadProvider : MainAPI() {
     
     inner class VidGuardExtractor : ExtractorApi() {
         override var name = "VidGuard"
-        override var mainUrl = "listeamed.net" // This is the gateway
+        override var mainUrl = "listeamed.net"
         override val requiresReferer = true
         override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
             val document = app.get(url, referer = referer).document
-            // Find the iframe pointing to the real server
             val realEmbedUrl = document.selectFirst("iframe")?.attr("src") ?: return
             
-            // Now, find the correct extractor to handle the *real* embed URL
+            // Handle dumbalag.com as a StreamHG-like server
+            if (realEmbedUrl.contains("dumbalag.com")) {
+                StreamHGExtractor().getUrl(realEmbedUrl, url, subtitleCallback, callback)
+                return
+            }
+            
             val matchingExtractor = extractorList.find { realEmbedUrl.contains(it.mainUrl) }
             matchingExtractor?.getUrl(realEmbedUrl, url, subtitleCallback, callback)
         }
@@ -293,7 +277,6 @@ class EgyDeadProvider : MainAPI() {
         coroutineScope {
             allLinks.forEach { link ->
                 launch {
-                    // dumbalag.com is also a StreamHG-like server
                     if (link.contains("dumbalag.com")) {
                         StreamHGExtractor().getUrl(link, data, subtitleCallback, callback)
                         return@launch
