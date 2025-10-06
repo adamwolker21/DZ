@@ -6,7 +6,9 @@ import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.utils.httpsify
-import com.lagradost.cloudstream3.Qualities
+// FIXED: The 'Qualities' enum was moved to the 'utils' package in recent Cloudstream updates.
+// Adding the correct import resolves the 'Unresolved reference' error.
+import com.lagradost.cloudstream3.utils.Qualities
 
 open class StreamHGExtractor : ExtractorApi() {
     override var name = "StreamHG"
@@ -25,13 +27,13 @@ open class StreamHGExtractor : ExtractorApi() {
             val unpacked = getAndUnpack(packedJs)
             val m3u8Link = Regex("""sources:\[\{file:"(.*?)"\}\]""").find(unpacked)?.groupValues?.get(1)
             if (m3u8Link != null) {
-                // FIXED: Replaced deprecated 'newExtractorLink' with its constructor
                 callback.invoke(
                     ExtractorLink(
                         source = this.name,
                         name = this.name,
                         url = httpsify(m3u8Link),
                         referer = referer ?: "",
+                        // With the correct import, this now works as intended.
                         quality = Qualities.Unknown.value,
                         isM3u8 = true,
                     )
@@ -55,14 +57,15 @@ open class ForafileExtractor : ExtractorApi() {
         val document = app.get(url, referer = referer).document
         val videoUrl = document.selectFirst("source")?.attr("src")
         if (videoUrl != null) {
-             // FIXED: Replaced deprecated 'newExtractorLink' with its constructor
             callback.invoke(
                 ExtractorLink(
                     source = this.name,
                     name = this.name,
                     url = videoUrl,
                     referer = referer ?: "",
+                     // With the correct import, this now works as intended.
                     quality = Qualities.Unknown.value,
+                    isM3u8 = videoUrl.contains(".m3u8")
                 )
             )
         }
