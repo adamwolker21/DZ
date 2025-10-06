@@ -61,11 +61,10 @@ class EgyDeadProvider : MainAPI() {
         val cleanedTitle = title.replace("مشاهدة", "").trim().replace(Regex("^(فيلم|مسلسل)"), "").trim()
         val isSeries = title.contains("مسلسل") || title.contains("الموسم")
 
-        // FIXED: Using direct constructors, consistent with the new API and your WeCima plugin.
         return if (isSeries) {
-            TvSeriesSearchResponse(cleanedTitle, href, this@EgyDeadProvider.name, TvType.TvSeries, posterUrl)
+            newTvSeriesSearchResponse(cleanedTitle, href, TvType.TvSeries) { this.posterUrl = posterUrl }
         } else {
-            MovieSearchResponse(cleanedTitle, href, this@EgyDeadProvider.name, TvType.Movie, posterUrl)
+            newMovieSearchResponse(cleanedTitle, href, TvType.Movie) { this.posterUrl = posterUrl }
         }
     }
 
@@ -89,19 +88,25 @@ class EgyDeadProvider : MainAPI() {
             val episodes = episodesDoc.select("div.EpsList li a").mapNotNull { epElement ->
                 val href = epElement.attr("href")
                 val epName = epElement.text().trim()
-                val epNum = epName.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
-                // FIXED: Using direct Episode constructor.
-                Episode(href, epName, episode = epNum)
+                val epNum = epName.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull() ?: return@mapNotNull null
+                newEpisode(href) { this.name = epName; this.episode = epNum }
             }.distinctBy { it.episode }
             val seriesTitle = pageTitle.replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "").trim()
             
-            // FIXED: Using direct TvSeriesLoadResponse constructor.
-            return TvSeriesLoadResponse(seriesTitle, url, this.name, TvType.TvSeries, episodes, posterUrl, year, plot, tags = tags)
+            // FIXED: Added the required 'contentRating' parameter as requested by the build error.
+            return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes) {
+                this.posterUrl = posterUrl; this.year = year; this.plot = plot; this.tags = tags
+                this.contentRating = null // Passing null as no rating is available on the site.
+            }
         } else {
             val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
             
-            // FIXED: Using direct MovieLoadResponse constructor.
-            return MovieLoadResponse(movieTitle, url, this.name, TvType.Movie, url, posterUrl, year, plot, tags = tags, duration = duration)
+            // FIXED: Added the required 'contentRating' parameter.
+            return newMovieLoadResponse(movieTitle, url, TvType.Movie, url) {
+                this.posterUrl = posterUrl; this.year = year; this.plot = plot
+                this.tags = tags; this.duration = duration
+                this.contentRating = null // Passing null as no rating is available on the site.
+            }
         }
     }
 
