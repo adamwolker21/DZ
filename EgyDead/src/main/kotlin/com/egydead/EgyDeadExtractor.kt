@@ -6,6 +6,8 @@ import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.utils.httpsify
+import com.lagradost.cloudstream3.Qualities
+import com.lagradost.cloudstream3.newExtractorLink
 
 open class StreamHGExtractor : ExtractorApi() {
     override var name = "StreamHG"
@@ -25,12 +27,12 @@ open class StreamHGExtractor : ExtractorApi() {
             val m3u8Link = Regex("""sources:\[\{file:"(.*?)"\}\]""").find(unpacked)?.groupValues?.get(1)
             if (m3u8Link != null) {
                 callback.invoke(
-                    ExtractorLink(
-                        this.name,
-                        this.name,
-                        httpsify(m3u8Link),
-                        referer ?: "",
-                        Qualities.Unknown.value,
+                    newExtractorLink(
+                        source = this.name,
+                        name = this.name,
+                        url = httpsify(m3u8Link),
+                        referer = referer ?: "",
+                        quality = Qualities.Unknown.value,
                         isM3u8 = true,
                     )
                 )
@@ -54,12 +56,12 @@ open class ForafileExtractor : ExtractorApi() {
         val videoUrl = document.selectFirst("source")?.attr("src")
         if (videoUrl != null) {
             callback.invoke(
-                ExtractorLink(
-                    this.name,
-                    this.name,
-                    videoUrl,
-                    referer ?: "",
-                    Qualities.Unknown.value,
+                newExtractorLink(
+                    source = this.name,
+                    name = this.name,
+                    url = videoUrl,
+                    referer = referer ?: "",
+                    quality = Qualities.Unknown.value,
                 )
             )
         }
