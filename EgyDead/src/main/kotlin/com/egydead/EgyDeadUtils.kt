@@ -48,9 +48,9 @@ object EgyDeadUtils {
             val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
             if(epNum == null) return@mapNotNull null
             newEpisode(href) {
-                name = it.text().trim()
-                episode = epNum
-                season = 1 
+                this.name = it.text().trim()
+                this.episode = epNum
+                this.season = 1 
             }
         }
         val serverLinks = document.select("div.servers-list iframe").map { it.attr("src") }
