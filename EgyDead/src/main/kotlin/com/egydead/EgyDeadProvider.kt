@@ -71,9 +71,21 @@ class EgyDeadProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        var document = app.get(url).document
+        val initialDoc = app.get(url).document
+        val pageTitle = initialDoc.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
+        var document = initialDoc
+
+        val categoryText = initialDoc.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: ""
+        val isSeries = categoryText.contains("مسلسلات")
+
+        // If it's a series and the episode list is not on the initial page, get the full page.
+        if (isSeries && initialDoc.select("div.EpsList li a").isEmpty()) {
+            val fullPage = getPageWithEpisodes(url)
+            if (fullPage != null) {
+                document = fullPage
+            }
+        }
         
-        val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterImage = document.selectFirst("div.single-thumbnail img")
         val posterUrl = posterImage?.attr("src")
         
@@ -102,23 +114,13 @@ class EgyDeadProvider : MainAPI() {
             plot = "$plot<br><br>$plotAppendix"
         }
 
-        val categoryText = document.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: ""
-        val isSeries = categoryText.contains("مسلسلات")
-
         if (isSeries) {
-            // If the episode list is not found, call our helper function to get it.
-            if (document.select("div.EpsList li a").isEmpty()) {
-                val fullPage = getPageWithEpisodes(url)
-                if (fullPage != null) {
-                    document = fullPage
-                }
-            }
-
             val seriesTitle = pageTitle
                 .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
                 .trim()
 
-            val episodes = document.select("div.EpsList li a").mapNotNull { epElement ->
+            // Get episodes from the (potentially updated) document
+            var episodes = document.select("div.EpsList li a").mapNotNull { epElement ->
                 val epHref = epElement.attr("href")
                 val epTitleAttr = epElement.attr("title")
                 val epNum = epTitleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
@@ -128,9 +130,19 @@ class EgyDeadProvider : MainAPI() {
                     episode = epNum
                     season = 1 
                 }
-            }.sortedBy { it.episode }
+            }.toMutableList()
+
+            // Smartly add the current episode if it's missing from the list
+            val currentEpNum = pageTitle.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
+            if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
+                 episodes.add(newEpisode(url) {
+                    name = "حلقه $currentEpNum"
+                    episode = currentEpNum
+                    season = 1
+                })
+            }
             
-            return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes) {
+            return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
                 this.posterUrl = posterUrl
                 this.plot = plot
                 this.year = year
@@ -155,7 +167,7 @@ class EgyDeadProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // We will also use the helper function here to get the servers.
+        // We use the helper function here to get the page with servers.
         val document = getPageWithEpisodes(data) ?: app.get(data).document
 
         document.select("div.servers-list iframe").apmap {
