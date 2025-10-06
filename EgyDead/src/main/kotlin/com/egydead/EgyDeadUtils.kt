@@ -2,7 +2,6 @@ package com.egydead
 
 import com.lagradost.cloudstream3.Episode
 import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.newEpisode
 import org.jsoup.nodes.Document
 
 // A data class to hold both episodes and server links
@@ -41,24 +40,20 @@ object EgyDeadUtils {
         }
     }
 
-    private suspend fun parseWatchPage(document: Document): WatchPageData {
-        val episodes = mutableListOf<Episode>()
-        
-        document.select("div.EpsList li a").forEach { element ->
-            val href = element.attr("href")
-            val titleAttr = element.attr("title")
+    private fun parseWatchPage(document: Document): WatchPageData {
+        val episodes = document.select("div.EpsList li a").mapNotNull {
+            val href = it.attr("href")
+            val titleAttr = it.attr("title")
             val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
+            if (epNum == null) return@mapNotNull null
             
-            if (epNum != null) {
-                val episode = newEpisode(href) {
-                    name = element.text().trim()
-                    episode = epNum
-                    season = 1
-                }
-                episodes.add(episode)
+            // استخدام app.newEpisode مع الصيغة الصحيحة
+            app.newEpisode(href) { episode ->
+                episode.name = it.text().trim()
+                episode.episode = epNum
+                episode.season = 1
             }
         }
-        
         val serverLinks = document.select("div.servers-list iframe").map { it.attr("src") }
         return WatchPageData(episodes, serverLinks)
     }
