@@ -5,7 +5,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
 // We are now using the helper function
-import com.egydead.EgyDeadUtils.getPageWithEpisodes
+import com.egydead.EgyDeadUtils.getWatchPageData
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -74,7 +74,6 @@ class EgyDeadProvider : MainAPI() {
         val document = app.get(url).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         
-        // Extract all metadata from the initial document
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
         var plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
@@ -104,33 +103,20 @@ class EgyDeadProvider : MainAPI() {
         val isSeries = categoryText.contains("مسلسلات")
 
         if (isSeries) {
-            var episodesDoc = document
-            // If the episode list is not on the initial page, get the full page.
-            if (document.select("div.EpsList li a").isEmpty()) {
-                val fullPage = getPageWithEpisodes(url)
-                if (fullPage != null) {
-                    episodesDoc = fullPage
-                }
-            }
+            var episodes = document.select("div.EpsList li a").mapNotNull { epElement ->
+                newEpisode(epElement)
+            }.toMutableList()
 
+            // If the episode list is not found, call our helper function to get it.
+            if (episodes.isEmpty()) {
+                val watchPageData = getWatchPageData(url)
+                episodes = watchPageData?.first?.toMutableList() ?: mutableListOf()
+            }
+            
             val seriesTitle = pageTitle
                 .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
                 .trim()
-
-            // Get episodes from the new document
-            var episodes = episodesDoc.select("div.EpsList li a").mapNotNull { epElement ->
-                val epHref = epElement.attr("href")
-                val epTitleAttr = epElement.attr("title")
-                val epNum = epTitleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
-
-                newEpisode(epHref) {
-                    name = epElement.text().trim()
-                    episode = epNum
-                    season = 1 
-                }
-            }.toMutableList()
-
-            // Add the current episode if it's missing from the list
+            
             val currentEpNum = pageTitle.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
             if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
                  episodes.add(newEpisode(url) {
@@ -166,15 +152,27 @@ class EgyDeadProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         // We use the helper function here to get the page with servers.
-        val document = getPageWithEpisodes(data) ?: app.get(data).document
+        val watchPageData = getWatchPageData(data)
+        val serverLinks = watchPageData?.second ?: emptyList()
 
-        document.select("div.servers-list iframe").apmap {
-            val link = it.attr("src")
+        serverLinks.apmap { link ->
             if (link.isNotBlank()) {
                 loadExtractor(link, data, subtitleCallback, callback)
             }
         }
 
         return true
+    }
+}
+
+// Helper function to parse an episode element
+private fun newEpisode(element: Element): Episode {
+    val href = element.attr("href")
+    val titleAttr = element.attr("title")
+    val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
+    return newEpisode(href) {
+        name = element.text().trim()
+        episode = epNum
+        season = 1 
     }
 }
