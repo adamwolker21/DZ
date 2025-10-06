@@ -164,7 +164,6 @@ class EgyDeadProvider : MainAPI() {
         VidGuardExtractor()
     )
     
-    // Base class for all eval-based extractors, now corrected
     abstract class BaseEvalExtractor : ExtractorApi() {
         override val requiresReferer = true
         override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
@@ -174,12 +173,12 @@ class EgyDeadProvider : MainAPI() {
                 val unpacked = getAndUnpack(packedJs)
                  Regex("""sources:\s*\[\{file:"([^"]+)""").findAll(unpacked).map { it.groupValues[1] }.forEach { link ->
                     callback.invoke(
-                        ExtractorLink(
-                            this.name,
-                            this.name,
-                            httpsify(link),
-                            url,
-                            Qualities.Unknown.value,
+                        newExtractorLink(
+                            source = this.name,
+                            name = this.name,
+                            url = httpsify(link),
+                            referer = url,
+                            quality = Qualities.Unknown.value,
                             isM3u8 = link.contains("m3u8")
                         )
                     )
@@ -206,7 +205,7 @@ class EgyDeadProvider : MainAPI() {
             val document = app.get(url, referer = referer).document
             val videoUrl = document.selectFirst("video.jw-video")?.attr("src")
             if (videoUrl != null) {
-                callback.invoke(ExtractorLink(this.name, this.name, videoUrl, url, Qualities.Unknown.value, false))
+                callback.invoke(newExtractorLink(this.name, this.name, videoUrl, url, Qualities.Unknown.value, false))
             }
         }
     }
@@ -221,12 +220,12 @@ class EgyDeadProvider : MainAPI() {
             if(jwPlayerScript != null) {
                  Regex("""sources:\s*\[\{file:"([^"]+)""").findAll(jwPlayerScript).map { it.groupValues[1] }.forEach { link ->
                      callback.invoke(
-                        ExtractorLink(
-                            this.name,
-                            this.name,
-                            httpsify(link),
-                            url,
-                            Qualities.Unknown.value,
+                        newExtractorLink(
+                            source = this.name,
+                            name = this.name,
+                            url = httpsify(link),
+                            referer = url,
+                            quality = Qualities.Unknown.value,
                             isM3u8 = link.contains("m3u8")
                         )
                     )
@@ -243,7 +242,6 @@ class EgyDeadProvider : MainAPI() {
             val document = app.get(url, referer = referer).document
             val realEmbedUrl = document.selectFirst("iframe")?.attr("src") ?: return
             
-            // Handle dumbalag.com as a StreamHG-like server
             if (realEmbedUrl.contains("dumbalag.com")) {
                 StreamHGExtractor().getUrl(realEmbedUrl, url, subtitleCallback, callback)
                 return
