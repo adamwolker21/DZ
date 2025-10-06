@@ -5,8 +5,6 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import com.egydead.extractors.StreamHGExtractor
-import com.egydead.extractors.ForafileExtractor
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -24,11 +22,13 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
+    // Helper function to perform the POST request and get the watch page
     private suspend fun getWatchPage(url: String): Document? {
         try {
             val initialResponse = app.get(url)
             val document = initialResponse.document
 
+            // If a watch button exists, we need to click it to get the real data
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
                 val headers = mapOf(
@@ -44,6 +44,7 @@ class EgyDeadProvider : MainAPI() {
                 val data = mapOf("View" to "1")
                 return app.post(url, headers = headers, data = data, cookies = cookies).document
             }
+            // If no watch button, return the current document
             return document
         } catch (e: Exception) {
             e.printStackTrace()
@@ -55,9 +56,16 @@ class EgyDeadProvider : MainAPI() {
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
-        val url = if (page == 1) "$mainUrl${request.data}" else "$mainUrl${request.data}?page=$page/"
+        val url = if (page == 1) {
+            "$mainUrl${request.data}"
+        } else {
+            "$mainUrl${request.data}?page=$page/"
+        }
+
         val document = app.get(url).document
-        val home = document.select("li.movieItem").mapNotNull { it.toSearchResult() }
+        val home = document.select("li.movieItem").mapNotNull {
+            it.toSearchResult()
+        }
         return newHomePageResponse(request.name, home)
     }
 
@@ -66,19 +74,29 @@ class EgyDeadProvider : MainAPI() {
         val href = linkTag.attr("href")
         val title = this.selectFirst("h1.BottomTitle")?.text() ?: return null
         val posterUrl = this.selectFirst("img")?.attr("src")
-        val cleanedTitle = title.replace("مشاهدة", "").trim().replace(Regex("^(فيلم|مسلسل)"), "").trim()
+
+        val cleanedTitle = title.replace("مشاهدة", "").trim()
+            .replace(Regex("^(فيلم|مسلسل)"), "").trim()
+
         val isSeries = title.contains("مسلسل") || title.contains("الموسم")
 
         return if (isSeries) {
-            newTvSeriesSearchResponse(cleanedTitle, href, TvType.TvSeries) { this.posterUrl = posterUrl }
+            newTvSeriesSearchResponse(cleanedTitle, href, TvType.TvSeries) {
+                this.posterUrl = posterUrl
+            }
         } else {
-            newMovieSearchResponse(cleanedTitle, href, TvType.Movie) { this.posterUrl = posterUrl }
+            newMovieSearchResponse(cleanedTitle, href, TvType.Movie) {
+                this.posterUrl = posterUrl
+            }
         }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val document = app.get("$mainUrl/?s=$query").document
-        return document.select("li.movieItem").mapNotNull { it.toSearchResult() }
+        val searchUrl = "$mainUrl/?s=$query"
+        val document = app.get(searchUrl).document
+        return document.select("li.movieItem").mapNotNull {
+            it.toSearchResult()
+        }
     }
 
     override suspend fun load(url: String): LoadResponse? {
@@ -89,12 +107,15 @@ class EgyDeadProvider : MainAPI() {
         var plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
         val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
-        val duration = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()?.filter { it.isDigit() }?.toIntOrNull()
+        val durationText = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()
+        val duration = durationText?.filter { it.isDigit() }?.toIntOrNull()
         val country = document.selectFirst("li:has(span:contains(البلد)) a")?.text()
         val channel = document.select("li:has(span:contains(القناه)) a").joinToString(", ") { it.text() }
 
         var plotAppendix = ""
-        if (!country.isNullOrBlank()) plotAppendix += "البلد: $country"
+        if (!country.isNullOrBlank()) {
+            plotAppendix += "البلد: $country"
+        }
         if (channel.isNotBlank()) {
             if (plotAppendix.isNotEmpty()) plotAppendix += " | "
             plotAppendix += "القناه: $channel"
@@ -103,20 +124,36 @@ class EgyDeadProvider : MainAPI() {
             if (plotAppendix.isNotEmpty()) plotAppendix += " | "
             plotAppendix += "المدة: $duration دقيقة"
         }
-        if(plotAppendix.isNotEmpty()) plot = "$plot<br><br>$plotAppendix"
+        if(plotAppendix.isNotEmpty()) {
+            plot = "$plot<br><br>$plotAppendix"
+        }
 
-        val isSeries = (document.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: "").contains("مسلسلات")
+        val categoryText = document.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: ""
+        val isSeries = categoryText.contains("مسلسلات")
 
         if (isSeries) {
-            var episodesDoc = if (document.selectFirst("div.watchNow form") != null) getWatchPage(url) ?: document else document
-            
-            val episodes = episodesDoc.select("div.EpsList li a").mapNotNull { el ->
-                val href = el.attr("href")
-                val epNum = el.attr("title").substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull() ?: return@mapNotNull null
-                newEpisode(href) { this.name = el.text().trim(); this.episode = epNum; this.season = 1 }
+            var episodesDoc = document
+            // If episodes are hidden, get the watch page document
+            if (document.selectFirst("div.watchNow form") != null) {
+                episodesDoc = getWatchPage(url) ?: document
+            }
+
+            val episodes = episodesDoc.select("div.EpsList li a").mapNotNull { epElement ->
+                val href = epElement.attr("href")
+                val titleAttr = epElement.attr("title")
+                val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
+                if (epNum == null) return@mapNotNull null
+                newEpisode(href) {
+                    this.name = epElement.text().trim()
+                    this.episode = epNum
+                    this.season = 1
+                }
             }.toMutableList()
             
-            val seriesTitle = pageTitle.replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "").trim()
+            val seriesTitle = pageTitle
+                .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
+                .trim()
+            
             val currentEpNum = pageTitle.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
             if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
                  episodes.add(newEpisode(url) {
@@ -127,12 +164,20 @@ class EgyDeadProvider : MainAPI() {
             }
             
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
-                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
+                this.posterUrl = posterUrl
+                this.plot = plot
+                this.year = year
+                this.tags = tags
             }
         } else {
-            val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
+             val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
+
             return newMovieLoadResponse(movieTitle, url, TvType.Movie, url) {
-                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags; this.duration = duration
+                this.posterUrl = posterUrl
+                this.plot = plot
+                this.year = year
+                this.tags = tags
+                this.duration = duration
             }
         }
     }
@@ -143,15 +188,14 @@ class EgyDeadProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        // Get the watch page document to find the server iframes
         val watchPageDoc = getWatchPage(data) ?: return false
 
-        watchPageDoc.select("div.mob-servers ul li").apmap {
-            val link = it.attr("data-link")
-
-            when {
-                link.contains("hglink.to") -> StreamHGExtractor().getUrl(link, data, subtitleCallback, callback)
-                link.contains("forafile.com") -> ForafileExtractor().getUrl(link, data, subtitleCallback, callback)
-                else -> if (link.isNotBlank()) loadExtractor(link, data, subtitleCallback, callback)
+        watchPageDoc.select("div.servers-list iframe").apmap {
+            val link = it.attr("src")
+            if (link.isNotBlank()) {
+                // Let the built-in extractor handle supported servers like DoodStream
+                loadExtractor(link, data, subtitleCallback, callback)
             }
         }
 
