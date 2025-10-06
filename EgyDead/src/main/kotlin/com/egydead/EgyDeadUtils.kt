@@ -41,20 +41,26 @@ object EgyDeadUtils {
     }
 
     private fun parseWatchPage(document: Document): WatchPageData {
-        val episodes = document.select("div.EpsList li a").mapNotNull {
-            val href = it.attr("href")
-            val titleAttr = it.attr("title")
-            val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
-            if (epNum == null) return@mapNotNull null
-            
-            // إنشاء Episode بشكل يدوي بدلاً من استخدام newEpisode
-            Episode().apply {
+    val episodes = mutableListOf<Episode>()
+    
+    document.select("div.EpsList li a").forEach {
+        val href = it.attr("href")
+        val titleAttr = it.attr("title")
+        val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
+        if (epNum != null) {
+            val episode = Episode().apply {
                 name = it.text().trim()
                 episode = epNum
                 season = 1
                 url = href
             }
+            episodes.add(episode)
         }
+    }
+    
+    val serverLinks = document.select("div.servers-list iframe").map { it.attr("src") }
+    return WatchPageData(episodes, serverLinks)
+    }
         val serverLinks = document.select("div.servers-list iframe").map { it.attr("src") }
         return WatchPageData(episodes, serverLinks)
     }
