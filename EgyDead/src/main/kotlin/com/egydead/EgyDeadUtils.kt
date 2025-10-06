@@ -10,7 +10,7 @@ data class WatchPageData(val episodes: List<Episode>, val serverLinks: List<Stri
 
 object EgyDeadUtils {
     
-    // This function now returns a Pair of episode list and server list
+    // This function now returns a WatchPageData object
     suspend fun getWatchPageData(url: String): WatchPageData? {
         try {
             val initialResponse = app.get(url)
@@ -46,6 +46,7 @@ object EgyDeadUtils {
             val href = it.attr("href")
             val titleAttr = it.attr("title")
             val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
+            if(epNum == null) return@mapNotNull null
             newEpisode(href) {
                 name = it.text().trim()
                 episode = epNum
