@@ -21,12 +21,10 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
-    // Helper function to perform the POST request and get the watch page
     private suspend fun getWatchPage(url: String): Document? {
         try {
             val initialResponse = app.get(url)
             val document = initialResponse.document
-            // If a watch button exists, we need to click it to get the real data
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
                 val headers = mapOf(
@@ -42,7 +40,6 @@ class EgyDeadProvider : MainAPI() {
                 val data = mapOf("View" to "1")
                 return app.post(url, headers = headers, data = data, cookies = cookies).document
             }
-            // If no watch button, return the current document
             return document
         } catch (e: Exception) {
             e.printStackTrace()
@@ -57,7 +54,6 @@ class EgyDeadProvider : MainAPI() {
         val url = if (page == 1) {
             "$mainUrl${request.data}"
         } else {
-            // Corrected pagination for EgyDead
             "$mainUrl${request.data}page/$page/"
         }
 
@@ -98,7 +94,6 @@ class EgyDeadProvider : MainAPI() {
         }
     }
 
-    // Restored your powerful and correct 'load' function
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
@@ -109,31 +104,28 @@ class EgyDeadProvider : MainAPI() {
         val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
         val duration = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()?.filter { it.isDigit() }?.toIntOrNull()
 
-        // Using your superior logic to determine if it's a series
         val categoryText = document.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: ""
         val isSeries = categoryText.contains("مسلسلات") || pageTitle.contains("مسلسل") || pageTitle.contains("الموسم") || document.select("div.EpsList").isNotEmpty()
 
         if (isSeries) {
-            // Your brilliant logic for handling hidden episodes
             val episodesDoc = getWatchPage(url) ?: document
 
+            // FINAL FIX v14: Ensured the list remains mutable after the distinctBy operation.
             val episodes = episodesDoc.select("div.EpsList li a").mapNotNull { epElement ->
                 val href = epElement.attr("href")
                 val titleAttr = epElement.attr("title")
-                // Parsing episode number from title attribute for accuracy
                 val epNum = titleAttr.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
                 if (epNum == null) return@mapNotNull null
                 newEpisode(href) {
                     this.name = epElement.text().trim()
                     this.episode = epNum
                 }
-            }.toMutableList().distinctBy { it.episode }
+            }.distinctBy { it.episode }.toMutableList() // The fix is here: .toMutableList()
             
             val seriesTitle = pageTitle
                 .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
                 .trim()
             
-            // Your logic for adding the current page as an episode if it's not in the list
             val currentEpNum = pageTitle.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
             if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
                  episodes.add(newEpisode(url) {
@@ -161,7 +153,7 @@ class EgyDeadProvider : MainAPI() {
         }
     }
     
-    // --- START OF INNER EXTRACTORS (from v12 for build stability) ---
+    // --- START OF INNER EXTRACTORS ---
 
     private val extractorList = listOf(StreamHGExtractor(), ForafileExtractor())
 
@@ -199,7 +191,6 @@ class EgyDeadProvider : MainAPI() {
 
     // --- END OF INNER EXTRACTORS ---
 
-    // Using the robust loadLinks logic from v12
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
