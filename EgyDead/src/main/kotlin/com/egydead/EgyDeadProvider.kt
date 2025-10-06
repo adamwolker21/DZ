@@ -117,16 +117,16 @@ class EgyDeadProvider : MainAPI() {
                 newEpisode(epHref) {
                     name = epElement.text().trim()
                     episode = epNum
-                    season = 1 
+                    season = 1
+                    this.duration = duration?.toLong()
                 }
             }.sortedBy { it.episode }
 
-            return newTvSeriesSearchResponse(seriesTitle, url, TvType.TvSeries, episodes) {
+            return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes) {
                 this.posterUrl = posterUrl
                 this.plot = plot
                 this.year = year
                 this.tags = tags
-                this.duration = duration
             }
         } else {
              val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
