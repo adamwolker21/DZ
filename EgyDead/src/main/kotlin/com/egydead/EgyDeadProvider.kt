@@ -21,10 +21,12 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
+    // A helper function to perform the POST request and get the watch page
     private suspend fun getWatchPage(url: String): Document? {
         try {
             val initialResponse = app.get(url)
             val document = initialResponse.document
+            // If a watch button exists, we need to click it to get the real data
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
                 val headers = mapOf(
@@ -36,6 +38,7 @@ class EgyDeadProvider : MainAPI() {
                 val data = mapOf("View" to "1")
                 return app.post(url, headers = headers, data = data, cookies = cookies).document
             }
+            // If no watch button, return the current document
             return document
         } catch (e: Exception) {
             e.printStackTrace()
@@ -106,6 +109,7 @@ class EgyDeadProvider : MainAPI() {
 
     private val extractorList = listOf(StreamHGExtractor(), ForafileExtractor())
 
+    // By defining the extractors inside the provider, we guarantee they share the same scope and dependencies.
     inner class StreamHGExtractor : ExtractorApi() {
         override var name = "StreamHG"
         override var mainUrl = "https://hglink.to"
@@ -118,9 +122,9 @@ class EgyDeadProvider : MainAPI() {
                 val unpacked = getAndUnpack(packedJs)
                 val m3u8Link = Regex("""sources:\[\{file:"(.*?)"\}\]""").find(unpacked)?.groupValues?.get(1)
                 if (m3u8Link != null) {
-                    // FINAL FIX V11: Explicitly defining the type to resolve compiler ambiguity.
-                    val link: ExtractorLink = newExtractorLink(this.name, this.name, httpsify(m3u8Link), referer ?: "", Qualities.Unknown.value)
-                    callback(link)
+                    // FINAL FIX V12: Bypass the problematic 'newExtractorLink' by using the high-level 'loadExtractor' function.
+                    // This is a robust way to avoid API version conflicts.
+                    loadExtractor(httpsify(m3u8Link), referer, subtitleCallback, callback)
                 }
             }
         }
@@ -135,9 +139,8 @@ class EgyDeadProvider : MainAPI() {
             val document = app.get(url, referer = referer).document
             val videoUrl = document.selectFirst("source")?.attr("src")
             if (videoUrl != null) {
-                 // FINAL FIX V11: Explicitly defining the type to resolve compiler ambiguity.
-                 val link: ExtractorLink = newExtractorLink(this.name, this.name, videoUrl, referer ?: "", Qualities.Unknown.value)
-                 callback(link)
+                 // FINAL FIX V12: Let the built-in 'loadExtractor' handle creating the link from the direct video URL.
+                 loadExtractor(videoUrl, referer, subtitleCallback, callback)
             }
         }
     }
@@ -153,10 +156,13 @@ class EgyDeadProvider : MainAPI() {
         watchPageDoc.select("div.servers-list iframe").apmap { iframe ->
             val link = iframe.attr("src")
             if (link.isNotBlank()) {
+                // Check if we have a custom inner extractor for this link
                 val matchingExtractor = extractorList.find { link.contains(it.mainUrl) }
                 if (matchingExtractor != null) {
+                    // Use our custom logic
                     matchingExtractor.getUrl(link, data, subtitleCallback, callback)
                 } else {
+                    // Fallback to the default behavior for other servers like DoodStream
                     loadExtractor(link, data, subtitleCallback, callback)
                 }
             }
