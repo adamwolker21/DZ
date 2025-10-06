@@ -3,9 +3,8 @@ package com.egydead
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
+import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-// We are now using the helper function
-import com.egydead.EgyDeadUtils.getWatchPageData
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -22,6 +21,36 @@ class EgyDeadProvider : MainAPI() {
         "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "أفلام آسيوية",
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
+
+    // Helper function to perform the POST request and get the watch page
+    private suspend fun getWatchPage(url: String): Document? {
+        try {
+            val initialResponse = app.get(url)
+            val document = initialResponse.document
+
+            // If a watch button exists, we need to click it to get the real data
+            if (document.selectFirst("div.watchNow form") != null) {
+                val cookies = initialResponse.cookies
+                val headers = mapOf(
+                    "Content-Type" to "application/x-www-form-urlencoded",
+                    "Referer" to url,
+                    "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
+                    "Origin" to mainUrl,
+                    "sec-fetch-dest" to "document",
+                    "sec-fetch-mode" to "navigate",
+                    "sec-fetch-site" to "same-origin",
+                    "sec-fetch-user" to "?1"
+                )
+                val data = mapOf("View" to "1")
+                return app.post(url, headers = headers, data = data, cookies = cookies).document
+            }
+            // If no watch button, return the current document
+            return document
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return null
+        }
+    }
 
     override suspend fun getMainPage(
         page: Int,
@@ -103,7 +132,13 @@ class EgyDeadProvider : MainAPI() {
         val isSeries = categoryText.contains("مسلسلات")
 
         if (isSeries) {
-            var episodes = document.select("div.EpsList li a").mapNotNull { epElement ->
+            var episodesDoc = document
+            // If episodes are hidden, get the watch page document
+            if (document.selectFirst("div.watchNow form") != null) {
+                episodesDoc = getWatchPage(url) ?: document
+            }
+
+            val episodes = episodesDoc.select("div.EpsList li a").mapNotNull { epElement ->
                 val href = epElement.attr("href")
                 val titleAttr = epElement.attr("title")
                 val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
@@ -114,11 +149,6 @@ class EgyDeadProvider : MainAPI() {
                     this.season = 1
                 }
             }.toMutableList()
-
-            if (document.selectFirst("div.watchNow form") != null) {
-                val watchPageData = getWatchPageData(url)
-                episodes = watchPageData?.episodes?.toMutableList() ?: mutableListOf()
-            }
             
             val seriesTitle = pageTitle
                 .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
@@ -158,10 +188,11 @@ class EgyDeadProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val watchPageData = getWatchPageData(data)
-        val serverLinks = watchPageData?.serverLinks ?: emptyList()
+        // Get the watch page document to find the server iframes
+        val watchPageDoc = getWatchPage(data) ?: return false
 
-        serverLinks.apmap { link ->
+        watchPageDoc.select("div.servers-list iframe").apmap {
+            val link = it.attr("src")
             if (link.isNotBlank()) {
                 loadExtractor(link, data, subtitleCallback, callback)
             }
