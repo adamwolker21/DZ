@@ -6,7 +6,6 @@ import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import com.lagradost.cloudstream3.Qualities // The missing import
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -172,17 +171,9 @@ class EgyDeadProvider : MainAPI() {
             val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
             if (packedJs != null) {
                 val unpacked = getAndUnpack(packedJs)
-                 Regex("""sources:\s*\[\{file:"([^"]+)""").findAll(unpacked).map { it.groupValues[1] }.forEach { link ->
-                    callback.invoke(
-                        newExtractorLink(
-                            source = this.name,
-                            name = this.name,
-                            url = httpsify(link),
-                            referer = url,
-                            quality = Qualities.Unknown.value,
-                            isM3u8 = link.contains("m3u8")
-                        )
-                    )
+                Regex("""sources:\s*\[\{file:"([^"]+)""").findAll(unpacked).map { it.groupValues[1] }.forEach { link ->
+                    // Pass the final URL to the powerful loadExtractor
+                    loadExtractor(httpsify(link), url, subtitleCallback, callback)
                 }
             }
         }
@@ -206,16 +197,7 @@ class EgyDeadProvider : MainAPI() {
             val document = app.get(url, referer = referer).document
             val videoUrl = document.selectFirst("video.jw-video")?.attr("src")
             if (videoUrl != null) {
-                callback.invoke(
-                    newExtractorLink(
-                        source = this.name,
-                        name = this.name,
-                        url = videoUrl,
-                        referer = url,
-                        quality = Qualities.Unknown.value,
-                        isM3u8 = false
-                    )
-                )
+                loadExtractor(videoUrl, url, subtitleCallback, callback)
             }
         }
     }
@@ -229,16 +211,7 @@ class EgyDeadProvider : MainAPI() {
             val jwPlayerScript = document.select("script:containsData(jwplayer(\"vplayer\").setup)").firstOrNull()?.data()
             if(jwPlayerScript != null) {
                  Regex("""sources:\s*\[\{file:"([^"]+)""").findAll(jwPlayerScript).map { it.groupValues[1] }.forEach { link ->
-                     callback.invoke(
-                        newExtractorLink(
-                            source = this.name,
-                            name = this.name,
-                            url = httpsify(link),
-                            referer = url,
-                            quality = Qualities.Unknown.value,
-                            isM3u8 = link.contains("m3u8")
-                        )
-                    )
+                    loadExtractor(httpsify(link), url, subtitleCallback, callback)
                 }
             }
         }
