@@ -1,19 +1,24 @@
 package com.egydead
 
+import com.lagradost.cloudstream3.Episode
 import com.lagradost.cloudstream3.app
+import com.lagradost.cloudstream3.newEpisode
 import org.jsoup.nodes.Document
+
+// A data class to hold both episodes and server links
+data class WatchPageData(val episodes: List<Episode>, val serverLinks: List<String>)
 
 object EgyDeadUtils {
     
-    suspend fun getPageWithEpisodes(url: String): Document? {
+    // This function now returns a Pair of episode list and server list
+    suspend fun getWatchPageData(url: String): WatchPageData? {
         try {
             val initialResponse = app.get(url)
-            var document = initialResponse.document
+            val document = initialResponse.document
 
-            // Check if we need to "click" the button
+            // If a watch button exists, we need to click it to get the real data
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
-                // Add navigation headers to simulate a real form submission
                 val headers = mapOf(
                     "Content-Type" to "application/x-www-form-urlencoded",
                     "Referer" to url,
@@ -25,12 +30,29 @@ object EgyDeadUtils {
                     "sec-fetch-user" to "?1"
                 )
                 val data = mapOf("View" to "1")
-                document = app.post(url, headers = headers, data = data, cookies = cookies).document
+                val watchPageDoc = app.post(url, headers = headers, data = data, cookies = cookies).document
+                return parseWatchPage(watchPageDoc)
             }
-            return document
+            // If no watch button, parse the current page
+            return parseWatchPage(document)
         } catch (e: Exception) {
             e.printStackTrace()
             return null
         }
+    }
+
+    private fun parseWatchPage(document: Document): WatchPageData {
+        val episodes = document.select("div.EpsList li a").mapNotNull {
+            val href = it.attr("href")
+            val titleAttr = it.attr("title")
+            val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
+            newEpisode(href) {
+                name = it.text().trim()
+                episode = epNum
+                season = 1 
+            }
+        }
+        val serverLinks = document.select("div.servers-list iframe").map { it.attr("src") }
+        return WatchPageData(episodes, serverLinks)
     }
 }
