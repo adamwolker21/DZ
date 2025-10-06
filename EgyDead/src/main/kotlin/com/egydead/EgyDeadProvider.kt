@@ -1,26 +1,33 @@
-package com.egydead
+package com.example
 
+import android.util.Base64
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.network.CloudflareKiller
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
+import com.example.extractors.GeneralPackedExtractor
+import com.example.extractors.VidbomExtractor
+import com.example.extractors.WeCimaExtractor
 import org.jsoup.nodes.Element
-// We are now using the helper function
-import com.egydead.EgyDeadUtils.getWatchPageData
 
-class EgyDeadProvider : MainAPI() {
-    override var mainUrl = "https://tv6.egydead.live"
-    override var name = "EgyDead"
+class WeCimaProvider : MainAPI() {
+    override var mainUrl = "https://wecima.now/"
+    override var name = "WeCima"
     override val hasMainPage = true
     override var lang = "ar"
+    override val hasDownloadSupport = true
     override val supportedTypes = setOf(
         TvType.Movie,
         TvType.TvSeries,
+        TvType.AsianDrama,
     )
 
+    private val interceptor = CloudflareKiller()
+
     override val mainPage = mainPageOf(
-        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-%d8%a7%d9%88%d9%86%d9%84%d8%a7%d9%8a%d9%86/" to "أفلام أجنبي",
-        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "أفلام آسيوية",
-        "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
+        "/category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa/1-%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات آسيوية",
+        "/category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa/7-series-english-%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a/" to "مسلسلات أجنبي",
+        "/category/%d8%a3%d9%81%d9%84%d8%a7%d9%85/10-movies-english-%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a/" to "أفلام أجنبي"
     )
 
     override suspend fun getMainPage(
@@ -28,154 +35,166 @@ class EgyDeadProvider : MainAPI() {
         request: MainPageRequest
     ): HomePageResponse {
         val url = if (page == 1) {
-            "$mainUrl${request.data}"
+            "$mainUrl${request.data.removePrefix("/")}"
         } else {
-            "$mainUrl${request.data}?page=$page/"
+            "$mainUrl${request.data.removePrefix("/")}?page=$page"
         }
-
-        val document = app.get(url).document
-        val home = document.select("li.movieItem").mapNotNull {
+        val document = app.get(url, interceptor = interceptor).document
+        val home = document.select("div.media-card").mapNotNull {
             it.toSearchResult()
         }
         return newHomePageResponse(request.name, home)
     }
-
+    
     private fun Element.toSearchResult(): SearchResponse? {
-        val linkTag = this.selectFirst("a") ?: return null
-        val href = linkTag.attr("href")
-        val title = this.selectFirst("h1.BottomTitle")?.text() ?: return null
-        val posterUrl = this.selectFirst("img")?.attr("src")
+        val linkElement = this.selectFirst("a") ?: return null
+        val href = linkElement.attr("href")
+        val title = this.selectFirst("h2[itemprop=name]")?.text() ?: return null
 
-        val cleanedTitle = title.replace("مشاهدة", "").trim()
-            .replace(Regex("^(فيلم|مسلسل)"), "").trim()
+        val style = this.selectFirst("span.media-card__bg")?.attr("style")
+        val posterUrl = style?.let {
+            Regex("""url\(['"]?(.*?)['"]?\)""").find(it)?.groupValues?.get(1)
+        } ?: this.selectFirst("meta[itemprop=thumbnailUrl]")?.attr("content")
 
-        val isSeries = title.contains("مسلسل") || title.contains("الموسم")
+        val isSeries = title.contains("مسلسل") || title.contains("برنامج") || title.contains("موسم")
 
         return if (isSeries) {
-            newTvSeriesSearchResponse(cleanedTitle, href, TvType.TvSeries) {
+            newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
                 this.posterUrl = posterUrl
             }
         } else {
-            newMovieSearchResponse(cleanedTitle, href, TvType.Movie) {
+            newMovieSearchResponse(title, href, TvType.Movie) {
                 this.posterUrl = posterUrl
             }
         }
     }
-
+    
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = "$mainUrl/?s=$query"
-        val document = app.get(searchUrl).document
-        return document.select("li.movieItem").mapNotNull {
+        val url = "$mainUrl?s=$query"
+        val document = app.get(url, interceptor = interceptor).document
+        return document.select("div.media-card").mapNotNull {
             it.toSearchResult()
         }
     }
-
+    
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url).document
-        val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
-        
-        val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
-        var plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
-        val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
-        val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
-        val durationText = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()
-        val duration = durationText?.filter { it.isDigit() }?.toIntOrNull()
-        val country = document.selectFirst("li:has(span:contains(البلد)) a")?.text()
-        val channel = document.select("li:has(span:contains(القناه)) a").joinToString(", ") { it.text() }
+        val document = app.get(url, interceptor = interceptor).document
 
-        var plotAppendix = ""
-        if (!country.isNullOrBlank()) {
-            plotAppendix += "البلد: $country"
-        }
-        if (channel.isNotBlank()) {
-            if (plotAppendix.isNotEmpty()) plotAppendix += " | "
-            plotAppendix += "القناه: $channel"
-        }
-        if (duration != null) {
-            if (plotAppendix.isNotEmpty()) plotAppendix += " | "
-            plotAppendix += "المدة: $duration دقيقة"
-        }
-        if(plotAppendix.isNotEmpty()) {
-            plot = "$plot<br><br>$plotAppendix"
+        val title = document.selectFirst("h1[itemprop=name]")?.ownText()?.trim() ?: return null
+
+        val posterStyle = document.selectFirst("wecima.media-entry--hero")?.attr("style")
+        val posterUrl = posterStyle?.let {
+            Regex("""url\(['"]?(.*?)['"]?\)""").find(it)?.groupValues?.get(1)
         }
 
-        val categoryText = document.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: ""
-        val isSeries = categoryText.contains("مسلسلات")
+        val plot = document.selectFirst("div.story__content")?.text()?.trim()
+        val tags = document.select("li:has(span:contains(النوع)) p a").map { it.text() }
 
-        if (isSeries) {
-            var episodes = document.select("div.EpsList li a").mapNotNull { epElement ->
-                newEpisode(epElement)
-            }.toMutableList()
+        // Updated year extraction
+        val year = document.selectFirst("li:has(span:contains(السنة)) p a")?.text()?.toIntOrNull()
+            ?: document.selectFirst("h1[itemprop=name] a.unline")?.text()?.toIntOrNull()
 
-            if (episodes.isEmpty()) {
-                val watchPageData = getWatchPageData(url)
-                episodes = watchPageData?.episodes?.toMutableList() ?: mutableListOf()
+        // New: Extract duration
+        val duration = document.selectFirst("li:has(span:contains(المدة)) p")
+            ?.text()?.filter { it.isDigit() }?.toIntOrNull()
+    
+        // New: Extract rating and convert to a 1-1000 scale
+        val rating = document.selectFirst("li:has(span:contains(التقييم)) p")
+            ?.text()?.let {
+                Regex("""(\d+\.?\d*)""").find(it)?.groupValues?.getOrNull(1)?.toFloatOrNull()?.times(100)
+                    ?.toInt()
+            }
+
+        val seasons = document.select("div.seasons__list li a")
+        val isTvSeries = seasons.isNotEmpty() || document.select("div.episodes__list").isNotEmpty()
+
+        if (isTvSeries) {
+            val episodes = mutableListOf<Episode>()
+            if (seasons.isNotEmpty()) {
+                seasons.apmap { seasonLink ->
+                    val seasonUrl = seasonLink.attr("href")
+                    val seasonName = seasonLink.text()
+                    val seasonNum = Regex("""\d+""").find(seasonName)?.value?.toIntOrNull()
+
+                    val seasonDoc = app.get(seasonUrl, interceptor = interceptor).document
+                    seasonDoc.select("div.episodes__list > a").forEach { epElement ->
+                        val epHref = epElement.attr("href")
+                        val epTitle = epElement.selectFirst("episodetitle.episode__title")?.text() ?: ""
+                        val epNum = Regex("""\d+""").find(epTitle)?.value?.toIntOrNull()
+
+                        episodes.add(
+                            newEpisode(epHref) {
+                                name = epTitle
+                                season = seasonNum
+                                episode = epNum
+                            }
+                        )
+                    }
+                }
+            } else {
+                document.select("div.episodes__list > a").forEach { epElement ->
+                    val epHref = epElement.attr("href")
+                    val epTitle = epElement.selectFirst("episodetitle.episode__title")?.text() ?: ""
+                    val epNum = Regex("""\d+""").find(epTitle)?.value?.toIntOrNull()
+                    episodes.add(newEpisode(epHref) { name = epTitle; season = 1; episode = epNum })
+                }
             }
             
-            val seriesTitle = pageTitle
-                .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
-                .trim()
-            
-            val currentEpNum = pageTitle.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
-            if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
-                 episodes.add(newEpisode(url, pageTitle, currentEpNum))
-            }
-            
-            return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
+            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes.distinctBy { it.data }.sortedWith(compareBy({ it.season }, { it.episode }))) {
                 this.posterUrl = posterUrl
                 this.plot = plot
                 this.year = year
                 this.tags = tags
+                this.rating = rating
+                this.duration = duration
             }
         } else {
-             val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
-
-            return newMovieLoadResponse(movieTitle, url, TvType.Movie, url) {
+            return newMovieLoadResponse(title, url, TvType.Movie, url) {
                 this.posterUrl = posterUrl
                 this.plot = plot
                 this.year = year
                 this.tags = tags
+                this.rating = rating
                 this.duration = duration
             }
         }
     }
-
+    
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val watchPageData = getWatchPageData(data)
-        val serverLinks = watchPageData?.serverLinks ?: emptyList()
+        val document = app.get(data, interceptor = interceptor).document
 
-        serverLinks.apmap { link ->
-            if (link.isNotBlank()) {
-                loadExtractor(link, data, subtitleCallback, callback)
+        document.select("ul.watch__server-list li btn").apmap { serverBtn ->
+            try {
+                val encodedUrl = serverBtn.attr("data-url")
+                if (encodedUrl.isBlank()) return@apmap
+
+                val decodedUrl = String(Base64.decode(encodedUrl, Base64.DEFAULT))
+                
+                // Manual routing based on domain
+                when {
+                    decodedUrl.contains("wecima.now/run/watch/") -> {
+                        WeCimaExtractor().getUrl(decodedUrl, data)?.forEach(callback)
+                    }
+                    decodedUrl.contains("vdbtm.shop") -> {
+                        VidbomExtractor().getUrl(decodedUrl, data)?.forEach(callback)
+                    }
+                    decodedUrl.contains("1vid1shar.space") || decodedUrl.contains("dingtezuni.com") -> {
+                        GeneralPackedExtractor().getUrl(decodedUrl, data)?.forEach(callback)
+                    }
+                    else -> {
+                        // Fallback for other servers like DoodStream
+                        loadExtractor(decodedUrl, data, subtitleCallback, callback)
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore errors
             }
         }
-
         return true
-    }
-}
-
-// Overloaded helper function for creating an episode from an Element
-private fun newEpisode(element: Element): Episode? {
-    val href = element.attr("href")
-    val titleAttr = element.attr("title")
-    val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull() ?: return null
-    return newEpisode(href) {
-        name = element.text().trim()
-        episode = epNum
-        season = 1 
-    }
-}
-
-// Overloaded helper function for creating an episode from a URL and title
-private fun newEpisode(url: String, title: String, epNum: Int): Episode {
-    return newEpisode(url) {
-        name = title.substringAfter(title.replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""),"").trim()).trim()
-        episode = epNum
-        season = 1
     }
 }
