@@ -6,9 +6,8 @@ import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.utils.httpsify
+// This import is essential for the code to compile correctly.
 import com.lagradost.cloudstream3.utils.Qualities
-// This import below is still necessary and correct.
-import com.lagradost.cloudstream3.newExtractorLink
 
 open class StreamHGExtractor : ExtractorApi() {
     override var name = "StreamHG"
@@ -27,9 +26,9 @@ open class StreamHGExtractor : ExtractorApi() {
             val unpacked = getAndUnpack(packedJs)
             val m3u8Link = Regex("""sources:\[\{file:"(.*?)"\}\]""").find(unpacked)?.groupValues?.get(1)
             if (m3u8Link != null) {
-                // FIXED: Reverted back to the 'newExtractorLink' helper function
+                // FIXED: Using the direct ExtractorLink constructor, which is the correct modern approach.
                 callback.invoke(
-                    newExtractorLink(
+                    ExtractorLink(
                         source = this.name,
                         name = this.name,
                         url = httpsify(m3u8Link),
@@ -57,9 +56,9 @@ open class ForafileExtractor : ExtractorApi() {
         val document = app.get(url, referer = referer).document
         val videoUrl = document.selectFirst("source")?.attr("src")
         if (videoUrl != null) {
-            // FIXED: Reverted back to the 'newExtractorLink' helper function
+             // FIXED: Using the direct ExtractorLink constructor.
             callback.invoke(
-                newExtractorLink(
+                ExtractorLink(
                     source = this.name,
                     name = this.name,
                     url = videoUrl,
