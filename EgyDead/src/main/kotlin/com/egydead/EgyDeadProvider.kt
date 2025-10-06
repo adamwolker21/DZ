@@ -194,6 +194,7 @@ class EgyDeadProvider : MainAPI() {
         watchPageDoc.select("div.servers-list iframe").apmap {
             val link = it.attr("src")
             if (link.isNotBlank()) {
+                // Let the built-in extractor handle supported servers like DoodStream
                 loadExtractor(link, data, subtitleCallback, callback)
             }
         }
