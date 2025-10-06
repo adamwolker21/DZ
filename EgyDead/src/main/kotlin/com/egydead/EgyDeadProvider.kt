@@ -4,6 +4,8 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -158,7 +160,8 @@ class EgyDeadProvider : MainAPI() {
         StreamHGExtractor(), 
         ForafileExtractor(),
         EarnVidsExtractor(),
-        VidGuardExtractor()
+        VidGuardExtractor(),
+        BigwarpExtractor() // Added based on your investigation
     )
 
     inner class StreamHGExtractor : ExtractorApi() {
@@ -193,6 +196,20 @@ class EgyDeadProvider : MainAPI() {
         }
     }
 
+    // Added based on your investigation
+    inner class BigwarpExtractor : ExtractorApi() {
+        override var name = "Bigwarp"
+        override var mainUrl = "https://bigwarp.pro"
+        override val requiresReferer = true
+        override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+            val document = app.get(url, referer = referer).document
+            val videoUrl = document.selectFirst("source")?.attr("src")
+            if (videoUrl != null) {
+                loadExtractor(videoUrl, referer, subtitleCallback, callback)
+            }
+        }
+    }
+
     inner class EarnVidsExtractor : ExtractorApi() {
         override var name = "EarnVids"
         override var mainUrl = "https://dingtezuni.com"
@@ -211,40 +228,38 @@ class EgyDeadProvider : MainAPI() {
         }
     }
 
-
     // --- END OF INNER EXTRACTORS ---
 
-    // Final comprehensive 'loadLinks' function
+    // Final, robust 'loadLinks' function with corrected coroutine handling
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val watchPageDoc = getWatchPage(data) ?: return false
         
-        // Use a set to automatically handle duplicate links from both lists
         val allLinks = mutableSetOf<String>()
 
-        // 1. Scrape the watch servers list
         watchPageDoc.select("div.mob-servers li").forEach {
             val link = it.attr("data-link")
             if(link.isNotBlank()) allLinks.add(link)
         }
 
-        // 2. Scrape the download servers list
         watchPageDoc.select("ul.donwload-servers-list li a.ser-link").forEach {
             val link = it.attr("href")
             if(link.isNotBlank()) allLinks.add(link)
         }
         
-        // Process all unique links found
-        allLinks.apmap { link ->
-            val matchingExtractor = extractorList.find { link.contains(it.mainUrl) }
-            if (matchingExtractor != null) {
-                // Use our custom logic
-                matchingExtractor.getUrl(link, data, subtitleCallback, callback)
-            } else {
-                // Fallback for DoodStream, Mixdrop, etc.
-                loadExtractor(link, data, subtitleCallback, callback)
+        // Use coroutineScope for robust parallel execution
+        coroutineScope {
+            allLinks.forEach { link ->
+                launch {
+                    val matchingExtractor = extractorList.find { link.contains(it.mainUrl) }
+                    if (matchingExtractor != null) {
+                        matchingExtractor.getUrl(link, data, subtitleCallback, callback)
+                    } else {
+                        loadExtractor(link, data, subtitleCallback, callback)
+                    }
+                }
             }
         }
         return true
