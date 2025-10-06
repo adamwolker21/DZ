@@ -87,7 +87,7 @@ class EgyDeadProvider : MainAPI() {
                 val epNum = epName.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull() ?: return@mapNotNull null
                 newEpisode(href) { this.name = epName; this.episode = epNum }
             }.distinctBy { it.episode }
-            val seriesTitle = pageTitle.replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "").trim()
+            val seriesTitle = pageTitle.replace(Regex("""(الحلقة \د+|مترجمة|الاخيرة)"""), "").trim()
             
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes) {
                 this.posterUrl = posterUrl; this.year = year; this.plot = plot; this.tags = tags
@@ -119,8 +119,9 @@ class EgyDeadProvider : MainAPI() {
                 val unpacked = getAndUnpack(packedJs)
                 val m3u8Link = Regex("""sources:\[\{file:"(.*?)"\}\]""").find(unpacked)?.groupValues?.get(1)
                 if (m3u8Link != null) {
+                    // FINAL FIX: Using the old helper function as explicitly requested by the build error.
                     callback.invoke(
-                        ExtractorLink(this.name, this.name, httpsify(m3u8Link), referer ?: "", Qualities.Unknown.value, isM3u8 = true)
+                        newExtractorLink(this.name, this.name, httpsify(m3u8Link), referer ?: "", Qualities.Unknown.value, isM3u8 = true)
                     )
                 }
             }
@@ -136,8 +137,9 @@ class EgyDeadProvider : MainAPI() {
             val document = app.get(url, referer = referer).document
             val videoUrl = document.selectFirst("source")?.attr("src")
             if (videoUrl != null) {
+                // FINAL FIX: Using the old helper function as explicitly requested by the build error.
                 callback.invoke(
-                    ExtractorLink(this.name, this.name, videoUrl, referer ?: "", Qualities.Unknown.value, isM3u8 = videoUrl.contains(".m3u8"))
+                    newExtractorLink(this.name, this.name, videoUrl, referer ?: "", Qualities.Unknown.value, isM3u8 = videoUrl.contains(".m3u8"))
                 )
             }
         }
@@ -151,7 +153,6 @@ class EgyDeadProvider : MainAPI() {
     ): Boolean {
         val watchPageDoc = getWatchPage(data) ?: return false
         
-        // A more robust way to handle links, calling our local extractors.
         watchPageDoc.select("div.servers-list iframe").apmap { iframe ->
             val link = iframe.attr("src")
             if (link.isNotBlank()) {
@@ -159,7 +160,6 @@ class EgyDeadProvider : MainAPI() {
                 if (matchingExtractor != null) {
                     matchingExtractor.getUrl(link, data, subtitleCallback, callback)
                 } else {
-                    // Fallback to the general extractor for other links like DoodStream.
                     loadExtractor(link, data, subtitleCallback, callback)
                 }
             }
