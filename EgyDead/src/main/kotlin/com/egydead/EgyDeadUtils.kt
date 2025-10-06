@@ -2,7 +2,6 @@ package com.egydead
 
 import com.lagradost.cloudstream3.Episode
 import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.newEpisode
 import org.jsoup.nodes.Document
 
 // A data class to hold both episodes and server links
@@ -48,11 +47,12 @@ object EgyDeadUtils {
             val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
             if (epNum == null) return@mapNotNull null
             
-            // استخدام كائن app لاستدعاء newEpisode بشكل صحيح
-            app.newEpisode(href) {
-                this.name = it.text().trim()
-                this.episode = epNum
-                this.season = 1 
+            // إنشاء Episode بشكل يدوي بدلاً من استخدام newEpisode
+            Episode().apply {
+                name = it.text().trim()
+                episode = epNum
+                season = 1
+                url = href
             }
         }
         val serverLinks = document.select("div.servers-list iframe").map { it.attr("src") }
