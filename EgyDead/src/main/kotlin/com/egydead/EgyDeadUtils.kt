@@ -48,8 +48,8 @@ object EgyDeadUtils {
             val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
             if (epNum == null) return@mapNotNull null
             
-            // Use the correct newEpisode function
-            newEpisode(href) {
+            // استخدام كائن app لاستدعاء newEpisode بشكل صحيح
+            app.newEpisode(href) {
                 this.name = it.text().trim()
                 this.episode = epNum
                 this.season = 1 
