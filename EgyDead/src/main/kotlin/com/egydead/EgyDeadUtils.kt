@@ -41,20 +41,25 @@ object EgyDeadUtils {
     }
 
     private fun parseWatchPage(document: Document): WatchPageData {
-    val episodes = document.select("div.EpsList li a").mapNotNull {
-        val href = it.attr("href")
-        val titleAttr = it.attr("title")
-        val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
-        if (epNum == null) return@mapNotNull null
-        
-        // استخدام المنشئ مع المعلمة data
-        Episode(href).apply {
-            name = it.text().trim()
-            episode = epNum
-            season = 1
+        val episodes = document.select("div.EpsList li a").mapNotNull {
+            val href = it.attr("href")
+            val titleAttr = it.attr("title")
+            val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
+            if (epNum == null) return@mapNotNull null
+            
+            // إنشاء Episode باستخدام app.newEpisode مع الصيغة الصحيحة
+            createEpisode(href, it.text().trim(), epNum, 1)
         }
+        val serverLinks = document.select("div.servers-list iframe").map { it.attr("src") }
+        return WatchPageData(episodes, serverLinks)
     }
-    val serverLinks = document.select("div.servers-list iframe").map { it.attr("src") }
-    return WatchPageData(episodes, serverLinks)
+
+    // دالة مساعدة لإنشاء Episode باستخدام app.newEpisode
+    private fun createEpisode(url: String, name: String, episode: Int, season: Int): Episode {
+        return app.newEpisode(url) { ep ->
+            ep.name = name
+            ep.episode = episode
+            ep.season = season
+        }
     }
 }
