@@ -27,24 +27,17 @@ class EgyDeadProvider : MainAPI() {
         try {
             val initialResponse = app.get(url)
             val document = initialResponse.document
-
-            // If a watch button exists, we need to click it to get the real data
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
                 val headers = mapOf(
-                    "Content-Type" to "application/x-www-form-urlencoded",
-                    "Referer" to url,
+                    "Content-Type" to "application/x-www-form-urlencoded", "Referer" to url,
                     "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
-                    "Origin" to mainUrl,
-                    "sec-fetch-dest" to "document",
-                    "sec-fetch-mode" to "navigate",
-                    "sec-fetch-site" to "same-origin",
-                    "sec-fetch-user" to "?1"
+                    "Origin" to mainUrl, "sec-fetch-dest" to "document", "sec-fetch-mode" to "navigate",
+                    "sec-fetch-site" to "same-origin", "sec-fetch-user" to "?1"
                 )
                 val data = mapOf("View" to "1")
                 return app.post(url, headers = headers, data = data, cookies = cookies).document
             }
-            // If no watch button, return the current document
             return document
         } catch (e: Exception) {
             e.printStackTrace()
@@ -56,149 +49,81 @@ class EgyDeadProvider : MainAPI() {
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
-        val url = if (page == 1) {
-            "$mainUrl${request.data}"
-        } else {
-            "$mainUrl${request.data}?page=$page/"
-        }
-
+        val url = if (page == 1) "$mainUrl${request.data}" else "$mainUrl${request.data}page/$page/"
         val document = app.get(url).document
-        val home = document.select("li.movieItem").mapNotNull {
-            it.toSearchResult()
-        }
+        val home = document.select("li.movieItem").mapNotNull { it.toSearchResult() }
         return newHomePageResponse(request.name, home)
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
-        val linkTag = this.selectFirst("a") ?: return null
-        val href = linkTag.attr("href")
+        val href = this.selectFirst("a")?.attr("href") ?: return null
         val title = this.selectFirst("h1.BottomTitle")?.text() ?: return null
         val posterUrl = this.selectFirst("img")?.attr("src")
-
-        val cleanedTitle = title.replace("مشاهدة", "").trim()
-            .replace(Regex("^(فيلم|مسلسل)"), "").trim()
-
+        val cleanedTitle = title.replace("مشاهدة", "").trim().replace(Regex("^(فيلم|مسلسل)"), "").trim()
         val isSeries = title.contains("مسلسل") || title.contains("الموسم")
 
+        // FIXED: Reverted back to the 'new...Response' helper functions
         return if (isSeries) {
-            newTvSeriesSearchResponse(cleanedTitle, href, TvType.TvSeries) {
-                this.posterUrl = posterUrl
-            }
+            newTvSeriesSearchResponse(cleanedTitle, href, TvType.TvSeries) { this.posterUrl = posterUrl }
         } else {
-            newMovieSearchResponse(cleanedTitle, href, TvType.Movie) {
-                this.posterUrl = posterUrl
-            }
+            newMovieSearchResponse(cleanedTitle, href, TvType.Movie) { this.posterUrl = posterUrl }
         }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = "$mainUrl/?s=$query"
-        val document = app.get(searchUrl).document
-        return document.select("li.movieItem").mapNotNull {
-            it.toSearchResult()
-        }
+        val document = app.get("$mainUrl/?s=$query").document
+        return document.select("li.movieItem").mapNotNull { it.toSearchResult() }
     }
 
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
-        
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
-        var plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
+        val plot = document.selectFirst("div.extra-content p")?.text()?.trim()
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
         val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
-        val durationText = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()
-        val duration = durationText?.filter { it.isDigit() }?.toIntOrNull()
-        val country = document.selectFirst("li:has(span:contains(البلد)) a")?.text()
-        val channel = document.select("li:has(span:contains(القناه)) a").joinToString(", ") { it.text() }
-
-        var plotAppendix = ""
-        if (!country.isNullOrBlank()) {
-            plotAppendix += "البلد: $country"
-        }
-        if (channel.isNotBlank()) {
-            if (plotAppendix.isNotEmpty()) plotAppendix += " | "
-            plotAppendix += "القناه: $channel"
-        }
-        if (duration != null) {
-            if (plotAppendix.isNotEmpty()) plotAppendix += " | "
-            plotAppendix += "المدة: $duration دقيقة"
-        }
-        if(plotAppendix.isNotEmpty()) {
-            plot = "$plot<br><br>$plotAppendix"
-        }
-
-        val categoryText = document.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: ""
-        val isSeries = categoryText.contains("مسلسلات")
+        val duration = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()?.filter { it.isDigit() }?.toIntOrNull()
+        val isSeries = document.select("div.EpsList").isNotEmpty() || pageTitle.contains("مسلسل") || pageTitle.contains("الموسم")
 
         if (isSeries) {
-            var episodesDoc = document
-            // If episodes are hidden, get the watch page document
-            if (document.selectFirst("div.watchNow form") != null) {
-                episodesDoc = getWatchPage(url) ?: document
-            }
-
+            val episodesDoc = getWatchPage(url) ?: document
             val episodes = episodesDoc.select("div.EpsList li a").mapNotNull { epElement ->
                 val href = epElement.attr("href")
-                val titleAttr = epElement.attr("title")
-                val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
-                if (epNum == null) return@mapNotNull null
+                val epName = epElement.text().trim()
+                val epNum = epName.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull() ?: return@mapNotNull null
+                
+                // FIXED: Reverted back to the 'newEpisode' helper function
                 newEpisode(href) {
-                    this.name = epElement.text().trim()
+                    this.name = epName
                     this.episode = epNum
-                    this.season = 1
                 }
-            }.toMutableList()
+            }.distinctBy { it.episode }
+            val seriesTitle = pageTitle.replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "").trim()
             
-            val seriesTitle = pageTitle
-                .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
-                .trim()
-            
-            val currentEpNum = pageTitle.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
-            if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
-                 episodes.add(newEpisode(url) {
-                    this.name = pageTitle.substringAfter(seriesTitle).trim().ifBlank { "حلقه $currentEpNum" }
-                    this.episode = currentEpNum
-                    this.season = 1
-                })
-            }
-            
-            return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
-                this.posterUrl = posterUrl
-                this.plot = plot
-                this.year = year
-                this.tags = tags
+            // FIXED: Reverted back to the 'newTvSeriesLoadResponse' helper function
+            return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes) {
+                this.posterUrl = posterUrl; this.year = year; this.plot = plot; this.tags = tags
             }
         } else {
-             val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
-
+            val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
+            
+            // FIXED: Reverted back to the 'newMovieLoadResponse' helper function
             return newMovieLoadResponse(movieTitle, url, TvType.Movie, url) {
-                this.posterUrl = posterUrl
-                this.plot = plot
-                this.year = year
-                this.tags = tags
-                this.duration = duration
+                this.posterUrl = posterUrl; this.year = year; this.plot = plot
+                this.tags = tags; this.duration = duration
             }
         }
     }
 
     override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
+        data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // Get the watch page document to find the server iframes
         val watchPageDoc = getWatchPage(data) ?: return false
-
         watchPageDoc.select("div.servers-list iframe").apmap {
             val link = it.attr("src")
-            if (link.isNotBlank()) {
-                // Let the built-in extractor handle supported servers like DoodStream
-                loadExtractor(link, data, subtitleCallback, callback)
-            }
+            if (link.isNotBlank()) loadExtractor(link, data, subtitleCallback, callback)
         }
-
         return true
     }
 }
