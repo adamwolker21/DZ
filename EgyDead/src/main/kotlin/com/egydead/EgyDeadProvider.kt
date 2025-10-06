@@ -8,8 +8,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 class EgyDeadProvider : MainAPI() {
-    // Corrected mainUrl based on the final investigation
-    override var mainUrl = "https://tv7.egydead.co" 
+    // We revert to the URL you confirmed is working
+    override var mainUrl = "https://tv6.egydead.live"
     override var name = "EgyDead"
     override val hasMainPage = true
     override var lang = "ar"
@@ -24,6 +24,7 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
+    // Your proven-to-work function to handle the hidden content
     private suspend fun getWatchPage(url: String): Document? {
         try {
             val initialResponse = app.get(url)
@@ -35,10 +36,6 @@ class EgyDeadProvider : MainAPI() {
                     "Referer" to url,
                     "User-Agent" to USER_AGENT,
                     "Origin" to mainUrl,
-                    "sec-fetch-dest" to "document",
-                    "sec-fetch-mode" to "navigate",
-                    "sec-fetch-site" to "same-origin",
-                    "sec-fetch-user" to "?1"
                 )
                 val data = mapOf("View" to "1")
                 return app.post(url, headers = headers, data = data, cookies = cookies).document
@@ -54,16 +51,9 @@ class EgyDeadProvider : MainAPI() {
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
-        val url = if (page == 1) {
-            "$mainUrl${request.data}"
-        } else {
-            "$mainUrl${request.data}page/$page/"
-        }
-
+        val url = if (page == 1) "$mainUrl${request.data}" else "$mainUrl${request.data}page/$page/"
         val document = app.get(url).document
-        val home = document.select("li.movieItem").mapNotNull {
-            it.toSearchResult()
-        }
+        val home = document.select("li.movieItem").mapNotNull { it.toSearchResult() }
         return newHomePageResponse(request.name, home)
     }
 
@@ -72,31 +62,22 @@ class EgyDeadProvider : MainAPI() {
         val href = fixUrl(linkTag.attr("href"))
         val title = this.selectFirst("h1.BottomTitle")?.text() ?: return null
         val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("src"))
-
-        val cleanedTitle = title.replace("مشاهدة", "").trim()
-            .replace(Regex("^(فيلم|مسلسل)"), "").trim()
-
+        val cleanedTitle = title.replace("مشاهدة", "").replace(Regex("^(فيلم|مسلسل)"), "").trim()
         val isSeries = title.contains("مسلسل") || title.contains("الموسم")
 
         return if (isSeries) {
-            newTvSeriesSearchResponse(cleanedTitle, href, TvType.TvSeries) {
-                this.posterUrl = posterUrl
-            }
+            newTvSeriesSearchResponse(cleanedTitle, href, TvType.TvSeries) { this.posterUrl = posterUrl }
         } else {
-            newMovieSearchResponse(cleanedTitle, href, TvType.Movie) {
-                this.posterUrl = posterUrl
-            }
+            newMovieSearchResponse(cleanedTitle, href, TvType.Movie) { this.posterUrl = posterUrl }
         }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = "$mainUrl/?s=$query"
-        val document = app.get(searchUrl).document
-        return document.select("li.movieItem").mapNotNull {
-            it.toSearchResult()
-        }
+        val document = app.get("$mainUrl/?s=$query").document
+        return document.select("li.movieItem").mapNotNull { it.toSearchResult() }
     }
 
+    // Your proven-to-work load function
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
@@ -107,27 +88,18 @@ class EgyDeadProvider : MainAPI() {
         val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
         val duration = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()?.filter { it.isDigit() }?.toIntOrNull()
 
-        val categoryText = document.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: ""
-        val isSeries = categoryText.contains("مسلسلات") || pageTitle.contains("مسلسل") || pageTitle.contains("الموسم") || document.select("div.EpsList").isNotEmpty()
+        val isSeries = pageTitle.contains("مسلسل") || pageTitle.contains("الموسم") || document.select("div.EpsList").isNotEmpty()
 
         if (isSeries) {
             val episodesDoc = getWatchPage(url) ?: document
-
-            val episodes = episodesDoc.select("div.EpsList li a").mapNotNull { epElement ->
-                val href = fixUrl(epElement.attr("href"))
-                val titleAttr = epElement.attr("title")
-                val epNum = titleAttr.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
+            val episodes = episodesDoc.select("div.EpsList li a").mapNotNull {
+                val href = fixUrl(it.attr("href"))
+                val epNum = it.attr("title").substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
                 if (epNum == null) return@mapNotNull null
-                newEpisode(href) {
-                    this.name = epElement.text().trim()
-                    this.episode = epNum
-                }
+                newEpisode(href) { this.name = it.text().trim(); this.episode = epNum }
             }.distinctBy { it.episode }.toMutableList()
             
-            val seriesTitle = pageTitle
-                .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
-                .trim()
-            
+            val seriesTitle = pageTitle.replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "").trim()
             val currentEpNum = pageTitle.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
             if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
                  episodes.add(newEpisode(url) {
@@ -137,33 +109,23 @@ class EgyDeadProvider : MainAPI() {
             }
             
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
-                this.posterUrl = posterUrl
-                this.plot = plot
-                this.year = year
-                this.tags = tags
+                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
             }
         } else {
              val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
-
             return newMovieLoadResponse(movieTitle, url, TvType.Movie, url) {
-                this.posterUrl = posterUrl
-                this.plot = plot
-                this.year = year
-                this.tags = tags
-                this.duration = duration
+                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags; this.duration = duration
             }
         }
     }
     
     // --- START OF INNER EXTRACTORS ---
+    // These extractors only find the final media URL and pass it to loadExtractor.
+    // This is the most stable and compatible method.
 
     private val extractorList = listOf(
-        StreamHGExtractor(),
-        ForafileExtractor(),
-        BigwarpExtractor(),
-        EarnVidsExtractor(),
-        VidGuardExtractor(),
-        DumbalagExtractor() // Added for cleanliness
+        StreamHGExtractor(), ForafileExtractor(), BigwarpExtractor(),
+        EarnVidsExtractor(), VidGuardExtractor(), DumbalagExtractor()
     )
     
     abstract class BaseEvalExtractor : ExtractorApi() {
@@ -173,71 +135,42 @@ class EgyDeadProvider : MainAPI() {
             val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
             if (packedJs != null) {
                 val unpacked = getAndUnpack(packedJs)
-                Regex("""sources:\s*\[\{file:"([^"]+)""").findAll(unpacked).map { it.groupValues[1] }.forEach { link ->
+                Regex("""sources:\s*\[\{file:"([^"]+)""").find(unpacked)?.groupValues?.get(1)?.let { link ->
                     loadExtractor(httpsify(link), url, subtitleCallback, callback)
                 }
             }
         }
     }
 
-    inner class StreamHGExtractor : BaseEvalExtractor() {
-        override var name = "StreamHG"
-        override var mainUrl = "hglink.to"
-    }
-
-    inner class DumbalagExtractor : BaseEvalExtractor() {
-        override var name = "StreamHG" // It's a mirror
-        override var mainUrl = "dumbalag.com"
-    }
-    
-    inner class EarnVidsExtractor : BaseEvalExtractor() {
-        override var name = "EarnVids"
-        override var mainUrl = "dingtezuni.com"
-    }
+    inner class StreamHGExtractor : BaseEvalExtractor() { override var name = "StreamHG"; override var mainUrl = "hglink.to" }
+    inner class DumbalagExtractor : BaseEvalExtractor() { override var name = "StreamHG"; override var mainUrl = "dumbalag.com" }
+    inner class EarnVidsExtractor : BaseEvalExtractor() { override var name = "EarnVids"; override var mainUrl = "dingtezuni.com" }
 
     inner class ForafileExtractor : ExtractorApi() {
-        override var name = "Forafile"
-        override var mainUrl = "forafile.com"
-        override val requiresReferer = true
+        override var name = "Forafile"; override var mainUrl = "forafile.com"; override val requiresReferer = true
         override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-            val document = app.get(url, referer = referer).document
-            val videoUrl = document.selectFirst("video.jw-video")?.attr("src")
-            if (videoUrl != null) {
-                loadExtractor(videoUrl, url, subtitleCallback, callback)
+            app.get(url, referer = referer).document.selectFirst("video.jw-video")?.attr("src")?.let {
+                loadExtractor(it, url, subtitleCallback, callback)
             }
         }
     }
 
     inner class BigwarpExtractor : ExtractorApi() {
-        override var name = "Bigwarp"
-        override var mainUrl = "bigwarp.pro"
-        override val requiresReferer = true
+        override var name = "Bigwarp"; override var mainUrl = "bigwarp.pro"; override val requiresReferer = true
         override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-            val document = app.get(url, referer = referer).document
-            val jwPlayerScript = document.select("script:containsData(jwplayer(\"vplayer\").setup)").firstOrNull()?.data()
-            if(jwPlayerScript != null) {
-                 Regex("""sources:\s*\[\{file:"([^"]+)""").findAll(jwPlayerScript).map { it.groupValues[1] }.forEach { link ->
-                    loadExtractor(httpsify(link), url, subtitleCallback, callback)
-                }
+            val script = app.get(url, referer = referer).document.select("script:containsData(jwplayer(\"vplayer\").setup)").firstOrNull()?.data()
+            Regex("""sources:\s*\[\{file:"([^"]+)""").find(script ?: "")?.groupValues?.get(1)?.let { link ->
+                loadExtractor(httpsify(link), url, subtitleCallback, callback)
             }
         }
     }
     
     inner class VidGuardExtractor : ExtractorApi() {
-        override var name = "VidGuard"
-        override var mainUrl = "listeamed.net"
-        override val requiresReferer = true
+        override var name = "VidGuard"; override var mainUrl = "listeamed.net"; override val requiresReferer = true
         override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-            val document = app.get(url, referer = referer).document
-            val realEmbedUrl = document.selectFirst("iframe")?.attr("src") ?: return
-            
+            val realEmbedUrl = app.get(url, referer = referer).document.selectFirst("iframe")?.attr("src") ?: return
             val matchingExtractor = extractorList.find { realEmbedUrl.contains(it.mainUrl) }
-            if(matchingExtractor != null) {
-                matchingExtractor.getUrl(realEmbedUrl, url, subtitleCallback, callback)
-            } else {
-                // Fallback for any other server inside the iframe
-                loadExtractor(realEmbedUrl, url, subtitleCallback, callback)
-            }
+            matchingExtractor?.getUrl(realEmbedUrl, url, subtitleCallback, callback) ?: loadExtractor(realEmbedUrl, url, subtitleCallback, callback)
         }
     }
 
@@ -248,28 +181,16 @@ class EgyDeadProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val watchPageDoc = getWatchPage(data) ?: return false
-        
         val allLinks = mutableSetOf<String>()
 
-        watchPageDoc.select("div.mob-servers li").forEach {
-            val link = it.attr("data-link")
-            if(link.isNotBlank()) allLinks.add(link)
-        }
-
-        watchPageDoc.select("ul.donwload-servers-list li a.ser-link").forEach {
-            val link = it.attr("href")
-            if(link.isNotBlank()) allLinks.add(link)
-        }
+        watchPageDoc.select("div.mob-servers li").mapNotNull { it.attr("data-link") }.filter { it.isNotBlank() }.forEach { allLinks.add(it) }
+        watchPageDoc.select("ul.donwload-servers-list li a.ser-link").mapNotNull { it.attr("href") }.filter { it.isNotBlank() }.forEach { allLinks.add(it) }
         
         coroutineScope {
             allLinks.forEach { link ->
                 launch {
                     val matchingExtractor = extractorList.find { link.contains(it.mainUrl) }
-                    if (matchingExtractor != null) {
-                        matchingExtractor.getUrl(link, data, subtitleCallback, callback)
-                    } else {
-                        loadExtractor(link, data, subtitleCallback, callback)
-                    }
+                    matchingExtractor?.getUrl(link, data, subtitleCallback, callback) ?: loadExtractor(link, data, subtitleCallback, callback)
                 }
             }
         }
