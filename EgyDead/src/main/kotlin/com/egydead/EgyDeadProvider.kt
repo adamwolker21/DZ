@@ -103,7 +103,7 @@ class EgyDeadProvider : MainAPI() {
         val isSeries = categoryText.contains("مسلسلات")
 
         if (isSeries) {
-             var episodes = document.select("div.EpsList li a").mapNotNull { epElement ->
+            var episodes = document.select("div.EpsList li a").mapNotNull { epElement ->
                 val href = epElement.attr("href")
                 val titleAttr = epElement.attr("title")
                 val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
