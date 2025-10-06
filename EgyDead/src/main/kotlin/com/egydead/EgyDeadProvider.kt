@@ -94,7 +94,6 @@ class EgyDeadProvider : MainAPI() {
             if (plotAppendix.isNotEmpty()) plotAppendix += " | "
             plotAppendix += "القناه: $channel"
         }
-        // Add duration to plot for series as well
         if (duration != null) {
             if (plotAppendix.isNotEmpty()) plotAppendix += " | "
             plotAppendix += "المدة: $duration دقيقة"
@@ -107,9 +106,6 @@ class EgyDeadProvider : MainAPI() {
         val isSeries = categoryText.contains("مسلسلات")
 
         if (isSeries) {
-            // TODO: In the next step, we will call getPageWithEpisodes(url) here
-            // to get the full episode list.
-
             val seriesTitle = pageTitle
                 .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
                 .trim()
@@ -125,8 +121,9 @@ class EgyDeadProvider : MainAPI() {
                     season = 1 
                 }
             }.sortedBy { it.episode }
-
-            return newTvSeriesSearchResponse(seriesTitle, url, TvType.TvSeries, episodes) {
+            
+            // Correct function call
+            return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes) {
                 this.posterUrl = posterUrl
                 this.plot = plot
                 this.year = year
@@ -154,7 +151,6 @@ class EgyDeadProvider : MainAPI() {
         // TODO: In the next step, we will call getPageWithEpisodes(data) here
         // to get the document that contains the server iframes.
         
-        // For now, it will only work if servers are directly on the page
         val document = app.get(data).document
 
         document.select("div.servers-list iframe").apmap {
