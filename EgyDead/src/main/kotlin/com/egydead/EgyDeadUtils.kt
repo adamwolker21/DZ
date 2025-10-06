@@ -42,21 +42,26 @@ object EgyDeadUtils {
 
     @Suppress("DEPRECATION")
     private fun parseWatchPage(document: Document): WatchPageData {
-        val episodes = document.select("div.EpsList li a").mapNotNull {
-            val href = it.attr("href")
-            val titleAttr = it.attr("title")
-            val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
-            if (epNum == null) return@mapNotNull null
-            
-            // استخدام منشئ Episode مع تجاهل التحذير - هذا هو الحل العملي الوحيد
-            Episode(
+    val episodes = mutableListOf<Episode>()
+    
+    document.select("div.EpsList li a").forEach { element ->
+        val href = element.attr("href")
+        val titleAttr = element.attr("title")
+        val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
+        
+        if (epNum != null) {
+            @Suppress("DEPRECATION")
+            val episode = Episode(
                 data = href,
-                name = it.text().trim(),
+                name = element.text().trim(),
                 episode = epNum,
                 season = 1
             )
+            episodes.add(episode)
         }
-        val serverLinks = document.select("div.servers-list iframe").map { it.attr("src") }
-        return WatchPageData(episodes, serverLinks)
     }
+    
+    val serverLinks = document.select("div.servers-list iframe").map { it.attr("src") }
+    return WatchPageData(episodes, serverLinks)
+}
 }
