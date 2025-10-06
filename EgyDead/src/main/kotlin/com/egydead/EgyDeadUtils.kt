@@ -47,11 +47,14 @@ object EgyDeadUtils {
             val titleAttr = it.attr("title")
             val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
             if(epNum == null) return@mapNotNull null
-            newEpisode(href) {
-                this.name = it.text().trim()
-                this.episode = epNum
-                this.season = 1 
-            }
+            
+            val episode = Episode(
+                url = href,
+                name = it.text().trim(),
+                season = 1,
+                episode = epNum,
+            )
+            episode
         }
         val serverLinks = document.select("div.servers-list iframe").map { it.attr("src") }
         return WatchPageData(episodes, serverLinks)
