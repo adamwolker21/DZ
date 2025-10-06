@@ -87,7 +87,7 @@ class EgyDeadProvider : MainAPI() {
                 val epNum = epName.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull() ?: return@mapNotNull null
                 newEpisode(href) { this.name = epName; this.episode = epNum }
             }.distinctBy { it.episode }
-            val seriesTitle = pageTitle.replace(Regex("""(الحلقة \د+|مترجمة|الاخيرة)"""), "").trim()
+            val seriesTitle = pageTitle.replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "").trim()
             
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes) {
                 this.posterUrl = posterUrl; this.year = year; this.plot = plot; this.tags = tags
@@ -106,7 +106,6 @@ class EgyDeadProvider : MainAPI() {
 
     private val extractorList = listOf(StreamHGExtractor(), ForafileExtractor())
 
-    // By defining the extractors inside the provider, we guarantee they share the same scope and dependencies.
     inner class StreamHGExtractor : ExtractorApi() {
         override var name = "StreamHG"
         override var mainUrl = "https://hglink.to"
@@ -119,9 +118,9 @@ class EgyDeadProvider : MainAPI() {
                 val unpacked = getAndUnpack(packedJs)
                 val m3u8Link = Regex("""sources:\[\{file:"(.*?)"\}\]""").find(unpacked)?.groupValues?.get(1)
                 if (m3u8Link != null) {
-                    // FINAL FIX: Using the old helper function as explicitly requested by the build error.
+                    // FINAL FIX V10: Removed the 'isM3u8' parameter as it is not found in the user's build environment.
                     callback.invoke(
-                        newExtractorLink(this.name, this.name, httpsify(m3u8Link), referer ?: "", Qualities.Unknown.value, isM3u8 = true)
+                        newExtractorLink(this.name, this.name, httpsify(m3u8Link), referer ?: "", Qualities.Unknown.value)
                     )
                 }
             }
@@ -137,9 +136,9 @@ class EgyDeadProvider : MainAPI() {
             val document = app.get(url, referer = referer).document
             val videoUrl = document.selectFirst("source")?.attr("src")
             if (videoUrl != null) {
-                // FINAL FIX: Using the old helper function as explicitly requested by the build error.
+                 // FINAL FIX V10: Removed the 'isM3u8' parameter. The player will auto-detect the type.
                 callback.invoke(
-                    newExtractorLink(this.name, this.name, videoUrl, referer ?: "", Qualities.Unknown.value, isM3u8 = videoUrl.contains(".m3u8"))
+                    newExtractorLink(this.name, this.name, videoUrl, referer ?: "", Qualities.Unknown.value)
                 )
             }
         }
