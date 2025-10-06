@@ -9,13 +9,11 @@ data class WatchPageData(val episodes: List<Episode>, val serverLinks: List<Stri
 
 object EgyDeadUtils {
     
-    // This function now returns a WatchPageData object
     suspend fun getWatchPageData(url: String): WatchPageData? {
         try {
             val initialResponse = app.get(url)
             val document = initialResponse.document
 
-            // If a watch button exists, we need to click it to get the real data
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
                 val headers = mapOf(
@@ -32,7 +30,6 @@ object EgyDeadUtils {
                 val watchPageDoc = app.post(url, headers = headers, data = data, cookies = cookies).document
                 return parseWatchPage(watchPageDoc)
             }
-            // If no watch button, parse the current page
             return parseWatchPage(document)
         } catch (e: Exception) {
             e.printStackTrace()
@@ -41,25 +38,25 @@ object EgyDeadUtils {
     }
 
     private fun parseWatchPage(document: Document): WatchPageData {
-        val episodes = document.select("div.EpsList li a").mapNotNull {
-            val href = it.attr("href")
-            val titleAttr = it.attr("title")
+        val episodes = mutableListOf<Episode>()
+        
+        document.select("div.EpsList li a").forEach { element ->
+            val href = element.attr("href")
+            val titleAttr = element.attr("title")
             val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
-            if (epNum == null) return@mapNotNull null
             
-            // إنشاء Episode باستخدام app.newEpisode مع الصيغة الصحيحة
-            createEpisode(href, it.text().trim(), epNum, 1)
+            if (epNum != null) {
+                val episode = Episode().apply {
+                    this.name = element.text().trim()
+                    this.episode = epNum
+                    this.season = 1
+                    this.data = href
+                }
+                episodes.add(episode)
+            }
         }
+        
         val serverLinks = document.select("div.servers-list iframe").map { it.attr("src") }
         return WatchPageData(episodes, serverLinks)
-    }
-
-    // دالة مساعدة لإنشاء Episode باستخدام app.newEpisode
-    private fun createEpisode(url: String, name: String, episode: Int, season: Int): Episode {
-        return app.newEpisode(url) { ep ->
-            ep.name = name
-            ep.episode = episode
-            ep.season = season
-        }
     }
 }
