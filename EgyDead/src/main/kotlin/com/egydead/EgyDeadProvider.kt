@@ -4,8 +4,8 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Element
-// We will use this later
-// import com.egydead.EgyDeadUtils.getPageWithEpisodes
+// We are now using the helper function
+import com.egydead.EgyDeadUtils.getPageWithEpisodes
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -71,7 +71,7 @@ class EgyDeadProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url).document
+        var document = app.get(url).document
         
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterImage = document.selectFirst("div.single-thumbnail img")
@@ -106,6 +106,14 @@ class EgyDeadProvider : MainAPI() {
         val isSeries = categoryText.contains("مسلسلات")
 
         if (isSeries) {
+            // If the episode list is not found, call our helper function to get it.
+            if (document.select("div.EpsList li a").isEmpty()) {
+                val fullPage = getPageWithEpisodes(url)
+                if (fullPage != null) {
+                    document = fullPage
+                }
+            }
+
             val seriesTitle = pageTitle
                 .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
                 .trim()
@@ -122,7 +130,6 @@ class EgyDeadProvider : MainAPI() {
                 }
             }.sortedBy { it.episode }
             
-            // Correct function call
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes) {
                 this.posterUrl = posterUrl
                 this.plot = plot
@@ -148,10 +155,8 @@ class EgyDeadProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // TODO: In the next step, we will call getPageWithEpisodes(data) here
-        // to get the document that contains the server iframes.
-        
-        val document = app.get(data).document
+        // We will also use the helper function here to get the servers.
+        val document = getPageWithEpisodes(data) ?: app.get(data).document
 
         document.select("div.servers-list iframe").apmap {
             val link = it.attr("src")
