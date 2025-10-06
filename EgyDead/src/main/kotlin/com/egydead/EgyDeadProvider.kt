@@ -8,7 +8,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 class EgyDeadProvider : MainAPI() {
-    override var mainUrl = "https://tv6.egydead.live"
+    // Corrected mainUrl based on the final investigation
+    override var mainUrl = "https://tv7.egydead.co" 
     override var name = "EgyDead"
     override val hasMainPage = true
     override var lang = "ar"
@@ -32,7 +33,7 @@ class EgyDeadProvider : MainAPI() {
                 val headers = mapOf(
                     "Content-Type" to "application/x-www-form-urlencoded",
                     "Referer" to url,
-                    "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
+                    "User-Agent" to USER_AGENT,
                     "Origin" to mainUrl,
                     "sec-fetch-dest" to "document",
                     "sec-fetch-mode" to "navigate",
@@ -161,7 +162,8 @@ class EgyDeadProvider : MainAPI() {
         ForafileExtractor(),
         BigwarpExtractor(),
         EarnVidsExtractor(),
-        VidGuardExtractor()
+        VidGuardExtractor(),
+        DumbalagExtractor() // Added for cleanliness
     )
     
     abstract class BaseEvalExtractor : ExtractorApi() {
@@ -172,7 +174,6 @@ class EgyDeadProvider : MainAPI() {
             if (packedJs != null) {
                 val unpacked = getAndUnpack(packedJs)
                 Regex("""sources:\s*\[\{file:"([^"]+)""").findAll(unpacked).map { it.groupValues[1] }.forEach { link ->
-                    // Pass the final URL to the powerful loadExtractor
                     loadExtractor(httpsify(link), url, subtitleCallback, callback)
                 }
             }
@@ -182,6 +183,11 @@ class EgyDeadProvider : MainAPI() {
     inner class StreamHGExtractor : BaseEvalExtractor() {
         override var name = "StreamHG"
         override var mainUrl = "hglink.to"
+    }
+
+    inner class DumbalagExtractor : BaseEvalExtractor() {
+        override var name = "StreamHG" // It's a mirror
+        override var mainUrl = "dumbalag.com"
     }
     
     inner class EarnVidsExtractor : BaseEvalExtractor() {
@@ -225,13 +231,13 @@ class EgyDeadProvider : MainAPI() {
             val document = app.get(url, referer = referer).document
             val realEmbedUrl = document.selectFirst("iframe")?.attr("src") ?: return
             
-            if (realEmbedUrl.contains("dumbalag.com")) {
-                StreamHGExtractor().getUrl(realEmbedUrl, url, subtitleCallback, callback)
-                return
-            }
-            
             val matchingExtractor = extractorList.find { realEmbedUrl.contains(it.mainUrl) }
-            matchingExtractor?.getUrl(realEmbedUrl, url, subtitleCallback, callback)
+            if(matchingExtractor != null) {
+                matchingExtractor.getUrl(realEmbedUrl, url, subtitleCallback, callback)
+            } else {
+                // Fallback for any other server inside the iframe
+                loadExtractor(realEmbedUrl, url, subtitleCallback, callback)
+            }
         }
     }
 
@@ -258,11 +264,6 @@ class EgyDeadProvider : MainAPI() {
         coroutineScope {
             allLinks.forEach { link ->
                 launch {
-                    if (link.contains("dumbalag.com")) {
-                        StreamHGExtractor().getUrl(link, data, subtitleCallback, callback)
-                        return@launch
-                    }
-
                     val matchingExtractor = extractorList.find { link.contains(it.mainUrl) }
                     if (matchingExtractor != null) {
                         matchingExtractor.getUrl(link, data, subtitleCallback, callback)
