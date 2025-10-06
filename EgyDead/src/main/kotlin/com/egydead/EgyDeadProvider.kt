@@ -94,6 +94,11 @@ class EgyDeadProvider : MainAPI() {
             if (plotAppendix.isNotEmpty()) plotAppendix += " | "
             plotAppendix += "القناه: $channel"
         }
+        // Add duration to plot for series as well
+        if (duration != null) {
+            if (plotAppendix.isNotEmpty()) plotAppendix += " | "
+            plotAppendix += "المدة: $duration دقيقة"
+        }
         if(plotAppendix.isNotEmpty()) {
             plot = "$plot<br><br>$plotAppendix"
         }
@@ -117,12 +122,11 @@ class EgyDeadProvider : MainAPI() {
                 newEpisode(epHref) {
                     name = epElement.text().trim()
                     episode = epNum
-                    season = 1
-                    this.duration = duration?.toLong()
+                    season = 1 
                 }
             }.sortedBy { it.episode }
 
-            return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes) {
+            return newTvSeriesSearchResponse(seriesTitle, url, TvType.TvSeries, episodes) {
                 this.posterUrl = posterUrl
                 this.plot = plot
                 this.year = year
