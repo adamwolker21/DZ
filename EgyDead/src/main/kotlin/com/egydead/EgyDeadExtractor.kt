@@ -1,12 +1,11 @@
 package com.egydead.extractors
 
-import com.lagradost.cloudstream3.SubtitleFile
-import com.lagradost.cloudstream3.app
+// Using a wildcard import to ensure all helper functions are available.
+import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.utils.httpsify
-// This import is essential for the code to compile correctly.
 import com.lagradost.cloudstream3.utils.Qualities
 
 open class StreamHGExtractor : ExtractorApi() {
@@ -26,9 +25,9 @@ open class StreamHGExtractor : ExtractorApi() {
             val unpacked = getAndUnpack(packedJs)
             val m3u8Link = Regex("""sources:\[\{file:"(.*?)"\}\]""").find(unpacked)?.groupValues?.get(1)
             if (m3u8Link != null) {
-                // FIXED: Using the direct ExtractorLink constructor, which is the correct modern approach.
+                // FIXED: Reverted to 'newExtractorLink' as explicitly requested by the build errors.
                 callback.invoke(
-                    ExtractorLink(
+                    newExtractorLink(
                         source = this.name,
                         name = this.name,
                         url = httpsify(m3u8Link),
@@ -56,9 +55,9 @@ open class ForafileExtractor : ExtractorApi() {
         val document = app.get(url, referer = referer).document
         val videoUrl = document.selectFirst("source")?.attr("src")
         if (videoUrl != null) {
-             // FIXED: Using the direct ExtractorLink constructor.
+            // FIXED: Reverted to 'newExtractorLink'.
             callback.invoke(
-                ExtractorLink(
+                newExtractorLink(
                     source = this.name,
                     name = this.name,
                     url = videoUrl,
