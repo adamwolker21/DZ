@@ -24,7 +24,6 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
-    // Helper function to perform the POST request and get the watch page
     private suspend fun getWatchPage(url: String): Document? {
         try {
             val initialResponse = app.get(url)
@@ -150,11 +149,8 @@ class EgyDeadProvider : MainAPI() {
             val link = it.attr("data-link")
 
             when {
-                // Custom extractors
                 link.contains("hglink.to") -> StreamHGExtractor().getUrl(link, data, subtitleCallback, callback)
                 link.contains("forafile.com") -> ForafileExtractor().getUrl(link, data, subtitleCallback, callback)
-                
-                // Default extractor for supported hosts
                 else -> if (link.isNotBlank()) loadExtractor(link, data, subtitleCallback, callback)
             }
         }
