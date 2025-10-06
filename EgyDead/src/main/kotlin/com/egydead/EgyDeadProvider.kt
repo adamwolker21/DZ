@@ -6,6 +6,7 @@ import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import com.lagradost.cloudstream3.Qualities // The missing import
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -173,7 +174,7 @@ class EgyDeadProvider : MainAPI() {
                 val unpacked = getAndUnpack(packedJs)
                  Regex("""sources:\s*\[\{file:"([^"]+)""").findAll(unpacked).map { it.groupValues[1] }.forEach { link ->
                     callback.invoke(
-                        ExtractorLink(
+                        newExtractorLink(
                             source = this.name,
                             name = this.name,
                             url = httpsify(link),
@@ -206,7 +207,7 @@ class EgyDeadProvider : MainAPI() {
             val videoUrl = document.selectFirst("video.jw-video")?.attr("src")
             if (videoUrl != null) {
                 callback.invoke(
-                    ExtractorLink(
+                    newExtractorLink(
                         source = this.name,
                         name = this.name,
                         url = videoUrl,
@@ -229,7 +230,7 @@ class EgyDeadProvider : MainAPI() {
             if(jwPlayerScript != null) {
                  Regex("""sources:\s*\[\{file:"([^"]+)""").findAll(jwPlayerScript).map { it.groupValues[1] }.forEach { link ->
                      callback.invoke(
-                        ExtractorLink(
+                        newExtractorLink(
                             source = this.name,
                             name = this.name,
                             url = httpsify(link),
