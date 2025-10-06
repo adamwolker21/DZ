@@ -173,7 +173,7 @@ class EgyDeadProvider : MainAPI() {
                 val unpacked = getAndUnpack(packedJs)
                  Regex("""sources:\s*\[\{file:"([^"]+)""").findAll(unpacked).map { it.groupValues[1] }.forEach { link ->
                     callback.invoke(
-                        newExtractorLink(
+                        ExtractorLink(
                             source = this.name,
                             name = this.name,
                             url = httpsify(link),
@@ -205,7 +205,16 @@ class EgyDeadProvider : MainAPI() {
             val document = app.get(url, referer = referer).document
             val videoUrl = document.selectFirst("video.jw-video")?.attr("src")
             if (videoUrl != null) {
-                callback.invoke(newExtractorLink(this.name, this.name, videoUrl, url, Qualities.Unknown.value, false))
+                callback.invoke(
+                    ExtractorLink(
+                        source = this.name,
+                        name = this.name,
+                        url = videoUrl,
+                        referer = url,
+                        quality = Qualities.Unknown.value,
+                        isM3u8 = false
+                    )
+                )
             }
         }
     }
@@ -220,7 +229,7 @@ class EgyDeadProvider : MainAPI() {
             if(jwPlayerScript != null) {
                  Regex("""sources:\s*\[\{file:"([^"]+)""").findAll(jwPlayerScript).map { it.groupValues[1] }.forEach { link ->
                      callback.invoke(
-                        newExtractorLink(
+                        ExtractorLink(
                             source = this.name,
                             name = this.name,
                             url = httpsify(link),
