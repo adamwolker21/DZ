@@ -148,7 +148,6 @@ class EgyDeadProvider : MainAPI() {
 
         watchPageDoc.select("div.mob-servers ul li").apmap {
             val link = it.attr("data-link")
-            val serverName = it.select("p").text()
 
             when {
                 // Custom extractors
@@ -156,7 +155,7 @@ class EgyDeadProvider : MainAPI() {
                 link.contains("forafile.com") -> ForafileExtractor().getUrl(link, data, subtitleCallback, callback)
                 
                 // Default extractor for supported hosts
-                else -> loadExtractor(link, data, subtitleCallback, callback)
+                else -> if (link.isNotBlank()) loadExtractor(link, data, subtitleCallback, callback)
             }
         }
 
