@@ -154,9 +154,13 @@ class EgyDeadProvider : MainAPI() {
     
     // --- START OF INNER EXTRACTORS ---
 
-    private val extractorList = listOf(StreamHGExtractor(), ForafileExtractor())
+    private val extractorList = listOf(
+        StreamHGExtractor(), 
+        ForafileExtractor(),
+        EarnVidsExtractor(),
+        VidGuardExtractor()
+    )
 
-    // Upgraded extractor based on your investigation
     inner class StreamHGExtractor : ExtractorApi() {
         override var name = "StreamHG"
         override var mainUrl = "https://hglink.to"
@@ -164,10 +168,8 @@ class EgyDeadProvider : MainAPI() {
 
         override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
             val doc = app.get(url, referer = referer).document
-            // Find the packed JS code as you discovered
             val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
             if (packedJs != null) {
-                // Unpack it to reveal the real source link
                 val unpacked = getAndUnpack(packedJs)
                 val m3u8Link = Regex("""sources:\[\{file:"(.*?)"\}\]""").find(unpacked)?.groupValues?.get(1)
                 if (m3u8Link != null) {
@@ -177,7 +179,6 @@ class EgyDeadProvider : MainAPI() {
         }
     }
 
-    // Upgraded extractor based on your investigation
     inner class ForafileExtractor : ExtractorApi() {
         override var name = "Forafile"
         override var mainUrl = "https://forafile.com"
@@ -185,7 +186,6 @@ class EgyDeadProvider : MainAPI() {
 
         override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
             val document = app.get(url, referer = referer).document
-            // Find the direct video link in the <source> tag as you discovered
             val videoUrl = document.selectFirst("source")?.attr("src")
             if (videoUrl != null) {
                  loadExtractor(videoUrl, referer, subtitleCallback, callback)
@@ -193,28 +193,58 @@ class EgyDeadProvider : MainAPI() {
         }
     }
 
+    inner class EarnVidsExtractor : ExtractorApi() {
+        override var name = "EarnVids"
+        override var mainUrl = "https://dingtezuni.com"
+        override val requiresReferer = true
+        override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+            loadExtractor(url, referer, subtitleCallback, callback)
+        }
+    }
+    
+    inner class VidGuardExtractor : ExtractorApi() {
+        override var name = "VidGuard"
+        override var mainUrl = "https://listeamed.net"
+        override val requiresReferer = true
+        override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+            loadExtractor(url, referer, subtitleCallback, callback)
+        }
+    }
+
+
     // --- END OF INNER EXTRACTORS ---
 
-    // Final corrected 'loadLinks' function
+    // Final comprehensive 'loadLinks' function
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val watchPageDoc = getWatchPage(data) ?: return false
         
-        // Searching in the correct location you identified: "div.mob-servers li"
-        watchPageDoc.select("div.mob-servers li").apmap { serverLi ->
-            // Getting the link from the "data-link" attribute you identified
-            val link = serverLi.attr("data-link")
-            if (link.isNotBlank()) {
-                val matchingExtractor = extractorList.find { link.contains(it.mainUrl) }
-                if (matchingExtractor != null) {
-                    // Use our custom logic for StreamHG and Forafile
-                    matchingExtractor.getUrl(link, data, subtitleCallback, callback)
-                } else {
-                    // Fallback for DoodStream, Mixdrop, etc.
-                    loadExtractor(link, data, subtitleCallback, callback)
-                }
+        // Use a set to automatically handle duplicate links from both lists
+        val allLinks = mutableSetOf<String>()
+
+        // 1. Scrape the watch servers list
+        watchPageDoc.select("div.mob-servers li").forEach {
+            val link = it.attr("data-link")
+            if(link.isNotBlank()) allLinks.add(link)
+        }
+
+        // 2. Scrape the download servers list
+        watchPageDoc.select("ul.donwload-servers-list li a.ser-link").forEach {
+            val link = it.attr("href")
+            if(link.isNotBlank()) allLinks.add(link)
+        }
+        
+        // Process all unique links found
+        allLinks.apmap { link ->
+            val matchingExtractor = extractorList.find { link.contains(it.mainUrl) }
+            if (matchingExtractor != null) {
+                // Use our custom logic
+                matchingExtractor.getUrl(link, data, subtitleCallback, callback)
+            } else {
+                // Fallback for DoodStream, Mixdrop, etc.
+                loadExtractor(link, data, subtitleCallback, callback)
             }
         }
         return true
