@@ -118,10 +118,9 @@ class EgyDeadProvider : MainAPI() {
                 val unpacked = getAndUnpack(packedJs)
                 val m3u8Link = Regex("""sources:\[\{file:"(.*?)"\}\]""").find(unpacked)?.groupValues?.get(1)
                 if (m3u8Link != null) {
-                    // FINAL FIX V10: Removed the 'isM3u8' parameter as it is not found in the user's build environment.
-                    callback.invoke(
-                        newExtractorLink(this.name, this.name, httpsify(m3u8Link), referer ?: "", Qualities.Unknown.value)
-                    )
+                    // FINAL FIX V11: Explicitly defining the type to resolve compiler ambiguity.
+                    val link: ExtractorLink = newExtractorLink(this.name, this.name, httpsify(m3u8Link), referer ?: "", Qualities.Unknown.value)
+                    callback(link)
                 }
             }
         }
@@ -136,10 +135,9 @@ class EgyDeadProvider : MainAPI() {
             val document = app.get(url, referer = referer).document
             val videoUrl = document.selectFirst("source")?.attr("src")
             if (videoUrl != null) {
-                 // FINAL FIX V10: Removed the 'isM3u8' parameter. The player will auto-detect the type.
-                callback.invoke(
-                    newExtractorLink(this.name, this.name, videoUrl, referer ?: "", Qualities.Unknown.value)
-                )
+                 // FINAL FIX V11: Explicitly defining the type to resolve compiler ambiguity.
+                 val link: ExtractorLink = newExtractorLink(this.name, this.name, videoUrl, referer ?: "", Qualities.Unknown.value)
+                 callback(link)
             }
         }
     }
