@@ -1,8 +1,7 @@
 package com.egydead
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.loadExtractor
+import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 
@@ -44,10 +43,7 @@ class EgyDeadProvider : MainAPI() {
         }
     }
 
-    override suspend fun getMainPage(
-        page: Int,
-        request: MainPageRequest
-    ): HomePageResponse {
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page == 1) "$mainUrl${request.data}" else "$mainUrl${request.data}page/$page/"
         val document = app.get(url).document
         val home = document.select("li.movieItem").mapNotNull { it.toSearchResult() }
@@ -77,7 +73,7 @@ class EgyDeadProvider : MainAPI() {
         val document = app.get(url).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
-        val plot = document.selectFirst("div.extra-content p")?.text()?.trim()
+        val plot = document.select("div.extra-content p").text().trim()
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
         val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
         val duration = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()?.filter { it.isDigit() }?.toIntOrNull()
@@ -93,31 +89,80 @@ class EgyDeadProvider : MainAPI() {
             }.distinctBy { it.episode }
             val seriesTitle = pageTitle.replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "").trim()
             
-            // FIXED: Added the required 'contentRating' parameter as requested by the build error.
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes) {
                 this.posterUrl = posterUrl; this.year = year; this.plot = plot; this.tags = tags
-                this.contentRating = null // Passing null as no rating is available on the site.
             }
         } else {
             val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
             
-            // FIXED: Added the required 'contentRating' parameter.
             return newMovieLoadResponse(movieTitle, url, TvType.Movie, url) {
                 this.posterUrl = posterUrl; this.year = year; this.plot = plot
                 this.tags = tags; this.duration = duration
-                this.contentRating = null // Passing null as no rating is available on the site.
             }
         }
     }
+    
+    // --- START OF INNER EXTRACTORS ---
+
+    private val extractorList = listOf(StreamHGExtractor(), ForafileExtractor())
+
+    // By defining the extractors inside the provider, we guarantee they share the same scope and dependencies.
+    inner class StreamHGExtractor : ExtractorApi() {
+        override var name = "StreamHG"
+        override var mainUrl = "https://hglink.to"
+        override val requiresReferer = true
+
+        override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+            val doc = app.get(url, referer = referer).document
+            val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
+            if (packedJs != null) {
+                val unpacked = getAndUnpack(packedJs)
+                val m3u8Link = Regex("""sources:\[\{file:"(.*?)"\}\]""").find(unpacked)?.groupValues?.get(1)
+                if (m3u8Link != null) {
+                    callback.invoke(
+                        ExtractorLink(this.name, this.name, httpsify(m3u8Link), referer ?: "", Qualities.Unknown.value, isM3u8 = true)
+                    )
+                }
+            }
+        }
+    }
+
+    inner class ForafileExtractor : ExtractorApi() {
+        override var name = "Forafile"
+        override var mainUrl = "https://forafile.com"
+        override val requiresReferer = true
+
+        override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+            val document = app.get(url, referer = referer).document
+            val videoUrl = document.selectFirst("source")?.attr("src")
+            if (videoUrl != null) {
+                callback.invoke(
+                    ExtractorLink(this.name, this.name, videoUrl, referer ?: "", Qualities.Unknown.value, isM3u8 = videoUrl.contains(".m3u8"))
+                )
+            }
+        }
+    }
+
+    // --- END OF INNER EXTRACTORS ---
 
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val watchPageDoc = getWatchPage(data) ?: return false
-        watchPageDoc.select("div.servers-list iframe").apmap {
-            val link = it.attr("src")
-            if (link.isNotBlank()) loadExtractor(link, data, subtitleCallback, callback)
+        
+        // A more robust way to handle links, calling our local extractors.
+        watchPageDoc.select("div.servers-list iframe").apmap { iframe ->
+            val link = iframe.attr("src")
+            if (link.isNotBlank()) {
+                val matchingExtractor = extractorList.find { link.contains(it.mainUrl) }
+                if (matchingExtractor != null) {
+                    matchingExtractor.getUrl(link, data, subtitleCallback, callback)
+                } else {
+                    // Fallback to the general extractor for other links like DoodStream.
+                    loadExtractor(link, data, subtitleCallback, callback)
+                }
+            }
         }
         return true
     }
