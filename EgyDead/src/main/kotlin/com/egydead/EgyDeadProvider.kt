@@ -71,26 +71,12 @@ class EgyDeadProvider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val initialDoc = app.get(url).document
-        val pageTitle = initialDoc.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
-        var document = initialDoc
-
-        val categoryText = initialDoc.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: ""
-        val isSeries = categoryText.contains("مسلسلات")
-
-        // If it's a series and the episode list is not on the initial page, get the full page.
-        if (isSeries && initialDoc.select("div.EpsList li a").isEmpty()) {
-            val fullPage = getPageWithEpisodes(url)
-            if (fullPage != null) {
-                document = fullPage
-            }
-        }
+        val document = app.get(url).document
+        val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         
-        val posterImage = document.selectFirst("div.single-thumbnail img")
-        val posterUrl = posterImage?.attr("src")
-        
+        // Extract all metadata from the initial document
+        val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
         var plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
-
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
         val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
         val durationText = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()
@@ -114,13 +100,25 @@ class EgyDeadProvider : MainAPI() {
             plot = "$plot<br><br>$plotAppendix"
         }
 
+        val categoryText = document.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: ""
+        val isSeries = categoryText.contains("مسلسلات")
+
         if (isSeries) {
+            var episodesDoc = document
+            // If the episode list is not on the initial page, get the full page.
+            if (document.select("div.EpsList li a").isEmpty()) {
+                val fullPage = getPageWithEpisodes(url)
+                if (fullPage != null) {
+                    episodesDoc = fullPage
+                }
+            }
+
             val seriesTitle = pageTitle
                 .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
                 .trim()
 
-            // Get episodes from the (potentially updated) document
-            var episodes = document.select("div.EpsList li a").mapNotNull { epElement ->
+            // Get episodes from the new document
+            var episodes = episodesDoc.select("div.EpsList li a").mapNotNull { epElement ->
                 val epHref = epElement.attr("href")
                 val epTitleAttr = epElement.attr("title")
                 val epNum = epTitleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
@@ -132,7 +130,7 @@ class EgyDeadProvider : MainAPI() {
                 }
             }.toMutableList()
 
-            // Smartly add the current episode if it's missing from the list
+            // Add the current episode if it's missing from the list
             val currentEpNum = pageTitle.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
             if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
                  episodes.add(newEpisode(url) {
