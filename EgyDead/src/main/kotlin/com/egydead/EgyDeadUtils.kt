@@ -47,11 +47,13 @@ object EgyDeadUtils {
             val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
             if (epNum == null) return@mapNotNull null
             
-            // استخدام app.newEpisode مع الصيغة الصحيحة
-            app.newEpisode(href) { episode ->
-                episode.name = it.text().trim()
-                episode.episode = epNum
-                episode.season = 1
+            // إنشاء Episode يدوياً
+            Episode().apply {
+                name = it.text().trim()
+                episode = epNum
+                season = 1
+                // استخدام setUrl إذا كانت الخاصية url غير مباشرة
+                this.data = href
             }
         }
         val serverLinks = document.select("div.servers-list iframe").map { it.attr("src") }
