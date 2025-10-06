@@ -107,10 +107,9 @@ class EgyDeadProvider : MainAPI() {
                 newEpisode(epElement)
             }.toMutableList()
 
-            // If the episode list is not found, call our helper function to get it.
             if (episodes.isEmpty()) {
                 val watchPageData = getWatchPageData(url)
-                episodes = watchPageData?.first?.toMutableList() ?: mutableListOf()
+                episodes = watchPageData?.episodes?.toMutableList() ?: mutableListOf()
             }
             
             val seriesTitle = pageTitle
@@ -119,11 +118,7 @@ class EgyDeadProvider : MainAPI() {
             
             val currentEpNum = pageTitle.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
             if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
-                 episodes.add(newEpisode(url) {
-                    name = "حلقه $currentEpNum"
-                    episode = currentEpNum
-                    season = 1
-                })
+                 episodes.add(newEpisode(url, pageTitle, currentEpNum))
             }
             
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
@@ -151,9 +146,8 @@ class EgyDeadProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // We use the helper function here to get the page with servers.
         val watchPageData = getWatchPageData(data)
-        val serverLinks = watchPageData?.second ?: emptyList()
+        val serverLinks = watchPageData?.serverLinks ?: emptyList()
 
         serverLinks.apmap { link ->
             if (link.isNotBlank()) {
@@ -165,14 +159,23 @@ class EgyDeadProvider : MainAPI() {
     }
 }
 
-// Helper function to parse an episode element
-private fun newEpisode(element: Element): Episode {
+// Overloaded helper function for creating an episode from an Element
+private fun newEpisode(element: Element): Episode? {
     val href = element.attr("href")
     val titleAttr = element.attr("title")
-    val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull()
+    val epNum = titleAttr.substringAfter("الحلقة").trim().substringBefore(" ").toIntOrNull() ?: return null
     return newEpisode(href) {
         name = element.text().trim()
         episode = epNum
         season = 1 
+    }
+}
+
+// Overloaded helper function for creating an episode from a URL and title
+private fun newEpisode(url: String, title: String, epNum: Int): Episode {
+    return newEpisode(url) {
+        name = title.substringAfter(title.replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""),"").trim()).trim()
+        episode = epNum
+        season = 1
     }
 }
