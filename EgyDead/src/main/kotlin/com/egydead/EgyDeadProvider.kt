@@ -5,7 +5,8 @@ import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.utils.M3u8Helper
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -296,18 +297,15 @@ class EgyDeadProvider : MainAPI() {
                 }
             }
 
-            if (matchingExtractor != null) {
-                try {
-                    matchingExtractor.getUrl(link, data)?.forEach(callback)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            } else {
-                try {
+            try {
+                if (matchingExtractor != null) {
+                    val links = matchingExtractor.getUrl(link, data)
+                    links?.forEach(callback)
+                } else {
                     loadExtractor(link, data, subtitleCallback, callback)
-                } catch (e: Exception) {
-                    e.printStackTrace()
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
@@ -322,7 +320,6 @@ class EgyDeadProvider : MainAPI() {
 
         val servers = watchPageDoc.select("div.mob-servers li, div.servers-list li")
         
-        // استخدام حلقة عادية بدلاً من forEach
         for (serverLi in servers) {
             processServer(serverLi, data, subtitleCallback, callback)
         }
