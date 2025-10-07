@@ -5,6 +5,7 @@ import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.utils.M3u8Helper
+import kotlinx.coroutines.*
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
