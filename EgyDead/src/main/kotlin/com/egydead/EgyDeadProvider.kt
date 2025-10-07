@@ -157,12 +157,27 @@ class EgyDeadProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val watchPageDoc = getWatchPage(data) ?: return false
+
+        // A hardcoded list of DoodStream's alternative domains.
+        val doodDomains = listOf("dood.la", "dood.pm", "dood.to", "dood.so", "dood.cx", "dood.watch")
         
         watchPageDoc.select("div.mob-servers li").apmap { serverLi ->
             val link = serverLi.attr("data-link")
             if (link.isNotBlank()) {
-                // Reverted the check back to 'otherNames' for compatibility
-                val matchingExtractor = extractorList.find { link.contains(it.mainUrl) || it.otherNames?.any { name -> link.contains(name) } == true }
+                val matchingExtractor = extractorList.find { extractor ->
+                    // Check if the link contains the extractor's main URL.
+                    val mainUrlMatch = link.contains(extractor.mainUrl)
+                    
+                    // As a special case for DoodStream, check its other domains as well.
+                    val doodMatch = if (extractor.name == "DoodStream") {
+                        doodDomains.any { domain -> link.contains(domain) }
+                    } else {
+                        false
+                    }
+                    
+                    mainUrlMatch || doodMatch
+                }
+
                 if (matchingExtractor != null) {
                     matchingExtractor.getUrl(link, data, subtitleCallback, callback)
                 } else {
