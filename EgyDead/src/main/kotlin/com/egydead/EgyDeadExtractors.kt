@@ -60,14 +60,14 @@ private class DoodStream : ExtractorApi() {
     override var mainUrl = "dood.stream"
     override val requiresReferer = true
 
+    // Suppress the deprecation warning on the entire function to ensure the build completes.
+    @Suppress("DEPRECATION")
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val newUrl = if (url.contains("/e/")) url else url.replace("/d/", "/e/")
         val response = app.get(newUrl, referer = referer).text
         val doodToken = response.substringAfter("'/pass_md5/").substringBefore("',")
         val md5PassUrl = "https://${mainUrl}/pass_md5/$doodToken"
         val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z" // "z" is a random string
-        // Suppress the deprecation warning to allow the build to complete.
-        @Suppress("DEPRECATION")
         callback.invoke(
             ExtractorLink(
                 source = this.name,
@@ -87,6 +87,8 @@ private class Mixdrop : ExtractorApi() {
     override var mainUrl = "mixdrop.co"
     override val requiresReferer = true
 
+    // Suppress the deprecation warning on the entire function to ensure the build completes.
+    @Suppress("DEPRECATION")
     override suspend fun getUrl(
         url: String,
         referer: String?,
@@ -99,8 +101,6 @@ private class Mixdrop : ExtractorApi() {
             val unpacked = getAndUnpack(script)
             val videoUrl = Regex("""MDCore\.wurl="([^"]+)""").find(unpacked)?.groupValues?.get(1)
             if (videoUrl != null) {
-                // Suppress the deprecation warning to allow the build to complete.
-                @Suppress("DEPRECATION")
                 callback.invoke(
                     ExtractorLink(
                         source = this.name,
