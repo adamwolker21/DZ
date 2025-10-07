@@ -282,32 +282,33 @@ class EgyDeadProvider : MainAPI() {
     // --- END OF INNER EXTRACTORS ---
 
     private suspend fun processServer(
-        serverLi: Element,
-        data: String,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ) {
-        val link = serverLi.attr("data-link")
-        if (link.isNotBlank()) {
-            val matchingExtractor = extractorList.find { ext ->
-                if (ext is PackedExtractor) {
-                    ext.a(link)
-                } else {
-                    link.contains(ext.mainUrl, true)
-                }
+    serverLi: Element,
+    data: String,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+) {
+    val link = serverLi.attr("data-link")
+    if (link.isNotBlank()) {
+        val matchingExtractor = extractorList.find { ext ->
+            if (ext is PackedExtractor) {
+                ext.a(link)
+            } else {
+                link.contains(ext.mainUrl, true)
             }
+        }
 
-            try {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            kotlin.runCatching {
                 if (matchingExtractor != null) {
-                    val links = matchingExtractor.getUrl(link, data)
-                    links?.forEach(callback)
+                    matchingExtractor.getUrl(link, data)?.forEach(callback)
                 } else {
                     loadExtractor(link, data, subtitleCallback, callback)
                 }
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 e.printStackTrace()
             }
         }
+    }
     }
 
     override suspend fun loadLinks(
