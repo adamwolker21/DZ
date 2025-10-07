@@ -175,22 +175,21 @@ class EgyDeadProvider : MainAPI() {
         override var mainUrl = domains[0]
         override val requiresReferer = false
 
-        override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
+        override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
             val doc = app.get(url, referer = referer).document
             val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
             if (packedJs != null) {
                 val unpacked = getAndUnpack(packedJs)
                 val m3u8Link = Regex("""(https?:\/\/[^\s'"]*master\.m3u8[^\s'"]*)""").find(unpacked)?.groupValues?.get(1)
                 if (m3u8Link != null) {
-                    return M3u8Helper.generateM3u8(
+                    M3u8Helper.generateM3u8(
                         this.name,
                         m3u8Link,
                         url, // referer
                         headers = emptyMap()
-                    )
+                    ).forEach(callback)
                 }
             }
-            return null
         }
 
         fun a(link: String): Boolean {
@@ -206,16 +205,21 @@ class EgyDeadProvider : MainAPI() {
         override var mainUrl = "forafile.com"
         override val requiresReferer = false
 
-        override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
+        override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
             val document = app.get(url).document
             val videoUrl = document.selectFirst("source, video")?.attr("src")
             if (videoUrl != null && videoUrl.endsWith(".mp4")) {
-                 return listOf(newExtractorLink(this.name, this.name, videoUrl, ExtractorLinkType.STREAM) {
-                    this.referer = mainUrl
-                    this.quality = Qualities.Unknown.value
-                })
+                 callback.invoke(
+                    ExtractorLink(
+                        this.name,
+                        this.name,
+                        videoUrl,
+                        mainUrl, // referer
+                        Qualities.Unknown.value,
+                        false // isM3u8
+                    )
+                )
             }
-            return null
         }
     }
     
@@ -224,32 +228,29 @@ class EgyDeadProvider : MainAPI() {
         override var mainUrl = "bigwarp.pro"
         override val requiresReferer = false
 
-        override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
+        override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
             val doc = app.get(url).document
-            val jwplayerScript = doc.selectFirst("script:containsData(jwplayer(\"vplayer\").setup)")?.data() ?: return null
+            val jwplayerScript = doc.selectFirst("script:containsData(jwplayer(\"vplayer\").setup)")?.data() ?: return
 
             val sourcesRegex = Regex("""sources:\s*\[(.+?)\]""")
-            val sourcesBlock = sourcesRegex.find(jwplayerScript)?.groupValues?.get(1) ?: return null
+            val sourcesBlock = sourcesRegex.find(jwplayerScript)?.groupValues?.get(1) ?: return
 
-            val links = mutableListOf<ExtractorLink>()
             val fileRegex = Regex("""\{file:"([^"]+)",label:"([^"]+)"\}""")
-
             fileRegex.findAll(sourcesBlock).forEach { match ->
                 val videoUrl = match.groupValues[1]
                 val qualityLabel = match.groupValues[2]
                 val quality = qualityLabel.getQualityFromString()
-                val link = newExtractorLink(
-                    this.name,
-                    "${this.name} ${qualityLabel}",
-                    videoUrl,
-                    if (videoUrl.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.STREAM
-                ) {
-                    this.referer = mainUrl
-                    this.quality = quality
-                }
-                links.add(link)
+                callback.invoke(
+                     ExtractorLink(
+                        this.name,
+                        "${this.name} ${qualityLabel}",
+                        videoUrl,
+                        mainUrl, // referer
+                        quality,
+                        videoUrl.contains(".m3u8") // isM3u8
+                    )
+                )
             }
-            return links
         }
     }
     
@@ -258,9 +259,9 @@ class EgyDeadProvider : MainAPI() {
         override var mainUrl = "listeamed.net"
         override val requiresReferer = false
 
-        override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
+        override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
             val doc = app.get(url, referer = referer).document
-            val iframeSrc = doc.selectFirst("iframe")?.attr("src") ?: return null
+            val iframeSrc = doc.selectFirst("iframe")?.attr("src") ?: return
 
             val playerDoc = app.get(iframeSrc, referer = url).document
             val packedJs = playerDoc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
@@ -268,18 +269,16 @@ class EgyDeadProvider : MainAPI() {
                 val unpacked = getAndUnpack(packedJs)
                 val m3u8Link = Regex("""(https?:\/\/[^\s'"]*master\.m3u8[^\s'"]*)""").find(unpacked)?.groupValues?.get(1)
                 if (m3u8Link != null) {
-                    return M3u8Helper.generateM3u8(
+                    M3u8Helper.generateM3u8(
                         this.name,
                         m3u8Link,
                         iframeSrc,
                         headers = emptyMap()
-                    )
+                    ).forEach(callback)
                 }
             }
-            return null
         }
     }
-
 
     // --- END OF INNER EXTRACTORS ---
 
@@ -301,7 +300,7 @@ class EgyDeadProvider : MainAPI() {
                 }
 
                 if (matchingExtractor != null) {
-                    matchingExtractor.getUrl(link, data)?.forEach(callback)
+                    matchingExtractor.getUrl(link, data, subtitleCallback, callback)
                 } else {
                     loadExtractor(link, data, subtitleCallback, callback)
                 }
