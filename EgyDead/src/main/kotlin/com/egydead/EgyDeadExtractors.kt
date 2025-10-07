@@ -7,7 +7,6 @@ import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.utils.httpsify
 import com.lagradost.cloudstream3.utils.loadExtractor
-import com.lagradost.cloudstream3.newExtractorLink
 
 // A list to hold all our extractors
 val extractorList = listOf(
@@ -29,10 +28,8 @@ private class StreamHG : ExtractorApi() {
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val doc = app.get(url, referer = referer).document
-        // Find the packed JS code
         val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
-            // Unpack it to reveal the real source link
             val unpacked = getAndUnpack(packedJs)
             val m3u8Link = Regex("""sources:\[\{file:"(.*?)"\}\]""").find(unpacked)?.groupValues?.get(1)
             if (m3u8Link != null) {
@@ -50,7 +47,6 @@ private class Forafile : ExtractorApi() {
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val document = app.get(url, referer = referer).document
-        // Find the direct video link in the <source> tag
         val videoUrl = document.selectFirst("source")?.attr("src")
         if (videoUrl != null) {
              loadExtractor(videoUrl, referer, subtitleCallback, callback)
@@ -62,8 +58,8 @@ private class Forafile : ExtractorApi() {
 private class DoodStream : ExtractorApi() {
     override var name = "DoodStream"
     override var mainUrl = "dood.stream"
-    // DoodStream can have multiple domains
-    override val otherDomains = listOf("dood.la", "dood.pm", "dood.to", "dood.so", "dood.cx", "dood.watch")
+    // Using the older 'otherNames' property for compatibility
+    override val otherNames = listOf("dood.la", "dood.pm", "dood.to", "dood.so", "dood.cx", "dood.watch")
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
@@ -73,15 +69,15 @@ private class DoodStream : ExtractorApi() {
         val md5PassUrl = "https://${mainUrl}/pass_md5/$doodToken"
         val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z" // "z" is a random string
         callback.invoke(
-            newExtractorLink(
+            // Using the deprecated ExtractorLink constructor for compatibility
+            ExtractorLink(
                 source = this.name,
                 name = this.name,
                 url = trueUrl,
                 referer = newUrl,
-                quality = 1080, // Doodstream doesn't provide quality, so we assume a high one
-            ) {
-                this.isM3u8 = trueUrl.contains(".m3u8")
-            }
+                quality = 1080,
+                isM3u8 = trueUrl.contains(".m3u8")
+            )
         )
     }
 }
@@ -99,23 +95,21 @@ private class Mixdrop : ExtractorApi() {
         callback: (ExtractorLink) -> Unit
     ) {
         val res = app.get(url, referer = referer).document
-        // Find packed javascript
         val script = res.selectFirst("script:containsData(eval(function(p,a,c,k,e,d)))")?.data()
         if (script != null) {
             val unpacked = getAndUnpack(script)
-            // Extract the video URL
             val videoUrl = Regex("""MDCore\.wurl="([^"]+)""").find(unpacked)?.groupValues?.get(1)
             if (videoUrl != null) {
                 callback.invoke(
-                    newExtractorLink(
+                    // Using the deprecated ExtractorLink constructor for compatibility
+                    ExtractorLink(
                         source = this.name,
                         name = this.name,
                         url = "https:${videoUrl}",
                         referer = url,
-                        quality = 720, // Mixdrop doesn't provide quality, so we assume a standard one
-                    ) {
-                        this.isM3u8 = videoUrl.contains(".m3u8")
-                    }
+                        quality = 720,
+                        isM3u8 = videoUrl.contains(".m3u8")
+                    )
                 )
             }
         }
