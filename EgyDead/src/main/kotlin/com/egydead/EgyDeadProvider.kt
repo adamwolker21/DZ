@@ -5,6 +5,8 @@ import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.utils.M3u8Helper
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -277,7 +279,6 @@ class EgyDeadProvider : MainAPI() {
         }
     }
 
-
     // --- END OF INNER EXTRACTORS ---
 
     override suspend fun loadLinks(
@@ -285,22 +286,26 @@ class EgyDeadProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val watchPageDoc = getWatchPage(data) ?: return false
-        
-        watchPageDoc.select("div.mob-servers li, div.servers-list li").apmap { serverLi ->
-            val link = serverLi.attr("data-link")
-            if (link.isNotBlank()) {
-                val matchingExtractor = extractorList.find { ext ->
-                    if (ext is PackedExtractor) {
-                        ext.a(link)
-                    } else {
-                        link.contains(ext.mainUrl, true)
-                    }
-                }
 
-                if (matchingExtractor != null) {
-                    matchingExtractor.getUrl(link, data)?.forEach(callback)
-                } else {
-                    loadExtractor(link, data, subtitleCallback, callback)
+        coroutineScope {
+            watchPageDoc.select("div.mob-servers li, div.servers-list li").forEach { serverLi ->
+                launch {
+                    val link = serverLi.attr("data-link")
+                    if (link.isNotBlank()) {
+                        val matchingExtractor = extractorList.find { ext ->
+                            if (ext is PackedExtractor) {
+                                ext.a(link)
+                            } else {
+                                link.contains(ext.mainUrl, true)
+                            }
+                        }
+
+                        if (matchingExtractor != null) {
+                            matchingExtractor.getUrl(link, data)?.forEach(callback)
+                        } else {
+                            loadExtractor(link, data, subtitleCallback, callback)
+                        }
+                    }
                 }
             }
         }
