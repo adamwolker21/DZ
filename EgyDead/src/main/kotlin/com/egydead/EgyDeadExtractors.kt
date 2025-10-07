@@ -55,8 +55,6 @@ private class Forafile : ExtractorApi() {
 }
 
 // Extracts from dood.stream domains
-// Suppress the deprecation warning on the entire class to ensure the build completes.
-@Suppress("DEPRECATION")
 private class DoodStream : ExtractorApi() {
     override var name = "DoodStream"
     override var mainUrl = "dood.stream"
@@ -67,23 +65,13 @@ private class DoodStream : ExtractorApi() {
         val response = app.get(newUrl, referer = referer).text
         val doodToken = response.substringAfter("'/pass_md5/").substringBefore("',")
         val md5PassUrl = "https://${mainUrl}/pass_md5/$doodToken"
+        // After getting the final URL, pass it to the helper function.
         val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z" // "z" is a random string
-        callback.invoke(
-            ExtractorLink(
-                source = this.name,
-                name = this.name,
-                url = trueUrl,
-                referer = newUrl,
-                quality = 1080,
-                isM3u8 = trueUrl.contains(".m3u8")
-            )
-        )
+        loadExtractor(trueUrl, newUrl, subtitleCallback, callback)
     }
 }
 
 // Extracts from mixdrop.co
-// Suppress the deprecation warning on the entire class to ensure the build completes.
-@Suppress("DEPRECATION")
 private class Mixdrop : ExtractorApi() {
     override var name = "Mixdrop"
     override var mainUrl = "mixdrop.co"
@@ -101,16 +89,9 @@ private class Mixdrop : ExtractorApi() {
             val unpacked = getAndUnpack(script)
             val videoUrl = Regex("""MDCore\.wurl="([^"]+)""").find(unpacked)?.groupValues?.get(1)
             if (videoUrl != null) {
-                callback.invoke(
-                    ExtractorLink(
-                        source = this.name,
-                        name = this.name,
-                        url = "https:${videoUrl}",
-                        referer = url,
-                        quality = 720,
-                        isM3u8 = videoUrl.contains(".m3u8")
-                    )
-                )
+                // After getting the final URL, pass it to the helper function.
+                val finalUrl = "https:${videoUrl}"
+                loadExtractor(finalUrl, url, subtitleCallback, callback)
             }
         }
     }
