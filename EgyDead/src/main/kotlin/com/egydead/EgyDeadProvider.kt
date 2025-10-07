@@ -1,12 +1,15 @@
 package com.egydead
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
+import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import com.lagradost.cloudstream3.utils.M3u8Helper
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -23,12 +26,15 @@ class EgyDeadProvider : MainAPI() {
         "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "أفلام آسيوية",
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
-
-    private fun String.getQualityFromString(): Int {
-        return Regex("(\\d{3,4})[pP]").find(this)?.groupValues?.get(1)?.toIntOrNull()
-            ?: this.toIntOrNull()
-            ?: Qualities.Unknown.value
-    }
+    
+    // The list now references the globally defined extractors from the other file
+    private val extractorList = listOf(
+        StreamHGExtractor(),
+        ForafileExtractor(),
+        BigwarpExtractor(),
+        EarnVidsExtractor(),
+        VidGuardExtractor()
+    )
 
     private suspend fun getWatchPage(url: String): Document? {
         try {
@@ -161,171 +167,33 @@ class EgyDeadProvider : MainAPI() {
         }
     }
     
-    // --- START OF INNER EXTRACTORS ---
-    private val extractorList = listOf(
-        StreamHGExtractor(),
-        ForafileExtractor(),
-        BigwarpExtractor(),
-        EarnVidsExtractor(),
-        VidGuardExtractor()
-    )
-
-    open class PackedExtractor(
-        override var name: String,
-        private vararg val domains: String
-    ) : ExtractorApi() {
-        override var mainUrl = domains[0]
-        override val requiresReferer = false
-
-        override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
-            val doc = app.get(url, referer = referer).document
-            val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
-            if (packedJs != null) {
-                val unpacked = getAndUnpack(packedJs)
-                val m3u8Link = Regex("""(https?:\/\/[^\s'"]*master\.m3u8[^\s'"]*)""").find(unpacked)?.groupValues?.get(1)
-                if (m3u8Link != null) {
-                    return M3u8Helper.generateM3u8(
-                        this.name,
-                        m3u8Link,
-                        url,
-                        headers = emptyMap()
-                    )
-                }
-            }
-            return null
-        }
-
-        fun a(link: String): Boolean {
-            return domains.any { link.contains(it, true) }
-        }
-    }
-
-    inner class StreamHGExtractor : PackedExtractor("StreamHG", "hglink.to", "davioad.com", "haxloppd.com", "kravaxxa.com", "dumbalag.com")
-    inner class EarnVidsExtractor : PackedExtractor("EarnVids", "dingtezuni.com")
-
-    inner class ForafileExtractor : ExtractorApi() {
-        override var name = "Forafile"
-        override var mainUrl = "forafile.com"
-        override val requiresReferer = false
-
-        override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
-            val document = app.get(url).document
-            val videoUrl = document.selectFirst("source, video")?.attr("src")
-            if (videoUrl != null && videoUrl.endsWith(".mp4")) {
-                 return listOf(
-                     newExtractorLink(this.name, this.name, videoUrl, type = ExtractorLinkType.VIDEO) {
-                        this.referer = mainUrl
-                        this.quality = Qualities.Unknown.value
-                    }
-                 )
-            }
-            return null
-        }
-    }
-    
-    inner class BigwarpExtractor : ExtractorApi() {
-        override var name = "Bigwarp"
-        override var mainUrl = "bigwarp.pro"
-        override val requiresReferer = false
-
-        override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
-            val doc = app.get(url).document
-            val jwplayerScript = doc.selectFirst("script:containsData(jwplayer(\"vplayer\").setup)")?.data() ?: return null
-
-            val sourcesRegex = Regex("""sources:\s*\[(.+?)\]""")
-            val sourcesBlock = sourcesRegex.find(jwplayerScript)?.groupValues?.get(1) ?: return null
-
-            val fileRegex = Regex("""\{file:"([^"]+)",label:"([^"]+)"\}""")
-            return fileRegex.findAll(sourcesBlock).map { match ->
-                val videoUrl = match.groupValues[1]
-                val qualityLabel = match.groupValues[2]
-                newExtractorLink(
-                    this.name,
-                    "${this.name} ${qualityLabel}",
-                    videoUrl,
-                    type = if (videoUrl.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                ) {
-                    this.referer = mainUrl
-                    this.quality = qualityLabel.getQualityFromString()
-                }
-            }.toList()
-        }
-    }
-    
-    inner class VidGuardExtractor : ExtractorApi() {
-        override var name = "VidGuard"
-        override var mainUrl = "listeamed.net"
-        override val requiresReferer = false
-
-        override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
-            val doc = app.get(url, referer = referer).document
-            val iframeSrc = doc.selectFirst("iframe")?.attr("src") ?: return null
-
-            val playerDoc = app.get(iframeSrc, referer = url).document
-            val packedJs = playerDoc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
-            if (packedJs != null) {
-                val unpacked = getAndUnpack(packedJs)
-                val m3u8Link = Regex("""(https?:\/\/[^\s'"]*master\.m3u8[^\s'"]*)""").find(unpacked)?.groupValues?.get(1)
-                if (m3u8Link != null) {
-                    return M3u8Helper.generateM3u8(
-                        this.name,
-                        m3u8Link,
-                        iframeSrc,
-                        headers = emptyMap()
-                    )
-                }
-            }
-            return null
-        }
-    }
-
-    // --- END OF INNER EXTRACTORS ---
-
-private suspend fun processServer(
-    serverLi: Element,
-    data: String,
-    subtitleCallback: (SubtitleFile) -> Unit,
-    callback: (ExtractorLink) -> Unit
-) {
-    val link = serverLi.attr("data-link")
-    if (link.isNotBlank()) {
-        val matchingExtractor = extractorList.find { ext ->
-            if (ext is PackedExtractor) {
-                ext.a(link)
-            } else {
-                link.contains(ext.mainUrl, true)
-            }
-        }
-
-        // إضافة withContext هنا
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                if (matchingExtractor != null) {
-                    matchingExtractor.getUrl(link, data)?.forEach(callback)
-                } else {
-                    loadExtractor(link, data, subtitleCallback, callback)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-}
-
     override suspend fun loadLinks(
-        data: String, 
-        isCasting: Boolean, 
-        subtitleCallback: (SubtitleFile) -> Unit,
+        data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        val watchPageDoc = getWatchPage(data) ?: return false
+    ): Boolean = coroutineScope {
+        val watchPageDoc = getWatchPage(data) ?: return@coroutineScope false
 
-        val servers = watchPageDoc.select("div.mob-servers li, div.servers-list li")
-        
-        for (serverLi in servers) {
-            processServer(serverLi, data, subtitleCallback, callback)
-        }
-        
-        return true
+        watchPageDoc.select("div.mob-servers li, div.servers-list li").map { serverLi ->
+            async(Dispatchers.IO) {
+                val link = serverLi.attr("data-link")
+                if (link.isNotBlank()) {
+                    val matchingExtractor = extractorList.find { ext ->
+                         if (ext is PackedExtractor) {
+                             ext.domains.any { link.contains(it, true) }
+                         } else {
+                             link.contains(ext.mainUrl, true)
+                         }
+                    }
+
+                    if (matchingExtractor != null) {
+                        matchingExtractor.getUrl(link, data)?.forEach(callback)
+                    } else {
+                        loadExtractor(link, data, subtitleCallback, callback)
+                    }
+                }
+            }
+        }.awaitAll()
+
+        return@coroutineScope true
     }
 }
