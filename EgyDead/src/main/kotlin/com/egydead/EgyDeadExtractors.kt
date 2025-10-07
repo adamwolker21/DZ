@@ -58,8 +58,6 @@ private class Forafile : ExtractorApi() {
 private class DoodStream : ExtractorApi() {
     override var name = "DoodStream"
     override var mainUrl = "dood.stream"
-    // We removed 'otherNames' as it was causing a build error.
-    // The check for other domains is now handled in the provider's 'loadLinks' function.
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
@@ -68,8 +66,9 @@ private class DoodStream : ExtractorApi() {
         val doodToken = response.substringAfter("'/pass_md5/").substringBefore("',")
         val md5PassUrl = "https://${mainUrl}/pass_md5/$doodToken"
         val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z" // "z" is a random string
+        // Suppress the deprecation warning to allow the build to complete.
+        @Suppress("DEPRECATION")
         callback.invoke(
-            // Using the deprecated ExtractorLink constructor as the new one is not available in the build environment.
             ExtractorLink(
                 source = this.name,
                 name = this.name,
@@ -100,8 +99,9 @@ private class Mixdrop : ExtractorApi() {
             val unpacked = getAndUnpack(script)
             val videoUrl = Regex("""MDCore\.wurl="([^"]+)""").find(unpacked)?.groupValues?.get(1)
             if (videoUrl != null) {
+                // Suppress the deprecation warning to allow the build to complete.
+                @Suppress("DEPRECATION")
                 callback.invoke(
-                    // Using the deprecated ExtractorLink constructor for compatibility.
                     ExtractorLink(
                         source = this.name,
                         name = this.name,
