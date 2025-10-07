@@ -22,6 +22,14 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
+    // Helper function to extract quality from text
+    // دالة مساعدة لاستخراج الجودة من النص
+    private fun String.getQualityFromString(): Int {
+        return Regex("(\\d{3,4})[pP]").find(this)?.groupValues?.get(1)?.toIntOrNull()
+            ?: this.toIntOrNull()
+            ?: Qualities.Unknown.value
+    }
+
     private suspend fun getWatchPage(url: String): Document? {
         try {
             val initialResponse = app.get(url)
@@ -204,11 +212,12 @@ class EgyDeadProvider : MainAPI() {
             if (videoUrl != null && videoUrl.endsWith(".mp4")) {
                  callback.invoke(
                     newExtractorLink(
-                        source = this.name,
-                        name = this.name,
-                        url = videoUrl,
-                        referer = "",
-                        quality = Qualities.Unknown.value
+                        this.name,
+                        this.name,
+                        videoUrl,
+                        mainUrl, // referer
+                        Qualities.Unknown.value, // quality
+                        false // isM3u8
                     )
                 )
             }
@@ -234,12 +243,12 @@ class EgyDeadProvider : MainAPI() {
                 val quality = qualityLabel.getQualityFromString()
                 callback.invoke(
                      newExtractorLink(
-                        source = this.name,
-                        name = "${this.name} ${qualityLabel}",
-                        url = videoUrl,
-                        referer = "",
-                        quality = quality,
-                        isM3u8 = videoUrl.contains(".m3u8")
+                        this.name,
+                        "${this.name} ${qualityLabel}",
+                        videoUrl,
+                        mainUrl, // referer
+                        quality,
+                        videoUrl.contains(".m3u8") // isM3u8
                     )
                 )
             }
