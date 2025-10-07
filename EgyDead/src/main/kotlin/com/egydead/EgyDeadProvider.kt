@@ -285,7 +285,7 @@ class EgyDeadProvider : MainAPI() {
     ): Boolean {
         val watchPageDoc = getWatchPage(data) ?: return false
 
-        watchPageDoc.select("div.mob-servers li, div.servers-list li").forEach { serverLi ->
+        for (serverLi in watchPageDoc.select("div.mob-servers li, div.servers-list li")) {
             val link = serverLi.attr("data-link")
             if (link.isNotBlank()) {
                 val matchingExtractor = extractorList.find { ext ->
