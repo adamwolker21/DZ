@@ -279,6 +279,30 @@ class EgyDeadProvider : MainAPI() {
 
     // --- END OF INNER EXTRACTORS ---
 
+    private suspend fun processServer(
+        serverLi: Element,
+        data: String,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        val link = serverLi.attr("data-link")
+        if (link.isNotBlank()) {
+            val matchingExtractor = extractorList.find { ext ->
+                if (ext is PackedExtractor) {
+                    ext.a(link)
+                } else {
+                    link.contains(ext.mainUrl, true)
+                }
+            }
+
+            if (matchingExtractor != null) {
+                matchingExtractor.getUrl(link, data)?.forEach(callback)
+            } else {
+                loadExtractor(link, data, subtitleCallback, callback)
+            }
+        }
+    }
+
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
@@ -286,22 +310,7 @@ class EgyDeadProvider : MainAPI() {
         val watchPageDoc = getWatchPage(data) ?: return false
 
         for (serverLi in watchPageDoc.select("div.mob-servers li, div.servers-list li")) {
-            val link = serverLi.attr("data-link")
-            if (link.isNotBlank()) {
-                val matchingExtractor = extractorList.find { ext ->
-                    if (ext is PackedExtractor) {
-                        ext.a(link)
-                    } else {
-                        link.contains(ext.mainUrl, true)
-                    }
-                }
-
-                if (matchingExtractor != null) {
-                    matchingExtractor.getUrl(link, data)?.forEach(callback)
-                } else {
-                    loadExtractor(link, data, subtitleCallback, callback)
-                }
-            }
+            processServer(serverLi, data, subtitleCallback, callback)
         }
         return true
     }
