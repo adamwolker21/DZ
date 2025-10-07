@@ -18,7 +18,7 @@ class EgyDeadProvider : MainAPI() {
     override val mainPage = mainPageOf(
         "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-%d8%a7%d9%88%d9%86%d9%84%d8%a7%d9%8a%d9%86/" to "أفلام أجنبي",
         "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "أفلام آسيوية",
-        "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
+        "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8-a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
     private suspend fun getWatchPage(url: String): Document? {
@@ -162,7 +162,7 @@ class EgyDeadProvider : MainAPI() {
             val link = serverLi.attr("data-link")
             if (link.isNotBlank()) {
                 // Now we use the global list from EgyDeadExtractors.kt
-                val matchingExtractor = extractorList.find { link.contains(it.mainUrl) || it.otherNames?.any { name -> link.contains(name) } == true }
+                val matchingExtractor = extractorList.find { link.contains(it.mainUrl) || it.otherDomains?.any { domain -> link.contains(domain) } == true }
                 if (matchingExtractor != null) {
                     matchingExtractor.getUrl(link, data, subtitleCallback, callback)
                 } else {
