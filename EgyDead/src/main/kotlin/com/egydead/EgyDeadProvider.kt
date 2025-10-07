@@ -210,15 +210,10 @@ class EgyDeadProvider : MainAPI() {
             val document = app.get(url).document
             val videoUrl = document.selectFirst("source, video")?.attr("src")
             if (videoUrl != null && videoUrl.endsWith(".mp4")) {
-                 return listOf(newExtractorLink(
-                        this.name,
-                        this.name,
-                        videoUrl,
-                        mainUrl, // referer
-                        Qualities.Unknown.value,
-                        ExtractorLinkType.DOWNLOADABLE
-                    )
-                )
+                 return listOf(newExtractorLink(this.name, this.name, videoUrl, ExtractorLinkType.STREAM) {
+                    this.referer = mainUrl
+                    this.quality = Qualities.Unknown.value
+                })
             }
             return null
         }
@@ -236,20 +231,25 @@ class EgyDeadProvider : MainAPI() {
             val sourcesRegex = Regex("""sources:\s*\[(.+?)\]""")
             val sourcesBlock = sourcesRegex.find(jwplayerScript)?.groupValues?.get(1) ?: return null
 
+            val links = mutableListOf<ExtractorLink>()
             val fileRegex = Regex("""\{file:"([^"]+)",label:"([^"]+)"\}""")
-            return fileRegex.findAll(sourcesBlock).map { match ->
+
+            fileRegex.findAll(sourcesBlock).forEach { match ->
                 val videoUrl = match.groupValues[1]
                 val qualityLabel = match.groupValues[2]
                 val quality = qualityLabel.getQualityFromString()
-                newExtractorLink(
+                val link = newExtractorLink(
                     this.name,
                     "${this.name} ${qualityLabel}",
                     videoUrl,
-                    mainUrl, // referer
-                    quality,
-                    if (videoUrl.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.DOWNLOADABLE
-                )
-            }.toList()
+                    if (videoUrl.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.STREAM
+                ) {
+                    this.referer = mainUrl
+                    this.quality = quality
+                }
+                links.add(link)
+            }
+            return links
         }
     }
     
