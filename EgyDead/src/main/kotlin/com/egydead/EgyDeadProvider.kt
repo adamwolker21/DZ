@@ -18,13 +18,18 @@ class EgyDeadProvider : MainAPI() {
     override val mainPage = mainPageOf(
         "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-%d8%a7%d9%88%d9%86%d9%84%d8%a7%d9%8a%d9%86/" to "أفلام أجنبي",
         "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "أفلام آسيوية",
-        "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8-a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
+        "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
+    /**
+     * This function handles the "Watch and Download" button logic.
+     * It performs a POST request to reveal the server links.
+     */
     private suspend fun getWatchPage(url: String): Document? {
         try {
             val initialResponse = app.get(url)
             val document = initialResponse.document
+            // Check if the button form exists on the page
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
                 val headers = mapOf(
@@ -32,14 +37,12 @@ class EgyDeadProvider : MainAPI() {
                     "Referer" to url,
                     "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
                     "Origin" to mainUrl,
-                    "sec-fetch-dest" to "document",
-                    "sec-fetch-mode" to "navigate",
-                    "sec-fetch-site" to "same-origin",
-                    "sec-fetch-user" to "?1"
                 )
                 val data = mapOf("View" to "1")
+                // Perform the POST request to get the real watch page with servers
                 return app.post(url, headers = headers, data = data, cookies = cookies).document
             }
+            // If no button is found, return the initial document
             return document
         } catch (e: Exception) {
             e.printStackTrace()
@@ -97,7 +100,7 @@ class EgyDeadProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
-        
+
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
         val plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
@@ -120,11 +123,11 @@ class EgyDeadProvider : MainAPI() {
                     this.episode = epNum
                 }
             }.distinctBy { it.episode }.toMutableList()
-            
+
             val seriesTitle = pageTitle
                 .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
                 .trim()
-            
+
             val currentEpNum = pageTitle.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
             if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
                  episodes.add(newEpisode(url) {
@@ -132,7 +135,7 @@ class EgyDeadProvider : MainAPI() {
                     this.episode = currentEpNum
                 })
             }
-            
+
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
                 this.posterUrl = posterUrl
                 this.plot = plot
@@ -156,33 +159,15 @@ class EgyDeadProvider : MainAPI() {
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        // Use our new function to get the correct page document
         val watchPageDoc = getWatchPage(data) ?: return false
 
-        // A hardcoded list of DoodStream's alternative domains.
-        val doodDomains = listOf("dood.la", "dood.pm", "dood.to", "dood.so", "dood.cx", "dood.watch")
-        
+        // Select server links from the correct container and attribute
         watchPageDoc.select("div.mob-servers li").apmap { serverLi ->
             val link = serverLi.attr("data-link")
             if (link.isNotBlank()) {
-                val matchingExtractor = extractorList.find { extractor ->
-                    // Check if the link contains the extractor's main URL.
-                    val mainUrlMatch = link.contains(extractor.mainUrl)
-                    
-                    // As a special case for DoodStream, check its other domains as well.
-                    val doodMatch = if (extractor.name == "DoodStream") {
-                        doodDomains.any { domain -> link.contains(domain) }
-                    } else {
-                        false
-                    }
-                    
-                    mainUrlMatch || doodMatch
-                }
-
-                if (matchingExtractor != null) {
-                    matchingExtractor.getUrl(link, data, subtitleCallback, callback)
-                } else {
-                    loadExtractor(link, data, subtitleCallback, callback)
-                }
+                // Find a matching extractor from our list and invoke it
+                extractorList.find { extractor -> link.contains(extractor.mainUrl) }?.getUrl(link, data, subtitleCallback, callback)
             }
         }
         return true
