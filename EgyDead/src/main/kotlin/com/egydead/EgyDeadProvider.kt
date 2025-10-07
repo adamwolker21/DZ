@@ -154,7 +154,6 @@ class EgyDeadProvider : MainAPI() {
     }
     
     // --- START OF INNER EXTRACTORS ---
-    // قائمة المستخرجات المحدثة
     private val extractorList = listOf(
         StreamHGExtractor(),
         ForafileExtractor(),
@@ -163,11 +162,9 @@ class EgyDeadProvider : MainAPI() {
         VidGuardExtractor()
     )
 
-    // A generic packed JS extractor for servers like StreamHG, EarnVids, etc.
-    // مستخرج عام للسيرفرات التي تستخدم كود جافاسكريبت مشفر
     open class PackedExtractor(
         override var name: String,
-        private vararg val domains: String // Accept multiple domains
+        private vararg val domains: String
     ) : ExtractorApi() {
         override var mainUrl = domains[0]
         override val requiresReferer = false
@@ -182,20 +179,17 @@ class EgyDeadProvider : MainAPI() {
                     M3u8Helper.generateM3u8(
                         this.name,
                         m3u8Link,
-                        url // Use the page URL as referer for the M3U8 file
+                        url
                     ).forEach(callback)
                 }
             }
         }
 
-        // Helper to check if a URL belongs to this extractor
         fun a(link: String): Boolean {
             return domains.any { link.contains(it, true) }
         }
     }
 
-    // Specific extractor implementations using the generic PackedExtractor
-    // تطبيقات محددة للمستخرجات باستخدام المستخرج العام
     inner class StreamHGExtractor : PackedExtractor("StreamHG", "hglink.to", "davioad.com", "haxloppd.com", "kravaxxa.com", "dumbalag.com")
     inner class EarnVidsExtractor : PackedExtractor("EarnVids", "dingtezuni.com")
 
@@ -206,18 +200,15 @@ class EgyDeadProvider : MainAPI() {
 
         override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
             val document = app.get(url).document
-            // Find the direct video link in the <source> or <video> tag
-            // البحث عن رابط الفيديو المباشر
             val videoUrl = document.selectFirst("source, video")?.attr("src")
             if (videoUrl != null && videoUrl.endsWith(".mp4")) {
                  callback.invoke(
-                    ExtractorLink(
-                        this.name,
-                        this.name,
-                        videoUrl,
-                        "",
-                        Qualities.Unknown.value,
-                        isM3u8 = false
+                    newExtractorLink(
+                        source = this.name,
+                        name = this.name,
+                        url = videoUrl,
+                        referer = "",
+                        quality = Qualities.Unknown.value
                     )
                 )
             }
@@ -240,15 +231,14 @@ class EgyDeadProvider : MainAPI() {
             fileRegex.findAll(sourcesBlock).forEach { match ->
                 val videoUrl = match.groupValues[1]
                 val qualityLabel = match.groupValues[2]
-                // Extract quality from label like "1920x1036" -> 1036
-                val quality = qualityLabel.substringAfter("x").substringBefore(" ").toIntOrNull() ?: Qualities.Unknown.value
+                val quality = qualityLabel.getQualityFromString()
                 callback.invoke(
-                    ExtractorLink(
-                        this.name,
-                        "${this.name} ${quality}p",
-                        videoUrl,
-                        "",
-                        quality,
+                     newExtractorLink(
+                        source = this.name,
+                        name = "${this.name} ${qualityLabel}",
+                        url = videoUrl,
+                        referer = "",
+                        quality = quality,
                         isM3u8 = videoUrl.contains(".m3u8")
                     )
                 )
@@ -265,8 +255,6 @@ class EgyDeadProvider : MainAPI() {
             val doc = app.get(url, referer = referer).document
             val iframeSrc = doc.selectFirst("iframe")?.attr("src") ?: return
 
-            // Now, the logic is the same as the PackedExtractor
-            // الآن، المنطق هو نفسه الخاص بالمستخرج العام
             val playerDoc = app.get(iframeSrc, referer = url).document
             val packedJs = playerDoc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
             if (packedJs != null) {
@@ -276,7 +264,7 @@ class EgyDeadProvider : MainAPI() {
                     M3u8Helper.generateM3u8(
                         this.name,
                         m3u8Link,
-                        iframeSrc // referer for the m3u8
+                        iframeSrc
                     ).forEach(callback)
                 }
             }
@@ -286,21 +274,15 @@ class EgyDeadProvider : MainAPI() {
 
     // --- END OF INNER EXTRACTORS ---
 
-    // Final corrected 'loadLinks' function
-    // دالة `loadLinks` النهائية والمصححة
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val watchPageDoc = getWatchPage(data) ?: return false
         
-        // Searching in multiple possible locations to make it more robust
-        // البحث في أماكن متعددة محتملة لجعله أكثر قوة
         watchPageDoc.select("div.mob-servers li, div.servers-list li").apmap { serverLi ->
             val link = serverLi.attr("data-link")
             if (link.isNotBlank()) {
-                // Find the first matching extractor based on its mainUrl or defined domains
-                // العثور على أول مستخرج مطابق
                 val matchingExtractor = extractorList.find { ext ->
                     if (ext is PackedExtractor) {
                         ext.a(link)
@@ -312,8 +294,6 @@ class EgyDeadProvider : MainAPI() {
                 if (matchingExtractor != null) {
                     matchingExtractor.getUrl(link, data, subtitleCallback, callback)
                 } else {
-                    // Fallback for other extractors like DoodStream, Mixdrop, etc.
-                    // خيار احتياطي للمستخرجات الأخرى
                     loadExtractor(link, data, subtitleCallback, callback)
                 }
             }
