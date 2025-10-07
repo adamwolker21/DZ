@@ -3,119 +3,118 @@ package com.egydead
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
-import com.lagradost.cloudstream3.utils.M3u8Helper
-import com.lagradost.cloudstream3.ExtractorLinkType
-import com.lagradost.cloudstream3.Qualities
-import com.lagradost.cloudstream3.newExtractorLink
+import com.lagradost.cloudstream3.utils.httpsify
+import com.lagradost.cloudstream3.utils.loadExtractor
 
-private fun String.getQualityFromString(): Int {
-    return Regex("(\\d{3,4})[pP]").find(this)?.groupValues?.get(1)?.toIntOrNull()
-        ?: this.toIntOrNull()
-        ?: Qualities.Unknown.value
-}
+// A list to hold all our extractors
+val extractorList = listOf(
+    StreamHG(),
+    Forafile(),
+    DoodStream(),
+    Mixdrop(),
+    // TODO: Implement the following extractors
+    // BigWarp(),
+    // EarnVids(),
+    // VidGuard(),
+)
 
-open class PackedExtractor(
-    override var name: String,
-    vararg val domains: String
-) : ExtractorApi() {
-    override var mainUrl = domains[0]
-    override val requiresReferer = false
+// Extracts from streamhg.org / hglink.to
+private class StreamHG : ExtractorApi() {
+    override var name = "StreamHG"
+    override var mainUrl = "hglink.to"
+    override val requiresReferer = true
 
-    override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val doc = app.get(url, referer = referer).document
+        // Find the packed JS code
         val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
+            // Unpack it to reveal the real source link
             val unpacked = getAndUnpack(packedJs)
-            val m3u8Link = Regex("""(https?:\/\/[^\s'"]*master\.m3u8[^\s'"]*)""").find(unpacked)?.groupValues?.get(1)
+            val m3u8Link = Regex("""sources:\[\{file:"(.*?)"\}\]""").find(unpacked)?.groupValues?.get(1)
             if (m3u8Link != null) {
-                return M3u8Helper.generateM3u8(
-                    this.name,
-                    m3u8Link,
-                    url,
-                    headers = emptyMap()
-                )
+                loadExtractor(httpsify(m3u8Link), referer, subtitleCallback, callback)
             }
         }
-        return null
     }
 }
 
-class StreamHGExtractor : PackedExtractor("StreamHG", "hglink.to", "davioad.com", "haxloppd.com", "kravaxxa.com", "dumbalag.com")
-class EarnVidsExtractor : PackedExtractor("EarnVids", "dingtezuni.com")
-
-class ForafileExtractor : ExtractorApi() {
+// Extracts from forafile.com
+private class Forafile : ExtractorApi() {
     override var name = "Forafile"
     override var mainUrl = "forafile.com"
-    override val requiresReferer = false
+    override val requiresReferer = true
 
-    override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
-        val document = app.get(url).document
-        val videoUrl = document.selectFirst("source, video")?.attr("src")
-        if (videoUrl != null && videoUrl.endsWith(".mp4")) {
-             return listOf(
-                 newExtractorLink(this.name, this.name, videoUrl, type = ExtractorLinkType.VIDEO) {
-                    this.referer = mainUrl
-                    this.quality = Qualities.Unknown.value
-                }
-             )
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        val document = app.get(url, referer = referer).document
+        // Find the direct video link in the <source> tag
+        val videoUrl = document.selectFirst("source")?.attr("src")
+        if (videoUrl != null) {
+             loadExtractor(videoUrl, referer, subtitleCallback, callback)
         }
-        return null
     }
 }
 
-class BigwarpExtractor : ExtractorApi() {
-    override var name = "Bigwarp"
-    override var mainUrl = "bigwarp.pro"
-    override val requiresReferer = false
+// Extracts from dood.stream domains
+private class DoodStream : ExtractorApi() {
+    override var name = "DoodStream"
+    override var mainUrl = "dood.stream"
+    // DoodStream can have multiple domains
+    override val otherNames = listOf("dood.la", "dood.pm", "dood.to", "dood.so", "dood.cx", "dood.watch")
+    override val requiresReferer = true
 
-    override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
-        val doc = app.get(url).document
-        val jwplayerScript = doc.selectFirst("script:containsData(jwplayer(\"vplayer\").setup)")?.data() ?: return null
-
-        val sourcesRegex = Regex("""sources:\s*\[(.+?)\]""")
-        val sourcesBlock = sourcesRegex.find(jwplayerScript)?.groupValues?.get(1) ?: return null
-
-        val fileRegex = Regex("""\{file:"([^"]+)",label:"([^"]+)"\}""")
-        return fileRegex.findAll(sourcesBlock).map { match ->
-            val videoUrl = match.groupValues[1]
-            val qualityLabel = match.groupValues[2]
-            newExtractorLink(
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        val newUrl = if (url.contains("/e/")) url else url.replace("/d/", "/e/")
+        val response = app.get(newUrl, referer = referer).text
+        val doodToken = response.substringAfter("'/pass_md5/").substringBefore("',")
+        val md5PassUrl = "https://${mainUrl}/pass_md5/$doodToken"
+        val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z" // "z" is a random string
+        callback.invoke(
+            ExtractorLink(
                 this.name,
-                "${this.name} ${qualityLabel}",
-                videoUrl,
-                type = if (videoUrl.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-            ) {
-                this.referer = mainUrl
-                this.quality = qualityLabel.getQualityFromString()
-            }
-        }.toList()
+                this.name,
+                trueUrl,
+                newUrl,
+                quality = 1080, // Doodstream doesn't provide quality, so we assume a high one
+                isM3u8 = trueUrl.contains(".m3u8")
+            )
+        )
     }
 }
 
-class VidGuardExtractor : ExtractorApi() {
-    override var name = "VidGuard"
-    override var mainUrl = "listeamed.net"
-    override val requiresReferer = false
+// Extracts from mixdrop.co
+private class Mixdrop : ExtractorApi() {
+    override var name = "Mixdrop"
+    override var mainUrl = "mixdrop.co"
+    override val requiresReferer = true
 
-    override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
-        val doc = app.get(url, referer = referer).document
-        val iframeSrc = doc.selectFirst("iframe")?.attr("src") ?: return null
-
-        val playerDoc = app.get(iframeSrc, referer = url).document
-        val packedJs = playerDoc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
-        if (packedJs != null) {
-            val unpacked = getAndUnpack(packedJs)
-            val m3u8Link = Regex("""(https?:\/\/[^\s'"]*master\.m3u8[^\s'"]*)""").find(unpacked)?.groupValues?.get(1)
-            if (m3u8Link != null) {
-                return M3u8Helper.generateM3u8(
-                    this.name,
-                    m3u8Link,
-                    iframeSrc,
-                    headers = emptyMap()
+    override suspend fun getUrl(
+        url: String,
+        referer: String?,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        val res = app.get(url, referer = referer).document
+        // Find packed javascript
+        val script = res.selectFirst("script:containsData(eval(function(p,a,c,k,e,d)))")?.data()
+        if (script != null) {
+            val unpacked = getAndUnpack(script)
+            // Extract the video URL
+            val videoUrl = Regex("""MDCore\.wurl="([^"]+)""").find(unpacked)?.groupValues?.get(1)
+            if (videoUrl != null) {
+                callback.invoke(
+                    ExtractorLink(
+                        this.name,
+                        this.name,
+                        "https:${videoUrl}",
+                        url,
+                        quality = 720, // Mixdrop doesn't provide quality, so we assume a standard one
+                        isM3u8 = videoUrl.contains(".m3u8")
+                    )
                 )
             }
         }
-        return null
     }
 }
