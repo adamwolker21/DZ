@@ -244,4 +244,88 @@ class EgyDeadProvider : MainAPI() {
                     type = if (videoUrl.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                 ) {
                     this.referer = mainUrl
-                    this.quality
+                    this.quality = qualityLabel.getQualityFromString()
+                }
+            }.toList()
+        }
+    }
+    
+    inner class VidGuardExtractor : ExtractorApi() {
+        override var name = "VidGuard"
+        override var mainUrl = "listeamed.net"
+        override val requiresReferer = false
+
+        override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
+            val doc = app.get(url, referer = referer).document
+            val iframeSrc = doc.selectFirst("iframe")?.attr("src") ?: return null
+
+            val playerDoc = app.get(iframeSrc, referer = url).document
+            val packedJs = playerDoc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
+            if (packedJs != null) {
+                val unpacked = getAndUnpack(packedJs)
+                val m3u8Link = Regex("""(https?:\/\/[^\s'"]*master\.m3u8[^\s'"]*)""").find(unpacked)?.groupValues?.get(1)
+                if (m3u8Link != null) {
+                    return M3u8Helper.generateM3u8(
+                        this.name,
+                        m3u8Link,
+                        iframeSrc,
+                        headers = emptyMap()
+                    )
+                }
+            }
+            return null
+        }
+    }
+
+    // --- END OF INNER EXTRACTORS ---
+
+    private suspend fun processServer(
+        serverLi: Element,
+        data: String,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        val link = serverLi.attr("data-link")
+        if (link.isNotBlank()) {
+            val matchingExtractor = extractorList.find { ext ->
+                if (ext is PackedExtractor) {
+                    ext.a(link)
+                } else {
+                    link.contains(ext.mainUrl, true)
+                }
+            }
+
+            if (matchingExtractor != null) {
+                try {
+                    matchingExtractor.getUrl(link, data)?.forEach(callback)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            } else {
+                try {
+                    loadExtractor(link, data, subtitleCallback, callback)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
+
+    override suspend fun loadLinks(
+        data: String, 
+        isCasting: Boolean, 
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        val watchPageDoc = getWatchPage(data) ?: return false
+
+        val servers = watchPageDoc.select("div.mob-servers li, div.servers-list li")
+        
+        // استخدام حلقة عادية بدلاً من forEach
+        for (serverLi in servers) {
+            processServer(serverLi, data, subtitleCallback, callback)
+        }
+        
+        return true
+    }
+}
