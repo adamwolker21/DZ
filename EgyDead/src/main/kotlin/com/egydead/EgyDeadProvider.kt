@@ -5,6 +5,8 @@ import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.utils.M3u8Helper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -107,12 +109,12 @@ class EgyDeadProvider : MainAPI() {
         
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
         val plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
-        val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
-        val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
-        val duration = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()?.filter { it.isDigit() }?.toIntOrNull()
+        val year = document.selectFirst("li:has(span:contains(Sene)) a")?.text()?.toIntOrNull()
+        val tags = document.select("li:has(span:contains(Tür)) a").map { it.text() }
+        val duration = document.selectFirst("li:has(span:contains(Süre)) a")?.text()?.filter { it.isDigit() }?.toIntOrNull()
 
-        val categoryText = document.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: ""
-        val isSeries = categoryText.contains("مسلسلات") || pageTitle.contains("مسلسل") || pageTitle.contains("الموسم") || document.select("div.EpsList").isNotEmpty()
+        val categoryText = document.selectFirst("li:has(span:contains(Kategori)) a")?.text() ?: ""
+        val isSeries = categoryText.contains("Diziler") || pageTitle.contains("مسلسل") || pageTitle.contains("الموسم") || document.select("div.EpsList").isNotEmpty()
 
         if (isSeries) {
             val episodesDoc = getWatchPage(url) ?: document
@@ -306,12 +308,15 @@ class EgyDeadProvider : MainAPI() {
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        val watchPageDoc = getWatchPage(data) ?: return false
+    ): Boolean = withContext(Dispatchers.IO) {
+        val watchPageDoc = getWatchPage(data)
+        if (watchPageDoc == null) {
+            return@withContext false
+        }
 
         for (serverLi in watchPageDoc.select("div.mob-servers li, div.servers-list li")) {
             processServer(serverLi, data, subtitleCallback, callback)
         }
-        return true
+        return@withContext true
     }
 }
