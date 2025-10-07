@@ -281,13 +281,12 @@ class EgyDeadProvider : MainAPI() {
 
     // --- END OF INNER EXTRACTORS ---
 
-// إزالة suspend واستخدام طريقة غير متزامنة
-private fun processServer(
+private suspend fun processServer(
     serverLi: Element,
     data: String,
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
-) {
+) = kotlinx.coroutines.coroutineScope {
     val link = serverLi.attr("data-link")
     if (link.isNotBlank()) {
         val matchingExtractor = extractorList.find { ext ->
@@ -298,17 +297,14 @@ private fun processServer(
             }
         }
 
-        // استخدام launch بدلاً من suspend
-        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                if (matchingExtractor != null) {
-                    matchingExtractor.getUrl(link, data)?.forEach(callback)
-                } else {
-                    loadExtractor(link, data, subtitleCallback, callback)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
+        try {
+            if (matchingExtractor != null) {
+                matchingExtractor.getUrl(link, data)?.forEach(callback)
+            } else {
+                loadExtractor(link, data, subtitleCallback, callback)
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 }
