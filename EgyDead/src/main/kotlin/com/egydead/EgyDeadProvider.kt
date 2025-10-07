@@ -161,12 +161,11 @@ class EgyDeadProvider : MainAPI() {
         watchPageDoc.select("div.mob-servers li").apmap { serverLi ->
             val link = serverLi.attr("data-link")
             if (link.isNotBlank()) {
-                // Now we use the global list from EgyDeadExtractors.kt
-                val matchingExtractor = extractorList.find { link.contains(it.mainUrl) || it.otherDomains?.any { domain -> link.contains(domain) } == true }
+                // Reverted the check back to 'otherNames' for compatibility
+                val matchingExtractor = extractorList.find { link.contains(it.mainUrl) || it.otherNames?.any { name -> link.contains(name) } == true }
                 if (matchingExtractor != null) {
                     matchingExtractor.getUrl(link, data, subtitleCallback, callback)
                 } else {
-                    // Fallback for any other server
                     loadExtractor(link, data, subtitleCallback, callback)
                 }
             }
