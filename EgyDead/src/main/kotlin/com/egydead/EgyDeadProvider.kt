@@ -5,6 +5,10 @@ import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.utils.M3u8Helper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -279,50 +283,33 @@ class EgyDeadProvider : MainAPI() {
 
     // --- END OF INNER EXTRACTORS ---
 
-    private suspend fun processServer(
-        serverLi: Element,
-        data: String,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ) {
-        val link = serverLi.attr("data-link")
-        if (link.isNotBlank()) {
-            val matchingExtractor = extractorList.find { ext ->
-                if (ext is PackedExtractor) {
-                    ext.a(link)
-                } else {
-                    link.contains(ext.mainUrl, true)
-                }
-            }
-
-            if (matchingExtractor != null) {
-                try {
-                    matchingExtractor.getUrl(link, data)?.forEach(callback)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            } else {
-                try {
-                    loadExtractor(link, data, subtitleCallback, callback)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
-    }
-
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        val watchPageDoc = getWatchPage(data) ?: return false
+    ): Boolean = coroutineScope {
+        val watchPageDoc = getWatchPage(data) ?: return@coroutineScope false
 
-        val servers = watchPageDoc.select("div.mob-servers li, div.servers-list li")
-        
-        servers.forEach { serverLi ->
-            processServer(serverLi, data, subtitleCallback, callback)
-        }
-        
-        return true
+        watchPageDoc.select("div.mob-servers li, div.servers-list li").map { serverLi ->
+            async(Dispatchers.IO) {
+                val link = serverLi.attr("data-link")
+                if (link.isNotBlank()) {
+                    val matchingExtractor = extractorList.find { ext ->
+                        if (ext is PackedExtractor) {
+                            ext.a(link)
+                        } else {
+                            link.contains(ext.mainUrl, true)
+                        }
+                    }
+
+                    if (matchingExtractor != null) {
+                        matchingExtractor.getUrl(link, data)?.forEach(callback)
+                    } else {
+                        loadExtractor(link, data, subtitleCallback, callback)
+                    }
+                }
+            }
+        }.awaitAll()
+
+        return@coroutineScope true
     }
 }
