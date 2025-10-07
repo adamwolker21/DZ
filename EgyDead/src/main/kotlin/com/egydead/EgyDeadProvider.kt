@@ -22,8 +22,6 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
-    // Helper function to extract quality from text
-    // دالة مساعدة لاستخراج الجودة من النص
     private fun String.getQualityFromString(): Int {
         return Regex("(\\d{3,4})[pP]").find(this)?.groupValues?.get(1)?.toIntOrNull()
             ?: this.toIntOrNull()
@@ -177,20 +175,22 @@ class EgyDeadProvider : MainAPI() {
         override var mainUrl = domains[0]
         override val requiresReferer = false
 
-        override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
             val doc = app.get(url, referer = referer).document
             val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
             if (packedJs != null) {
                 val unpacked = getAndUnpack(packedJs)
                 val m3u8Link = Regex("""(https?:\/\/[^\s'"]*master\.m3u8[^\s'"]*)""").find(unpacked)?.groupValues?.get(1)
                 if (m3u8Link != null) {
-                    M3u8Helper.generateM3u8(
+                    return M3u8Helper.generateM3u8(
                         this.name,
                         m3u8Link,
-                        url
-                    ).forEach(callback)
+                        url, // referer
+                        headers = emptyMap()
+                    )
                 }
             }
+            return null
         }
 
         fun a(link: String): Boolean {
@@ -206,21 +206,21 @@ class EgyDeadProvider : MainAPI() {
         override var mainUrl = "forafile.com"
         override val requiresReferer = false
 
-        override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
             val document = app.get(url).document
             val videoUrl = document.selectFirst("source, video")?.attr("src")
             if (videoUrl != null && videoUrl.endsWith(".mp4")) {
-                 callback.invoke(
-                    newExtractorLink(
+                 return listOf(newExtractorLink(
                         this.name,
                         this.name,
                         videoUrl,
                         mainUrl, // referer
-                        Qualities.Unknown.value, // quality
-                        false // isM3u8
+                        Qualities.Unknown.value,
+                        ExtractorLinkType.DOWNLOADABLE
                     )
                 )
             }
+            return null
         }
     }
     
@@ -229,29 +229,27 @@ class EgyDeadProvider : MainAPI() {
         override var mainUrl = "bigwarp.pro"
         override val requiresReferer = false
 
-        override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
             val doc = app.get(url).document
-            val jwplayerScript = doc.selectFirst("script:containsData(jwplayer(\"vplayer\").setup)")?.data() ?: return
+            val jwplayerScript = doc.selectFirst("script:containsData(jwplayer(\"vplayer\").setup)")?.data() ?: return null
 
             val sourcesRegex = Regex("""sources:\s*\[(.+?)\]""")
-            val sourcesBlock = sourcesRegex.find(jwplayerScript)?.groupValues?.get(1) ?: return
+            val sourcesBlock = sourcesRegex.find(jwplayerScript)?.groupValues?.get(1) ?: return null
 
             val fileRegex = Regex("""\{file:"([^"]+)",label:"([^"]+)"\}""")
-            fileRegex.findAll(sourcesBlock).forEach { match ->
+            return fileRegex.findAll(sourcesBlock).map { match ->
                 val videoUrl = match.groupValues[1]
                 val qualityLabel = match.groupValues[2]
                 val quality = qualityLabel.getQualityFromString()
-                callback.invoke(
-                     newExtractorLink(
-                        this.name,
-                        "${this.name} ${qualityLabel}",
-                        videoUrl,
-                        mainUrl, // referer
-                        quality,
-                        videoUrl.contains(".m3u8") // isM3u8
-                    )
+                newExtractorLink(
+                    this.name,
+                    "${this.name} ${qualityLabel}",
+                    videoUrl,
+                    mainUrl, // referer
+                    quality,
+                    if (videoUrl.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.DOWNLOADABLE
                 )
-            }
+            }.toList()
         }
     }
     
@@ -260,9 +258,9 @@ class EgyDeadProvider : MainAPI() {
         override var mainUrl = "listeamed.net"
         override val requiresReferer = false
 
-        override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
             val doc = app.get(url, referer = referer).document
-            val iframeSrc = doc.selectFirst("iframe")?.attr("src") ?: return
+            val iframeSrc = doc.selectFirst("iframe")?.attr("src") ?: return null
 
             val playerDoc = app.get(iframeSrc, referer = url).document
             val packedJs = playerDoc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
@@ -270,13 +268,15 @@ class EgyDeadProvider : MainAPI() {
                 val unpacked = getAndUnpack(packedJs)
                 val m3u8Link = Regex("""(https?:\/\/[^\s'"]*master\.m3u8[^\s'"]*)""").find(unpacked)?.groupValues?.get(1)
                 if (m3u8Link != null) {
-                    M3u8Helper.generateM3u8(
+                    return M3u8Helper.generateM3u8(
                         this.name,
                         m3u8Link,
-                        iframeSrc
-                    ).forEach(callback)
+                        iframeSrc,
+                        headers = emptyMap()
+                    )
                 }
             }
+            return null
         }
     }
 
@@ -301,7 +301,7 @@ class EgyDeadProvider : MainAPI() {
                 }
 
                 if (matchingExtractor != null) {
-                    matchingExtractor.getUrl(link, data, subtitleCallback, callback)
+                    matchingExtractor.getUrl(link, data)?.forEach(callback)
                 } else {
                     loadExtractor(link, data, subtitleCallback, callback)
                 }
