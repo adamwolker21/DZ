@@ -57,8 +57,8 @@ private class Forafile : ExtractorApi() {
 }
 
 // --- DoodStream Handlers ---
-// Base class with the extraction logic
-private open class DoodStreamBase : ExtractorApi() {
+// Base abstract class with the extraction logic
+private abstract class DoodStreamBase : ExtractorApi() {
     override var name = "DoodStream"
     override val requiresReferer = true
 
@@ -66,7 +66,6 @@ private open class DoodStreamBase : ExtractorApi() {
         val newUrl = if (url.contains("/e/")) url else url.replace("/d/", "/e/")
         val response = app.get(newUrl, referer = referer).text
         val doodToken = response.substringAfter("'/pass_md5/").substringBefore("',")
-        // Use this.mainUrl to build the pass_md5 URL correctly for each domain
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
         val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z" // "z" is a random string
         loadExtractor(trueUrl, newUrl, subtitleCallback, callback)
@@ -74,7 +73,7 @@ private open class DoodStreamBase : ExtractorApi() {
 }
 // Child class for the official domain
 private class DoodStream : DoodStreamBase() {
-    override var mainUrl = "doodstream.com" // Updated to official domain
+    override var mainUrl = "doodstream.com"
 }
 // Child class for the alternative domain
 private class DsvPlay : DoodStreamBase() {
@@ -83,8 +82,8 @@ private class DsvPlay : DoodStreamBase() {
 
 
 // --- Mixdrop Handlers ---
-// Base class with the extraction logic
-private open class MixdropBase : ExtractorApi() {
+// Base abstract class with the extraction logic
+private abstract class MixdropBase : ExtractorApi() {
     override var name = "Mixdrop"
     override val requiresReferer = true
 
@@ -108,7 +107,7 @@ private open class MixdropBase : ExtractorApi() {
 }
 // Child class for the official domain
 private class Mixdrop : MixdropBase() {
-    override var mainUrl = "mixdrop.ag" // Updated to official domain
+    override var mainUrl = "mixdrop.ag"
 }
 // Child class for the alternative domain
 private class Mdfx9dc8n : MixdropBase() {
