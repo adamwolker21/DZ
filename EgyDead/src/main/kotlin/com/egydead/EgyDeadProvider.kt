@@ -4,6 +4,8 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import com.lagradost.cloudstream3.utils.ExtractorLink
+
 import com.lagradost.cloudstream3.utils.M3u8Helper
 
 class EgyDeadProvider : MainAPI() {
