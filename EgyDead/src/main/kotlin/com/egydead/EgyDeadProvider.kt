@@ -25,8 +25,7 @@ class EgyDeadProvider : MainAPI() {
         "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "أفلام آسيوية",
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
-    
-    // The list now references the globally defined extractors from the other file
+
     private val extractorList = listOf(
         StreamHGExtractor(),
         ForafileExtractor(),
@@ -111,7 +110,7 @@ class EgyDeadProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
-        
+
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
         val plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
@@ -134,11 +133,11 @@ class EgyDeadProvider : MainAPI() {
                     this.episode = epNum
                 }
             }.distinctBy { it.episode }.toMutableList()
-            
+
             val seriesTitle = pageTitle
                 .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
                 .trim()
-            
+
             val currentEpNum = pageTitle.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
             if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
                  episodes.add(newEpisode(url) {
@@ -146,7 +145,7 @@ class EgyDeadProvider : MainAPI() {
                     this.episode = currentEpNum
                 })
             }
-            
+
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
                 this.posterUrl = posterUrl
                 this.plot = plot
@@ -165,7 +164,7 @@ class EgyDeadProvider : MainAPI() {
             }
         }
     }
-    
+
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
