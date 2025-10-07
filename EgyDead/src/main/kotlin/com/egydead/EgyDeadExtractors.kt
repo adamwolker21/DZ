@@ -55,13 +55,13 @@ private class Forafile : ExtractorApi() {
 }
 
 // Extracts from dood.stream domains
+// Suppress the deprecation warning on the entire class to ensure the build completes.
+@Suppress("DEPRECATION")
 private class DoodStream : ExtractorApi() {
     override var name = "DoodStream"
     override var mainUrl = "dood.stream"
     override val requiresReferer = true
 
-    // Suppress the deprecation warning on the entire function to ensure the build completes.
-    @Suppress("DEPRECATION")
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val newUrl = if (url.contains("/e/")) url else url.replace("/d/", "/e/")
         val response = app.get(newUrl, referer = referer).text
@@ -82,13 +82,13 @@ private class DoodStream : ExtractorApi() {
 }
 
 // Extracts from mixdrop.co
+// Suppress the deprecation warning on the entire class to ensure the build completes.
+@Suppress("DEPRECATION")
 private class Mixdrop : ExtractorApi() {
     override var name = "Mixdrop"
     override var mainUrl = "mixdrop.co"
     override val requiresReferer = true
 
-    // Suppress the deprecation warning on the entire function to ensure the build completes.
-    @Suppress("DEPRECATION")
     override suspend fun getUrl(
         url: String,
         referer: String?,
