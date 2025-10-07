@@ -286,7 +286,7 @@ private suspend fun processServer(
     data: String,
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
-) = kotlinx.coroutines.coroutineScope {
+) {
     val link = serverLi.attr("data-link")
     if (link.isNotBlank()) {
         val matchingExtractor = extractorList.find { ext ->
@@ -297,14 +297,17 @@ private suspend fun processServer(
             }
         }
 
-        try {
-            if (matchingExtractor != null) {
-                matchingExtractor.getUrl(link, data)?.forEach(callback)
-            } else {
-                loadExtractor(link, data, subtitleCallback, callback)
+        // إضافة withContext هنا
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                if (matchingExtractor != null) {
+                    matchingExtractor.getUrl(link, data)?.forEach(callback)
+                } else {
+                    loadExtractor(link, data, subtitleCallback, callback)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
         }
     }
 }
