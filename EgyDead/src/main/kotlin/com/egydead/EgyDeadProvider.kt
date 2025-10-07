@@ -5,10 +5,6 @@ import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.utils.M3u8Helper
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -189,7 +185,7 @@ class EgyDeadProvider : MainAPI() {
                     return M3u8Helper.generateM3u8(
                         this.name,
                         m3u8Link,
-                        url, // referer
+                        url,
                         headers = emptyMap()
                     )
                 }
@@ -248,68 +244,4 @@ class EgyDeadProvider : MainAPI() {
                     type = if (videoUrl.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                 ) {
                     this.referer = mainUrl
-                    this.quality = qualityLabel.getQualityFromString()
-                }
-            }.toList()
-        }
-    }
-    
-    inner class VidGuardExtractor : ExtractorApi() {
-        override var name = "VidGuard"
-        override var mainUrl = "listeamed.net"
-        override val requiresReferer = false
-
-        override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
-            val doc = app.get(url, referer = referer).document
-            val iframeSrc = doc.selectFirst("iframe")?.attr("src") ?: return null
-
-            val playerDoc = app.get(iframeSrc, referer = url).document
-            val packedJs = playerDoc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
-            if (packedJs != null) {
-                val unpacked = getAndUnpack(packedJs)
-                val m3u8Link = Regex("""(https?:\/\/[^\s'"]*master\.m3u8[^\s'"]*)""").find(unpacked)?.groupValues?.get(1)
-                if (m3u8Link != null) {
-                    return M3u8Helper.generateM3u8(
-                        this.name,
-                        m3u8Link,
-                        iframeSrc,
-                        headers = emptyMap()
-                    )
-                }
-            }
-            return null
-        }
-    }
-
-    // --- END OF INNER EXTRACTORS ---
-
-    override suspend fun loadLinks(
-        data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean = coroutineScope {
-        val watchPageDoc = getWatchPage(data) ?: return@coroutineScope false
-
-        watchPageDoc.select("div.mob-servers li, div.servers-list li").map { serverLi ->
-            async(Dispatchers.IO) {
-                val link = serverLi.attr("data-link")
-                if (link.isNotBlank()) {
-                    val matchingExtractor = extractorList.find { ext ->
-                        if (ext is PackedExtractor) {
-                            ext.a(link)
-                        } else {
-                            link.contains(ext.mainUrl, true)
-                        }
-                    }
-
-                    if (matchingExtractor != null) {
-                        matchingExtractor.getUrl(link, data)?.forEach(callback)
-                    } else {
-                        loadExtractor(link, data, subtitleCallback, callback)
-                    }
-                }
-            }
-        }.awaitAll()
-
-        return@coroutineScope true
-    }
-}
+                    this.quality
