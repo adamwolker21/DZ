@@ -1,14 +1,9 @@
 package com.egydead
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.loadExtractor
+import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.Dispatchers
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -21,17 +16,9 @@ class EgyDeadProvider : MainAPI() {
     )
 
     override val mainPage = mainPageOf(
-        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%aj%d9%86%d8%a8%d9%8a-%d8%a7%d9%88%d9%86%d9%84%d8%a7%d9%8a%d9%86/" to "أفلام أجنبي",
+        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-%d8%a7%d9%88%d9%86%d9%84%d8%a7%d9%8a%d9%86/" to "أفلام أجنبي",
         "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "أفلام آسيوية",
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
-    )
-
-    private val extractorList = listOf(
-        StreamHGExtractor(),
-        ForafileExtractor(),
-        BigwarpExtractor(),
-        EarnVidsExtractor(),
-        VidGuardExtractor()
     )
 
     private suspend fun getWatchPage(url: String): Document? {
@@ -110,7 +97,7 @@ class EgyDeadProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
-
+        
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
         val plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
@@ -133,11 +120,11 @@ class EgyDeadProvider : MainAPI() {
                     this.episode = epNum
                 }
             }.distinctBy { it.episode }.toMutableList()
-
+            
             val seriesTitle = pageTitle
                 .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
                 .trim()
-
+            
             val currentEpNum = pageTitle.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
             if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
                  episodes.add(newEpisode(url) {
@@ -145,7 +132,7 @@ class EgyDeadProvider : MainAPI() {
                     this.episode = currentEpNum
                 })
             }
-
+            
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
                 this.posterUrl = posterUrl
                 this.plot = plot
@@ -168,30 +155,22 @@ class EgyDeadProvider : MainAPI() {
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
-    ): Boolean = coroutineScope {
-        val watchPageDoc = getWatchPage(data) ?: return@coroutineScope false
-
-        watchPageDoc.select("div.mob-servers li, div.servers-list li").map { serverLi ->
-            async(Dispatchers.IO) {
-                val link = serverLi.attr("data-link")
-                if (link.isNotBlank()) {
-                    val matchingExtractor = extractorList.find { ext ->
-                         if (ext is PackedExtractor) {
-                             ext.domains.any { link.contains(it, true) }
-                         } else {
-                             link.contains(ext.mainUrl, true)
-                         }
-                    }
-
-                    if (matchingExtractor != null) {
-                        matchingExtractor.getUrl(link, data)?.forEach(callback)
-                    } else {
-                        loadExtractor(link, data, subtitleCallback, callback)
-                    }
+    ): Boolean {
+        val watchPageDoc = getWatchPage(data) ?: return false
+        
+        watchPageDoc.select("div.mob-servers li").apmap { serverLi ->
+            val link = serverLi.attr("data-link")
+            if (link.isNotBlank()) {
+                // Now we use the global list from EgyDeadExtractors.kt
+                val matchingExtractor = extractorList.find { link.contains(it.mainUrl) || it.otherNames?.any { name -> link.contains(name) } == true }
+                if (matchingExtractor != null) {
+                    matchingExtractor.getUrl(link, data, subtitleCallback, callback)
+                } else {
+                    // Fallback for any other server
+                    loadExtractor(link, data, subtitleCallback, callback)
                 }
             }
-        }.awaitAll()
-
-        return@coroutineScope true
+        }
+        return true
     }
 }
