@@ -7,6 +7,7 @@ import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.utils.httpsify
 import com.lagradost.cloudstream3.utils.loadExtractor
+import com.lagradost.cloudstream3.newExtractorLink
 
 // A list to hold all our extractors
 val extractorList = listOf(
@@ -62,7 +63,7 @@ private class DoodStream : ExtractorApi() {
     override var name = "DoodStream"
     override var mainUrl = "dood.stream"
     // DoodStream can have multiple domains
-    override val otherNames = listOf("dood.la", "dood.pm", "dood.to", "dood.so", "dood.cx", "dood.watch")
+    override val otherDomains = listOf("dood.la", "dood.pm", "dood.to", "dood.so", "dood.cx", "dood.watch")
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
@@ -72,14 +73,15 @@ private class DoodStream : ExtractorApi() {
         val md5PassUrl = "https://${mainUrl}/pass_md5/$doodToken"
         val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z" // "z" is a random string
         callback.invoke(
-            ExtractorLink(
-                this.name,
-                this.name,
-                trueUrl,
-                newUrl,
+            newExtractorLink(
+                source = this.name,
+                name = this.name,
+                url = trueUrl,
+                referer = newUrl,
                 quality = 1080, // Doodstream doesn't provide quality, so we assume a high one
-                isM3u8 = trueUrl.contains(".m3u8")
-            )
+            ) {
+                this.isM3u8 = trueUrl.contains(".m3u8")
+            }
         )
     }
 }
@@ -105,14 +107,15 @@ private class Mixdrop : ExtractorApi() {
             val videoUrl = Regex("""MDCore\.wurl="([^"]+)""").find(unpacked)?.groupValues?.get(1)
             if (videoUrl != null) {
                 callback.invoke(
-                    ExtractorLink(
-                        this.name,
-                        this.name,
-                        "https:${videoUrl}",
-                        url,
+                    newExtractorLink(
+                        source = this.name,
+                        name = this.name,
+                        url = "https:${videoUrl}",
+                        referer = url,
                         quality = 720, // Mixdrop doesn't provide quality, so we assume a standard one
-                        isM3u8 = videoUrl.contains(".m3u8")
-                    )
+                    ) {
+                        this.isM3u8 = videoUrl.contains(".m3u8")
+                    }
                 )
             }
         }
