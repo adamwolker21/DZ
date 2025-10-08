@@ -57,10 +57,9 @@ private suspend fun safeGetAsText(url: String, referer: String? = null): String?
 }
 
 // =================================================================================================
-// START OF THE MANUAL REDIRECT STREAMHG EXTRACTOR (v36)
+// START OF THE FINAL STREAMHG EXTRACTOR (v37)
 // =================================================================================================
-private abstract class StreamHGBase : ExtractorApi() {
-    override var name = "StreamHG"
+private abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
 
     // This list contains all possible domains the video might be hosted on.
@@ -74,7 +73,7 @@ private abstract class StreamHGBase : ExtractorApi() {
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         // Diagnostic Log: Check if this function is ever called.
-        Log.d("StreamHG_Extractor", "->->-> StreamHGBase getUrl function CALLED for URL: $url <-<-<-")
+        Log.d(name, "->->-> StreamHGBase getUrl function CALLED for URL: $url <-<-<-")
 
         // Step 1: Extract the unique video ID from the original URL.
         val videoId = url.substringAfterLast("/")
@@ -118,13 +117,13 @@ private abstract class StreamHGBase : ExtractorApi() {
     }
 }
 
-// Add the new domain to the list of classes that use this logic
-private class StreamHG : StreamHGBase() { override var mainUrl = "hglink.to" }
-private class Davioad : StreamHGBase() { override var mainUrl = "davioad.com" }
-private class Haxloppd : StreamHGBase() { override var mainUrl = "haxloppd.com" }
-private class Kravaxxa : StreamHGBase() { override var mainUrl = "kravaxxa.com" }
-private class Cavanhabg : StreamHGBase() { override var mainUrl = "cavanhabg.com"}
-private class Dumbalag : StreamHGBase() { override var mainUrl = "dumbalag.com" }
+// Each class now has a unique name to avoid registration conflicts.
+private class StreamHG : StreamHGBase("StreamHG", "hglink.to")
+private class Davioad : StreamHGBase("StreamHG (Davioad)", "davioad.com")
+private class Haxloppd : StreamHGBase("StreamHG (Haxloppd)", "haxloppd.com")
+private class Kravaxxa : StreamHGBase("StreamHG (Kravaxxa)", "kravaxxa.com")
+private class Cavanhabg : StreamHGBase("StreamHG (Cavanhabg)", "cavanhabg.com")
+private class Dumbalag : StreamHGBase("StreamHG (Dumbalag)", "dumbalag.com" )
 
 // =================================================================================================
 // END OF REVISED STREAMHG EXTRACTOR
