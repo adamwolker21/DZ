@@ -2,10 +2,9 @@ package com.egydead
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.network.CloudflareKiller // The correct import
-import org.jsoup.nodes.Document
+import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Element
-import android.util.Log 
+import android.util.Log
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -19,21 +18,25 @@ class EgyDeadProvider : MainAPI() {
 
     override val mainPage = mainPageOf(
         "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-%d8%a7%d9%88%d9%86%d9%84%d8%a7%d9%8a%d9%86/" to "أفلام أجنبي",
+        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%b9%d8%b1%d8%a8%d9%8a%d8%a9/" to "أفلام عربية",
         "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "أفلام آسيوية",
+        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d9%87%d9%86%d8%af%d9%8a%d8%a9/" to "أفلام هندية",
+        "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a%d8%a9/" to "مسلسلات أجنبية",
+        "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%b9%d8%b1%d8%a8%d9%8a%d8%a9/" to "مسلسلات عربية",
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
-    // The interceptor to be used for the main site requests
+    // A lazy-loaded instance of the CloudflareKiller interceptor
     private val cloudflareKiller by lazy { CloudflareKiller() }
 
-    // This function will now use CloudflareKiller to get the real watch page
-    private suspend fun getWatchPage(url: String): Document? {
-        try {
-            val initialResponse = app.get(url, interceptor = cloudflareKiller)
-            val document = initialResponse.document
-            if (document.selectFirst("div.watchNow form") != null) {
-                val cookies = initialResponse.cookies
-                val headers = mapOf(
+    // This function handles the initial POST request to reveal the server links
+    private suspend fun getWatchPage(url: String): com.lagradost.cloudstream3.network.response? {
+        return try {
+            app.post(
+                url,
+                // This interceptor is crucial for bypassing Cloudflare on the main site
+                interceptor = cloudflareKiller, 
+                headers = mapOf(
                     "Content-Type" to "application/x-www-form-urlencoded",
                     "Referer" to url,
                     "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
@@ -42,15 +45,12 @@ class EgyDeadProvider : MainAPI() {
                     "sec-fetch-mode" to "navigate",
                     "sec-fetch-site" to "same-origin",
                     "sec-fetch-user" to "?1"
-                )
-                val data = mapOf("View" to "1")
-                // The POST request also needs the interceptor
-                return app.post(url, headers = headers, data = data, cookies = cookies, interceptor = cloudflareKiller).document
-            }
-            return document
+                ),
+                data = mapOf("View" to "1")
+            )
         } catch (e: Exception) {
-            e.printStackTrace()
-            return null
+            Log.e("EgyDead", "getWatchPage failed for url: $url", e)
+            null
         }
     }
 
@@ -111,34 +111,21 @@ class EgyDeadProvider : MainAPI() {
         val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
         val duration = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()?.filter { it.isDigit() }?.toIntOrNull()
 
-        val categoryText = document.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: ""
-        val isSeries = categoryText.contains("مسلسلات") || pageTitle.contains("مسلسل") || pageTitle.contains("الموسم") || document.select("div.EpsList").isNotEmpty()
+        val isSeries = document.select("div.EpsList").isNotEmpty()
 
         if (isSeries) {
-            val episodesDoc = getWatchPage(url) ?: document
-
-            val episodes = episodesDoc.select("div.EpsList li a").mapNotNull { epElement ->
+            val episodes = document.select("div.EpsList li a").mapNotNull { epElement ->
                 val href = epElement.attr("href")
                 val titleAttr = epElement.attr("title")
-                val epNum = titleAttr.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
-                if (epNum == null) return@mapNotNull null
+                val epNum = titleAttr.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull() ?: return@mapNotNull null
+                
                 newEpisode(href) {
                     this.name = epElement.text().trim()
                     this.episode = epNum
                 }
-            }.distinctBy { it.episode }.toMutableList()
+            }.distinctBy { it.episode }
             
-            val seriesTitle = pageTitle
-                .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
-                .trim()
-            
-            val currentEpNum = pageTitle.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
-            if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
-                 episodes.add(newEpisode(url) {
-                    this.name = pageTitle.substringAfter(seriesTitle).trim().ifBlank { "حلقة $currentEpNum" }
-                    this.episode = currentEpNum
-                })
-            }
+            val seriesTitle = pageTitle.replace(Regex("""(مسلسل|الموسم \d+|الحلقة \d+|مترجمة|الاخيرة)"""), "").trim()
             
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
                 this.posterUrl = posterUrl
@@ -158,35 +145,52 @@ class EgyDeadProvider : MainAPI() {
             }
         }
     }
-    
+
+    // =================================================================================================
+    // START OF THE FINAL, ROBUST loadLinks FUNCTION (v38)
+    // =================================================================================================
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        // Get the watch page, returning false if it fails
+        val response = getWatchPage(data) ?: return false
+        val document = response.document
+
         Log.d("EgyDead", "Loading links for URL: $data")
-        val watchPageDoc = getWatchPage(data)
-        
-        if(watchPageDoc == null) {
-            Log.e("EgyDead", "Failed to get watch page document.")
-            return false
-        }
-        
-        Log.d("EgyDead", "Document title: ${watchPageDoc.title()}")
+        Log.d("EgyDead", "Document title: ${document.title()}")
 
-        // We only use the streaming servers as requested
-        val servers = watchPageDoc.select("div.mob-servers li")
-        
-        Log.d("EgyDead", "Found ${servers.size} potential server elements.")
+        // A state variable to track if any link was successfully found
+        var linksFound = false
+
+        // A new callback that wraps the original one. It will set our flag to true
+        // the first time it successfully receives a link.
+        val newCallback = { link: ExtractorLink ->
+            linksFound = true
+            callback(link)
+        }
+
+        val servers = document.select("div.mob-servers li")
+        Log.d("EgyDead", "Found ${servers.size} potential server elements")
         servers.forEachIndexed { index, server ->
-            Log.d("EgyDead", "Server data-link $index: ${server.attr("data-link")}")
+            val link = server.attr("data-link")
+            val name = server.text()
+            Log.d("EgyDead", "Server #$index | Name: $name | Link: $link")
         }
 
-        servers.apmap { serverLi ->
-            val link = serverLi.attr("data-link")
+        // Use apmap to process all servers in parallel. It will wait for all of them to finish.
+        servers.apmap { server ->
+            val link = server.attr("data-link")
             if (link.isNotBlank()) {
-                loadExtractor(link, data, subtitleCallback, callback)
+                // We pass our new, enhanced callback to loadExtractor
+                loadExtractor(link, data, subtitleCallback, newCallback)
             }
         }
-        return true
+
+        // The function now returns true ONLY if the callback was ever invoked.
+        return linksFound
     }
+    // =================================================================================================
+    // END OF THE FINAL loadLinks FUNCTION
+    // =================================================================================================
 }
