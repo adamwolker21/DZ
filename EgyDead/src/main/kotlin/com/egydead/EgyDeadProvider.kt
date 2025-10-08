@@ -104,7 +104,7 @@ class EgyDeadProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url, interceptor = cloudflareKiller).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
-        
+
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
         val plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
@@ -118,15 +118,15 @@ class EgyDeadProvider : MainAPI() {
                 val href = epElement.attr("href")
                 val titleAttr = epElement.attr("title")
                 val epNum = titleAttr.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull() ?: return@mapNotNull null
-                
+
                 newEpisode(href) {
                     this.name = epElement.text().trim()
                     this.episode = epNum
                 }
             }.distinctBy { it.episode }
-            
+
             val seriesTitle = pageTitle.replace(Regex("""(مسلسل|الموسم \d+|الحلقة \d+|مترجمة|الاخيرة)"""), "").trim()
-            
+
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
                 this.posterUrl = posterUrl
                 this.plot = plot
@@ -147,7 +147,7 @@ class EgyDeadProvider : MainAPI() {
     }
 
     // =================================================================================================
-    // START OF THE FINAL, ROBUST loadLinks FUNCTION (v39)
+    // START OF THE FINAL, ROBUST loadLinks FUNCTION (v40)
     // =================================================================================================
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
