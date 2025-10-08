@@ -12,7 +12,7 @@ import android.util.Log
 
 // The list of extractors, used by the provider
 val extractorList = listOf(
-    StreamHG(), Davioad(), Haxloppd(), Kravaxxa(), Cavanhabg(),
+    StreamHG(), Davioad(), Haxloppd(), Kravaxxa(), Cavanhabg(), Dumbalag(),
     Forafile(),
     DoodStream(), DsvPlay(),
     Mixdrop(), Mdfx9dc8n(), Mxdrop(),
@@ -39,7 +39,6 @@ private val BROWSER_HEADERS = mapOf(
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
 private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
-    // This GET request now automatically follows JS redirects thanks to the interceptor
     return try {
         app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller).document
     } catch (e: Exception) {
@@ -58,50 +57,71 @@ private suspend fun safeGetAsText(url: String, referer: String? = null): String?
 }
 
 // =================================================================================================
-// START OF REVISED, SIMPLIFIED STREAMHG EXTRACTOR (v34)
+// START OF THE MANUAL REDIRECT STREAMHG EXTRACTOR (v35)
 // =================================================================================================
 private abstract class StreamHGBase : ExtractorApi() {
     override var name = "StreamHG"
     override val requiresReferer = true
 
-    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        // Step 1: Directly request the hglink URL. The safeGetAsDocument function
-        // with CloudflareKiller will handle the JS redirect and return the FINAL page document.
-        val finalPageDoc = safeGetAsDocument(url, referer)
+    // This list contains all possible domains the video might be hosted on.
+    private val potentialHosts = listOf(
+        "kravaxxa.com",
+        "cavanhabg.com",
+        "dumbalag.com",
+        "davioad.com",
+        "haxloppd.com"
+    )
 
-        if (finalPageDoc == null) {
-            Log.e(name, "Failed to get final page document, Cloudflare bypass might have failed for $url")
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        // Step 1: Extract the unique video ID from the original URL.
+        val videoId = url.substringAfterLast("/")
+        if (videoId.isBlank()) {
+            Log.e(name, "Could not extract video ID from $url")
             return
         }
+        Log.d(name, "Extracted video ID: $videoId")
 
-        // The current URL of the document after the redirect is the correct referer for the video.
-        val finalPageUrl = finalPageDoc.location()
-        Log.d(name, "Successfully landed on final page: $finalPageUrl")
+        // Step 2: Loop through each potential host and try to find the video.
+        for (host in potentialHosts) {
+            val finalPageUrl = "https://$host/e/$videoId"
+            Log.d(name, "Attempting to access final page: $finalPageUrl")
 
-        // Step 2: Find and unpack the JS on the final page to get the m3u8 link
-        val packedJs = finalPageDoc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
-        if (packedJs != null) {
-            val unpacked = getAndUnpack(packedJs)
-            val m3u8Link = Regex("""(https?://.*?/master\.m3u8)""").find(unpacked)?.groupValues?.get(1)
-            
-            if (m3u8Link != null) {
-                 Log.d(name, "Found m3u8 link: $m3u8Link")
-                // Step 3: Use the safe, compatible loadExtractor function, providing the final page URL as the referer
-                loadExtractor(m3u8Link, finalPageUrl, subtitleCallback, callback)
+            // The referer for this request should be the original hglink url
+            val finalPageDoc = safeGetAsDocument(finalPageUrl, url)
 
+            // Step 3: Check if this page contains the packed JS. If not, continue to the next host.
+            val packedJs = finalPageDoc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
+            if (packedJs != null) {
+                Log.d(name, "Success! Found packed JS on $finalPageUrl")
+                val unpacked = getAndUnpack(packedJs)
+                val m3u8Link = Regex("""(https?://.*?/master\.m3u8)""").find(unpacked)?.groupValues?.get(1)
+                
+                if (m3u8Link != null) {
+                    Log.d(name, "Found m3u8 link: $m3u8Link")
+                    // Use the final page URL as the referer for the video stream
+                    loadExtractor(m3u8Link, finalPageUrl, subtitleCallback, callback)
+                    // Once we find the link, we stop the loop immediately.
+                    return
+                } else {
+                    Log.e(name, "Found packed JS on $finalPageUrl but failed to extract m3u8 link.")
+                }
             } else {
-                 Log.e(name, "m3u8 link not found in unpacked JS on page $finalPageUrl")
+                Log.d(name, "Packed JS not found on $finalPageUrl, trying next host.")
             }
-        } else {
-            Log.e(name, "Packed JS not found on page $finalPageUrl")
         }
+
+        // If the loop finishes without finding any links
+        Log.e(name, "Failed to find a working link for video ID $videoId after trying all hosts.")
     }
 }
+
+// Add the new domain to the list of classes that use this logic
 private class StreamHG : StreamHGBase() { override var mainUrl = "hglink.to" }
 private class Davioad : StreamHGBase() { override var mainUrl = "davioad.com" }
 private class Haxloppd : StreamHGBase() { override var mainUrl = "haxloppd.com" }
 private class Kravaxxa : StreamHGBase() { override var mainUrl = "kravaxxa.com" }
 private class Cavanhabg : StreamHGBase() { override var mainUrl = "cavanhabg.com"}
+private class Dumbalag : StreamHGBase() { override var mainUrl = "dumbalag.com" }
 
 // =================================================================================================
 // END OF REVISED STREAMHG EXTRACTOR
