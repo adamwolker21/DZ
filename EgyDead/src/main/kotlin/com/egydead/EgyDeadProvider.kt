@@ -2,9 +2,10 @@ package com.egydead
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.network.CloudflareKiller // The correct import
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import android.util.Log // Import Log
+import android.util.Log 
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -22,10 +23,13 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
+    // The interceptor to be used for the main site requests
+    private val cloudflareKiller by lazy { CloudflareKiller() }
+
+    // This function will now use CloudflareKiller to get the real watch page
     private suspend fun getWatchPage(url: String): Document? {
         try {
-            // No CloudflareKiller needed here as the main site seems less protected
-            val initialResponse = app.get(url)
+            val initialResponse = app.get(url, interceptor = cloudflareKiller)
             val document = initialResponse.document
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
@@ -40,7 +44,8 @@ class EgyDeadProvider : MainAPI() {
                     "sec-fetch-user" to "?1"
                 )
                 val data = mapOf("View" to "1")
-                return app.post(url, headers = headers, data = data, cookies = cookies).document
+                // The POST request also needs the interceptor
+                return app.post(url, headers = headers, data = data, cookies = cookies, interceptor = cloudflareKiller).document
             }
             return document
         } catch (e: Exception) {
@@ -59,7 +64,7 @@ class EgyDeadProvider : MainAPI() {
             "$mainUrl${request.data}page/$page/"
         }
 
-        val document = app.get(url).document
+        val document = app.get(url, interceptor = cloudflareKiller).document
         val home = document.select("li.movieItem").mapNotNull {
             it.toSearchResult()
         }
@@ -90,14 +95,14 @@ class EgyDeadProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "$mainUrl/?s=$query"
-        val document = app.get(searchUrl).document
+        val document = app.get(searchUrl, interceptor = cloudflareKiller).document
         return document.select("li.movieItem").mapNotNull {
             it.toSearchResult()
         }
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url).document
+        val document = app.get(url, interceptor = cloudflareKiller).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
@@ -158,7 +163,6 @@ class EgyDeadProvider : MainAPI() {
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // Your suggested logging starts here
         Log.d("EgyDead", "Loading links for URL: $data")
         val watchPageDoc = getWatchPage(data)
         
@@ -168,27 +172,19 @@ class EgyDeadProvider : MainAPI() {
         }
         
         Log.d("EgyDead", "Document title: ${watchPageDoc.title()}")
-        // End of your suggested logging
 
+        // We only use the streaming servers as requested
         val servers = watchPageDoc.select("div.mob-servers li")
         
-        // More logging
         Log.d("EgyDead", "Found ${servers.size} potential server elements.")
         servers.forEachIndexed { index, server ->
-            Log.d("EgyDead", "Server element $index HTML: ${server.html()}")
             Log.d("EgyDead", "Server data-link $index: ${server.attr("data-link")}")
         }
-        // End of more logging
 
         servers.apmap { serverLi ->
             val link = serverLi.attr("data-link")
             if (link.isNotBlank()) {
-                val matchingExtractor = extractorList.find { extractor -> link.contains(extractor.mainUrl) }
-                if (matchingExtractor != null) {
-                    matchingExtractor.getUrl(link, data, subtitleCallback, callback)
-                } else {
-                    loadExtractor(link, data, subtitleCallback, callback)
-                }
+                loadExtractor(link, data, subtitleCallback, callback)
             }
         }
         return true
