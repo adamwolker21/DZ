@@ -145,10 +145,7 @@ class EgyDeadProvider : MainAPI() {
             }
         }
     }
-
-    // =================================================================================================
-    // START OF THE FINAL, ROBUST loadLinks FUNCTION (v40)
-    // =================================================================================================
+    
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
@@ -190,7 +187,4 @@ class EgyDeadProvider : MainAPI() {
         // The function now returns true ONLY if the callback was ever invoked.
         return linksFound
     }
-    // =================================================================================================
-    // END OF THE FINAL loadLinks FUNCTION
-    // =================================================================================================
 }
