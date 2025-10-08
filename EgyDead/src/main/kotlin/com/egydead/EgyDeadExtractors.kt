@@ -5,9 +5,9 @@ import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
-import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.newExtractorLink // Import the new function
 import org.jsoup.nodes.Document
 import android.util.Log
 
@@ -33,7 +33,7 @@ private val BROWSER_HEADERS = mapOf(
     "Sec-Fetch-Site" to "cross-site",
     "Sec-Fetch-User" to "?1",
     "Upgrade-Insecure-Requests" to "1",
-    "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+    "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/5.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
 )
 
 private val cloudflareKiller by lazy { CloudflareKiller() }
@@ -71,49 +71,36 @@ private abstract class StreamHGBase(override var name: String, override var main
     )
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        Log.d(name, "->->-> StreamHGBase getUrl function CALLED for URL: $url <-<-<-")
-
         val videoId = url.substringAfterLast("/")
         if (videoId.isBlank()) {
             Log.e(name, "Could not extract video ID from $url")
             return
         }
-        Log.d(name, "Extracted video ID: $videoId")
 
         for (host in potentialHosts) {
             val finalPageUrl = "https://$host/e/$videoId"
-            Log.d(name, "Attempting to access final page: $finalPageUrl")
-
             val finalPageDoc = safeGetAsDocument(finalPageUrl, referer = url)
-
             val packedJs = finalPageDoc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
+
             if (packedJs != null) {
-                Log.d(name, "Success! Found packed JS on $finalPageUrl")
                 val unpacked = getAndUnpack(packedJs)
                 val m3u8Link = Regex("""(https?://.*?/master\.m3u8)""").find(unpacked)?.groupValues?.get(1)
 
                 if (m3u8Link != null) {
-                    Log.d(name, "Found m3u8 link: $m3u8Link. Calling callback directly.")
                     callback(
-                        ExtractorLink(
-                            this.name,
-                            this.name,
-                            m3u8Link,
-                            finalPageUrl,
-                            Qualities.Unknown.value,
+                        newExtractorLink(
+                            source = this.name,
+                            name = this.name,
+                            url = m3u8Link,
+                            referer = finalPageUrl,
+                            quality = Qualities.Unknown.value,
                             isM3u8 = true
                         )
                     )
                     return
-                } else {
-                    Log.e(name, "Found packed JS on $finalPageUrl but failed to extract m3u8 link.")
                 }
-            } else {
-                Log.d(name, "Packed JS not found on $finalPageUrl, trying next host.")
             }
         }
-
-        Log.e(name, "Failed to find a working link for video ID $videoId after trying all hosts.")
     }
 }
 
@@ -137,20 +124,16 @@ private class Forafile : ExtractorApi() {
             val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
             if (mp4Link != null) {
                  callback(
-                    ExtractorLink(
-                        this.name,
-                        this.name,
-                        mp4Link,
-                        url,
-                        Qualities.Unknown.value,
+                    newExtractorLink(
+                        source = this.name,
+                        name = this.name,
+                        url = mp4Link,
+                        referer = url,
+                        quality = Qualities.Unknown.value,
                         isM3u8 = false
                     )
                 )
-            } else {
-                 Log.e(name, "mp4 link not found in unpacked JS for $url")
             }
-        } else {
-             Log.e(name, "Packed JS not found for $url. Cloudflare bypass likely failed.")
         }
     }
 }
@@ -160,21 +143,22 @@ private abstract class DoodStreamBase : ExtractorApi() {
     override val requiresReferer = true
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val newUrl = if (url.contains("/e/")) url else url.replace("/d/", "/e/")
-        val responseText = safeGetAsText(newUrl, referer)
-
-        if (responseText.isNullOrBlank()) {
-            Log.e(name, "Response text was null or blank for $newUrl.")
-            return
-        }
-
+        val responseText = safeGetAsText(newUrl, referer) ?: return
         val doodToken = responseText.substringAfter("'/pass_md5/").substringBefore("',")
-        if (doodToken.isBlank()) {
-            Log.e(name, "Could not find doodToken for $url.")
-            return
-        }
+        if (doodToken.isBlank()) return
+
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
         val trueUrl = app.get(md5PassUrl, referer = newUrl, headers = mapOf("User-Agent" to "Mozilla/5.0")).text + "z"
-        callback(ExtractorLink(this.name, this.name, trueUrl, newUrl, Qualities.Unknown.value, isM3u8 = false))
+        callback(
+            newExtractorLink(
+                source = this.name,
+                name = this.name,
+                url = trueUrl,
+                referer = newUrl,
+                quality = Qualities.Unknown.value,
+                isM3u8 = false
+            )
+        )
     }
 }
 private class DoodStream : DoodStreamBase() { override var mainUrl = "doodstream.com" }
@@ -194,29 +178,25 @@ private abstract class PackedJsExtractorBase(
             val videoUrl = regex.find(unpacked)?.groupValues?.get(1)
             if (videoUrl != null && videoUrl.isNotBlank()) {
                 val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
-                callback(ExtractorLink(this.name, this.name, finalUrl, url, Qualities.Unknown.value))
-            } else {
-                Log.e(name, "Regex failed to find video URL in unpacked JS for $url")
+                callback(
+                    newExtractorLink(
+                        source = this.name,
+                        name = this.name,
+                        url = finalUrl,
+                        referer = url,
+                        quality = Qualities.Unknown.value
+                    )
+                )
             }
-        } else {
-             Log.e(name, "Packed JS not found for $url.")
         }
     }
 }
-// =================================================================================
-// START of v6 FIX
-// Corrected the typo from Packed_JsExtractorBase to PackedJsExtractorBase
-// in the following four class definitions to resolve the build error.
-// =================================================================================
+
 private class Mixdrop : PackedJsExtractorBase("Mixdrop", "mixdrop.ag", """MDCore\.wurl="([^"]+)""".toRegex())
 private class Mdfx9dc8n : PackedJsExtractorBase("Mdfx9dc8n", "mdfx9dc8n.net", """MDCore\.wurl="([^"]+)""".toRegex())
 private class Mxdrop : PackedJsExtractorBase("Mxdrop", "mxdrop.to", """MDCore\.wurl="([^"]+)""".toRegex())
-
 private class Bigwarp : PackedJsExtractorBase("Bigwarp", "bigwarp.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
 private class BigwarpPro : PackedJsExtractorBase("Bigwarp Pro", "bigwarp.pro", """\s*file\s*:\s*"([^"]+)""".toRegex())
-// =================================================================================
-// END of v6 FIX
-// =================================================================================
 
 private open class PlaceholderExtractor(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
