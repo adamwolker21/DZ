@@ -21,11 +21,6 @@ val extractorList = listOf(
     VidGuard()
 )
 
-// =================================================================================
-// START of v3 FIX
-// Headers copied directly from the user's cURL command to perfectly mimic a browser.
-// This is crucial for bypassing server-side bot detection that causes timeouts.
-// =================================================================================
 private val BROWSER_HEADERS = mapOf(
     "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
     "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
@@ -39,32 +34,38 @@ private val BROWSER_HEADERS = mapOf(
     "Upgrade-Insecure-Requests" to "1",
     "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
 )
-// =================================================================================
-// END of v3 FIX
-// =================================================================================
 
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
+// =================================================================================
+// START of v4 FIX
+// Added verify = false to bypass the SSLHandshakeException.
+// This tells the HTTP client to not validate the server's SSL certificate,
+// which is necessary when the server uses a self-signed or untrusted certificate.
+// =================================================================================
 private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
     return try {
-        // The referer is added separately by the app.get function
-        app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller).document
+        app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false).document
     } catch (e: Exception) {
         Log.e("SafeGetAsDocument", "Request failed for $url. Error: ${e.message}")
-        e.printStackTrace() // Print full stack trace for better debugging
+        e.printStackTrace()
         null
     }
 }
 
 private suspend fun safeGetAsText(url: String, referer: String? = null): String? {
      return try {
-        app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller).text
+        app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false).text
     } catch (e: Exception) {
         Log.e("SafeGetAsText", "Request failed for $url. Error: ${e.message}")
         e.printStackTrace()
         null
     }
 }
+// =================================================================================
+// END of v4 FIX
+// =================================================================================
+
 
 private abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
@@ -91,7 +92,6 @@ private abstract class StreamHGBase(override var name: String, override var main
             val finalPageUrl = "https://$host/e/$videoId"
             Log.d(name, "Attempting to access final page: $finalPageUrl")
 
-            // The original `url` (e.g., hglink.to) is the correct referer for this request.
             val finalPageDoc = safeGetAsDocument(finalPageUrl, referer = url)
 
             val packedJs = finalPageDoc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
@@ -102,7 +102,6 @@ private abstract class StreamHGBase(override var name: String, override var main
 
                 if (m3u8Link != null) {
                     Log.d(name, "Found m3u8 link: $m3u8Link")
-                    // Use the final page URL as the referer for the video stream
                     loadExtractor(m3u8Link, finalPageUrl, subtitleCallback, callback)
                     return
                 } else {
