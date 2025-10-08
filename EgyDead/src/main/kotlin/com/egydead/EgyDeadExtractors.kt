@@ -7,7 +7,7 @@ import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.network.CloudflareKiller
-import com.lagradost.cloudstream3.utils.Qualities // Import for quality enum
+import com.lagradost.cloudstream3.utils.Qualities
 import org.jsoup.nodes.Document
 import android.util.Log
 
@@ -70,12 +70,6 @@ private abstract class StreamHGBase(override var name: String, override var main
         "haxloppd.com"
     )
 
-    // =================================================================================
-    // START of v5 FIX
-    // The extractor now calls the callback directly with the found m3u8 link
-    // instead of passing the job to loadExtractor again. This fixes the timing issue
-    // (race condition) where the parent function would finish before the link was processed.
-    // =================================================================================
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         Log.d(name, "->->-> StreamHGBase getUrl function CALLED for URL: $url <-<-<-")
 
@@ -102,15 +96,14 @@ private abstract class StreamHGBase(override var name: String, override var main
                     Log.d(name, "Found m3u8 link: $m3u8Link. Calling callback directly.")
                     callback(
                         ExtractorLink(
-                            this.name,                               // source name
-                            this.name,                               // display name
-                            m3u8Link,                                 // the URL
-                            finalPageUrl,                             // referer
-                            Qualities.Unknown.value,                  // quality, player will determine it
+                            this.name,
+                            this.name,
+                            m3u8Link,
+                            finalPageUrl,
+                            Qualities.Unknown.value,
                             isM3u8 = true
                         )
                     )
-                    // We found a working link, so we exit the loop and the function immediately.
                     return
                 } else {
                     Log.e(name, "Found packed JS on $finalPageUrl but failed to extract m3u8 link.")
@@ -122,9 +115,6 @@ private abstract class StreamHGBase(override var name: String, override var main
 
         Log.e(name, "Failed to find a working link for video ID $videoId after trying all hosts.")
     }
-    // =================================================================================
-    // END of v5 FIX
-    // =================================================================================
 }
 
 private class StreamHG : StreamHGBase("StreamHG", "hglink.to")
@@ -144,7 +134,6 @@ private class Forafile : ExtractorApi() {
         val packedJs = document?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
             val unpacked = getAndUnpack(packedJs)
-            // Forafile seems to use mp4 directly
             val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
             if (mp4Link != null) {
                  callback(
@@ -152,7 +141,7 @@ private class Forafile : ExtractorApi() {
                         this.name,
                         this.name,
                         mp4Link,
-                        url, // Referer is the forafile page itself
+                        url,
                         Qualities.Unknown.value,
                         isM3u8 = false
                     )
@@ -184,7 +173,6 @@ private abstract class DoodStreamBase : ExtractorApi() {
             return
         }
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
-        // Doodstream requires a specific User-Agent for the final link
         val trueUrl = app.get(md5PassUrl, referer = newUrl, headers = mapOf("User-Agent" to "Mozilla/5.0")).text + "z"
         callback(ExtractorLink(this.name, this.name, trueUrl, newUrl, Qualities.Unknown.value, isM3u8 = false))
     }
@@ -215,13 +203,20 @@ private abstract class PackedJsExtractorBase(
         }
     }
 }
-
+// =================================================================================
+// START of v6 FIX
+// Corrected the typo from Packed_JsExtractorBase to PackedJsExtractorBase
+// in the following four class definitions to resolve the build error.
+// =================================================================================
 private class Mixdrop : PackedJsExtractorBase("Mixdrop", "mixdrop.ag", """MDCore\.wurl="([^"]+)""".toRegex())
-private class Mdfx9dc8n : Packed_JsExtractorBase("Mdfx9dc8n", "mdfx9dc8n.net", """MDCore\.wurl="([^"]+)""".toRegex())
-private class Mxdrop : Packed_JsExtractorBase("Mxdrop", "mxdrop.to", """MDCore\.wurl="([^"]+)""".toRegex())
+private class Mdfx9dc8n : PackedJsExtractorBase("Mdfx9dc8n", "mdfx9dc8n.net", """MDCore\.wurl="([^"]+)""".toRegex())
+private class Mxdrop : PackedJsExtractorBase("Mxdrop", "mxdrop.to", """MDCore\.wurl="([^"]+)""".toRegex())
 
-private class Bigwarp : Packed_JsExtractorBase("Bigwarp", "bigwarp.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
-private class BigwarpPro : Packed_JsExtractorBase("Bigwarp Pro", "bigwarp.pro", """\s*file\s*:\s*"([^"]+)""".toRegex())
+private class Bigwarp : PackedJsExtractorBase("Bigwarp", "bigwarp.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
+private class BigwarpPro : PackedJsExtractorBase("Bigwarp Pro", "bigwarp.pro", """\s*file\s*:\s*"([^"]+)""".toRegex())
+// =================================================================================
+// END of v6 FIX
+// =================================================================================
 
 private open class PlaceholderExtractor(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
