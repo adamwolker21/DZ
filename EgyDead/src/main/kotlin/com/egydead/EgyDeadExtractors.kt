@@ -7,24 +7,34 @@ import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.utils.httpsify
 import com.lagradost.cloudstream3.utils.loadExtractor
-import android.util.Log // Import Log for debugging
+import com.lagradost.cloudstream3.utils.CloudflareKiller // Import the Cloudflare bypass tool
+import android.util.Log
 
 // A list to hold all our extractors
 val extractorList = listOf(
-    StreamHG(), Davioad(), Haxloppd(), Kravaxxa(),
+    StreamHG(), Davioad(), Haxloppd(), Kravaxxa(), Cavanhabg(), // Added Cavanhabg
     Forafile(),
     DoodStream(), DsvPlay(),
     Mixdrop(), Mdfx9dc8n(),
 )
 
-// --- Base Headers for mimicking a real browser ---
-// We will fill this with the data from browser developer tools
-val BROWSER_HEADERS = mapOf(
-    "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+// --- Full headers from your cURL data to perfectly mimic a browser ---
+private val BROWSER_HEADERS = mapOf(
     "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
     "Accept-Language" to "en-US,en;q=0.9",
-    // We will add more headers here once we get them
+    "Sec-Ch-Ua" to "\"Chromium\";v=\"137\", \"Not/A)Brand\";v=\"24\"",
+    "Sec-Ch-Ua-Mobile" to "?0",
+    "Sec-Ch-Ua-Platform" to "\"Linux\"",
+    "Sec-Fetch-Dest" to "iframe",
+    "Sec-Fetch-Mode" to "navigate",
+    "Sec-Fetch-Site" to "cross-site",
+    "Upgrade-Insecure-Requests" to "1",
+    "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
 )
+
+// --- Cloudflare Interceptor ---
+// We will use this for all requests to the extractor pages
+private val cfInterceptor = CloudflareKiller()
 
 // --- StreamHG Handlers ---
 private abstract class StreamHGBase : ExtractorApi() {
@@ -32,11 +42,10 @@ private abstract class StreamHGBase : ExtractorApi() {
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        // Perform the request with browser-like headers
-        val doc = app.get(url, referer = referer, headers = BROWSER_HEADERS).document
+        // Use the CloudflareKiller interceptor to bypass "Just a moment..." page
+        val doc = app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cfInterceptor).document
         
-        // V16 DEBUGGING: Log the received HTML content
-        Log.d(name, "Page content for $url:\n${doc.html()}")
+        Log.d(name, "Successfully fetched page for $url")
 
         val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
@@ -45,10 +54,10 @@ private abstract class StreamHGBase : ExtractorApi() {
             if (m3u8Link != null) {
                 loadExtractor(httpsify(m3u8Link), url, subtitleCallback, callback)
             } else {
-                 Log.d(name, "Packed JS found but m3u8 link not found after unpacking.")
+                 Log.e(name, "m3u8 link not found in unpacked JS for $url")
             }
         } else {
-            Log.d(name, "Packed JS not found on page.")
+            Log.e(name, "Packed JS not found on page for $url. Page might have changed.")
         }
     }
 }
@@ -56,6 +65,7 @@ private class StreamHG : StreamHGBase() { override var mainUrl = "hglink.to" }
 private class Davioad : StreamHGBase() { override var mainUrl = "davioad.com" }
 private class Haxloppd : StreamHGBase() { override var mainUrl = "haxloppd.com" }
 private class Kravaxxa : StreamHGBase() { override var mainUrl = "kravaxxa.com" }
+private class Cavanhabg : StreamHGBase() { override var mainUrl = "cavanhabg.com"} // New domain handler
 
 // --- Forafile Handler ---
 private class Forafile : ExtractorApi() {
@@ -64,16 +74,7 @@ private class Forafile : ExtractorApi() {
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val document = app.get(url, referer = referer, headers = BROWSER_HEADERS).document
-
-        // V16 DEBUGGING: Log the received HTML content
-        Log.d(name, "Page content for $url:\n${document.html()}")
-
-        val videoUrlDirect = document.selectFirst("video.jw-video")?.attr("src")
-        if (videoUrlDirect?.isNotBlank() == true) {
-            loadExtractor(videoUrlDirect, url, subtitleCallback, callback)
-            return
-        }
+        val document = app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cfInterceptor).document
 
         val packedJs = document.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
@@ -82,10 +83,10 @@ private class Forafile : ExtractorApi() {
             if (mp4Link != null) {
                 loadExtractor(mp4Link, url, subtitleCallback, callback)
             } else {
-                Log.d(name, "Packed JS found but mp4 link not found after unpacking.")
+                 Log.e(name, "mp4 link not found in unpacked JS for $url")
             }
         } else {
-             Log.d(name, "Packed JS not found on page.")
+             Log.e(name, "Packed JS not found on page for $url.")
         }
     }
 }
@@ -96,11 +97,11 @@ private abstract class DoodStreamBase : ExtractorApi() {
     override val requiresReferer = true
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val newUrl = if (url.contains("/e/")) url else url.replace("/d/", "/e/")
-        val response = app.get(newUrl, referer = referer, headers = BROWSER_HEADERS).text
-        // The rest of the logic should be fine, but we added headers to the initial request
+        // Doodstream can also be behind Cloudflare
+        val response = app.get(newUrl, referer = referer, headers = BROWSER_HEADERS, interceptor = cfInterceptor).text
         val doodToken = response.substringAfter("'/pass_md5/").substringBefore("',")
         if (doodToken.isBlank()) {
-            Log.d(name, "Could not find doodToken. Response was:\n$response")
+            Log.e(name, "Could not find doodToken for $url")
             return
         }
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
@@ -116,11 +117,7 @@ private abstract class MixdropBase : ExtractorApi() {
     override var name = "Mixdrop"
     override val requiresReferer = true
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val res = app.get(url, referer = referer, headers = BROWSER_HEADERS).document
-        
-        // V16 DEBUGGING: Log the received HTML content
-        Log.d(name, "Page content for $url:\n${res.html()}")
-
+        val res = app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cfInterceptor).document
         val script = res.selectFirst("script:containsData(eval(function(p,a,c,k,e,d)))")?.data()
         if (script != null) {
             val unpacked = getAndUnpack(script)
@@ -129,10 +126,10 @@ private abstract class MixdropBase : ExtractorApi() {
                 val finalUrl = "https:${videoUrl}"
                 loadExtractor(finalUrl, url, subtitleCallback, callback)
             } else {
-                Log.d(name, "Packed JS found but MDCore.wurl not found after unpacking.")
+                Log.e(name, "MDCore.wurl not found in unpacked JS for $url")
             }
         } else {
-             Log.d(name, "Packed JS not found on page.")
+             Log.e(name, "Packed JS not found on page for $url.")
         }
     }
 }
