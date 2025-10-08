@@ -57,7 +57,7 @@ private suspend fun safeGetAsText(url: String, referer: String? = null): String?
 }
 
 // =================================================================================================
-// START OF THE FINAL STREAMHG EXTRACTOR (v38)
+// START OF THE FINAL STREAMHG EXTRACTOR (v40)
 // =================================================================================================
 private abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
@@ -97,7 +97,7 @@ private abstract class StreamHGBase(override var name: String, override var main
                 Log.d(name, "Success! Found packed JS on $finalPageUrl")
                 val unpacked = getAndUnpack(packedJs)
                 val m3u8Link = Regex("""(https?://.*?/master\.m3u8)""").find(unpacked)?.groupValues?.get(1)
-                
+
                 if (m3u8Link != null) {
                     Log.d(name, "Found m3u8 link: $m3u8Link")
                     // Use the final page URL as the referer for the video stream
