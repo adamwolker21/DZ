@@ -21,28 +21,37 @@ val extractorList = listOf(
     VidGuard()
 )
 
-// --- Full headers to perfectly mimic a browser, based on user's cURL data ---
+// =================================================================================
+// START of v3 FIX
+// Headers copied directly from the user's cURL command to perfectly mimic a browser.
+// This is crucial for bypassing server-side bot detection that causes timeouts.
+// =================================================================================
 private val BROWSER_HEADERS = mapOf(
-    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
-    "Accept-Language" to "en-US,en;q=0.9",
-    "Sec-Ch-Ua" to "\"Chromium\";v=\"137\", \"Not/A)Brand\";v=\"24\"",
+    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
+    "Sec-Ch-Ua" to "\"Not/A)Brand\";v=\"99\", \"Google Chrome\";v=\"115\", \"Chromium\";v=\"115\"",
     "Sec-Ch-Ua-Mobile" to "?0",
     "Sec-Ch-Ua-Platform" to "\"Linux\"",
     "Sec-Fetch-Dest" to "iframe",
     "Sec-Fetch-Mode" to "navigate",
     "Sec-Fetch-Site" to "cross-site",
+    "Sec-Fetch-User" to "?1",
     "Upgrade-Insecure-Requests" to "1",
-    "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+    "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
 )
+// =================================================================================
+// END of v3 FIX
+// =================================================================================
 
-// The definitive solution: A dedicated safe networking function with CloudflareKiller
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
 private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
     return try {
+        // The referer is added separately by the app.get function
         app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller).document
     } catch (e: Exception) {
         Log.e("SafeGetAsDocument", "Request failed for $url. Error: ${e.message}")
+        e.printStackTrace() // Print full stack trace for better debugging
         null
     }
 }
@@ -52,17 +61,14 @@ private suspend fun safeGetAsText(url: String, referer: String? = null): String?
         app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller).text
     } catch (e: Exception) {
         Log.e("SafeGetAsText", "Request failed for $url. Error: ${e.message}")
+        e.printStackTrace()
         null
     }
 }
 
-// =================================================================================================
-// START OF THE FINAL STREAMHG EXTRACTOR (v40)
-// =================================================================================================
 private abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
 
-    // This list contains all possible domains the video might be hosted on.
     private val potentialHosts = listOf(
         "kravaxxa.com",
         "cavanhabg.com",
@@ -72,10 +78,8 @@ private abstract class StreamHGBase(override var name: String, override var main
     )
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        // Diagnostic Log: Check if this function is ever called.
         Log.d(name, "->->-> StreamHGBase getUrl function CALLED for URL: $url <-<-<-")
 
-        // Step 1: Extract the unique video ID from the original URL.
         val videoId = url.substringAfterLast("/")
         if (videoId.isBlank()) {
             Log.e(name, "Could not extract video ID from $url")
@@ -83,15 +87,13 @@ private abstract class StreamHGBase(override var name: String, override var main
         }
         Log.d(name, "Extracted video ID: $videoId")
 
-        // Step 2: Loop through each potential host and try to find the video.
         for (host in potentialHosts) {
             val finalPageUrl = "https://$host/e/$videoId"
             Log.d(name, "Attempting to access final page: $finalPageUrl")
 
-            // The referer for this request should be the original hglink url
-            val finalPageDoc = safeGetAsDocument(finalPageUrl, url)
+            // The original `url` (e.g., hglink.to) is the correct referer for this request.
+            val finalPageDoc = safeGetAsDocument(finalPageUrl, referer = url)
 
-            // Step 3: Check if this page contains the packed JS. If not, continue to the next host.
             val packedJs = finalPageDoc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
             if (packedJs != null) {
                 Log.d(name, "Success! Found packed JS on $finalPageUrl")
@@ -102,7 +104,6 @@ private abstract class StreamHGBase(override var name: String, override var main
                     Log.d(name, "Found m3u8 link: $m3u8Link")
                     // Use the final page URL as the referer for the video stream
                     loadExtractor(m3u8Link, finalPageUrl, subtitleCallback, callback)
-                    // Once we find the link, we stop the loop immediately.
                     return
                 } else {
                     Log.e(name, "Found packed JS on $finalPageUrl but failed to extract m3u8 link.")
@@ -112,12 +113,10 @@ private abstract class StreamHGBase(override var name: String, override var main
             }
         }
 
-        // If the loop finishes without finding any links
         Log.e(name, "Failed to find a working link for video ID $videoId after trying all hosts.")
     }
 }
 
-// Each class now has a unique name to avoid registration conflicts.
 private class StreamHG : StreamHGBase("StreamHG", "hglink.to")
 private class Davioad : StreamHGBase("StreamHG (Davioad)", "davioad.com")
 private class Haxloppd : StreamHGBase("StreamHG (Haxloppd)", "haxloppd.com")
@@ -125,12 +124,6 @@ private class Kravaxxa : StreamHGBase("StreamHG (Kravaxxa)", "kravaxxa.com")
 private class Cavanhabg : StreamHGBase("StreamHG (Cavanhabg)", "cavanhabg.com")
 private class Dumbalag : StreamHGBase("StreamHG (Dumbalag)", "dumbalag.com" )
 
-// =================================================================================================
-// END OF REVISED STREAMHG EXTRACTOR
-// =================================================================================================
-
-
-// --- Forafile Handler ---
 private class Forafile : ExtractorApi() {
     override var name = "Forafile"
     override var mainUrl = "forafile.com"
@@ -153,7 +146,6 @@ private class Forafile : ExtractorApi() {
     }
 }
 
-// --- DoodStream Handlers ---
 private abstract class DoodStreamBase : ExtractorApi() {
     override var name = "DoodStream"
     override val requiresReferer = true
@@ -179,7 +171,6 @@ private abstract class DoodStreamBase : ExtractorApi() {
 private class DoodStream : DoodStreamBase() { override var mainUrl = "doodstream.com" }
 private class DsvPlay : DoodStreamBase() { override var mainUrl = "dsvplay.com" }
 
-// --- Packed JS Extractor Base for Mixdrop, Bigwarp, etc. ---
 private abstract class PackedJsExtractorBase(
     override var name: String,
     override var mainUrl: String,
@@ -211,7 +202,6 @@ private class Mxdrop : PackedJsExtractorBase("Mxdrop", "mxdrop.to", """MDCore\.w
 private class Bigwarp : PackedJsExtractorBase("Bigwarp", "bigwarp.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
 private class BigwarpPro : PackedJsExtractorBase("Bigwarp Pro", "bigwarp.pro", """\s*file\s*:\s*"([^"]+)""".toRegex())
 
-// Placeholder extractors for new servers - they won't work yet but prevent crashes
 private open class PlaceholderExtractor(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
