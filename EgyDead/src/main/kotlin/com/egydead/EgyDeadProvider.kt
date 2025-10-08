@@ -152,7 +152,7 @@ class EgyDeadProvider : MainAPI() {
     ): Boolean {
         // Get the watch page, returning false if it fails
         val response = getWatchPage(data) ?: return false
-        val document = response.document
+        val document = response.document // This is now the correct way to access the document
 
         Log.d("EgyDead", "Loading links for URL: $data")
         Log.d("EgyDead", "Document title: ${document.title()}")
