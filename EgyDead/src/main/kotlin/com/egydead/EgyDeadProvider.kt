@@ -4,6 +4,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import android.util.Log // Import Log
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -21,15 +22,13 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
-    // Function to handle the POST request to get the real watch page
     private suspend fun getWatchPage(url: String): Document? {
         try {
+            // No CloudflareKiller needed here as the main site seems less protected
             val initialResponse = app.get(url)
             val document = initialResponse.document
-            // Check if the "Watch Now" button exists
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
-                // Full headers to mimic a real browser request
                 val headers = mapOf(
                     "Content-Type" to "application/x-www-form-urlencoded",
                     "Referer" to url,
@@ -159,20 +158,35 @@ class EgyDeadProvider : MainAPI() {
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // Get the page with server links by simulating the button click
-        val watchPageDoc = getWatchPage(data) ?: return false
+        // Your suggested logging starts here
+        Log.d("EgyDead", "Loading links for URL: $data")
+        val watchPageDoc = getWatchPage(data)
         
-        // Find all server links
-        watchPageDoc.select("div.mob-servers li").apmap { serverLi ->
+        if(watchPageDoc == null) {
+            Log.e("EgyDead", "Failed to get watch page document.")
+            return false
+        }
+        
+        Log.d("EgyDead", "Document title: ${watchPageDoc.title()}")
+        // End of your suggested logging
+
+        val servers = watchPageDoc.select("div.mob-servers li")
+        
+        // More logging
+        Log.d("EgyDead", "Found ${servers.size} potential server elements.")
+        servers.forEachIndexed { index, server ->
+            Log.d("EgyDead", "Server element $index HTML: ${server.html()}")
+            Log.d("EgyDead", "Server data-link $index: ${server.attr("data-link")}")
+        }
+        // End of more logging
+
+        servers.apmap { serverLi ->
             val link = serverLi.attr("data-link")
             if (link.isNotBlank()) {
-                // Find the appropriate extractor from our list
                 val matchingExtractor = extractorList.find { extractor -> link.contains(extractor.mainUrl) }
                 if (matchingExtractor != null) {
-                    // Let the extractor handle the link
                     matchingExtractor.getUrl(link, data, subtitleCallback, callback)
                 } else {
-                    // Fallback for any other servers
                     loadExtractor(link, data, subtitleCallback, callback)
                 }
             }
