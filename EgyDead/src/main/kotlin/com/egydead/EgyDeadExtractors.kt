@@ -7,8 +7,8 @@ import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.utils.httpsify
 import com.lagradost.cloudstream3.utils.loadExtractor
+import com.lagradost.cloudstream3.utils.CloudflareParser // Import the correct tool
 import android.util.Log
-import org.jsoup.nodes.Document
 
 // A list to hold all our extractors
 val extractorList = listOf(
@@ -37,8 +37,10 @@ private abstract class StreamHGBase : ExtractorApi() {
     override var name = "StreamHG"
     override val requiresReferer = true
 
-    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val doc = app.get(url, referer = referer, headers = BROWSER_HEADERS).document
+    // FIX #1: referer is now non-nullable String to prevent crash
+    override suspend fun getUrl(url: String, referer: String, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        // FIX #2: Use the built-in CloudflareParser
+        val doc = app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = CloudflareParser()).document
         
         Log.d(name, "Page requested for $url")
 
@@ -52,7 +54,7 @@ private abstract class StreamHGBase : ExtractorApi() {
                  Log.e(name, "m3u8 link not found in unpacked JS for $url")
             }
         } else {
-            Log.e(name, "Packed JS not found on page for $url. Check for Cloudflare.")
+            Log.e(name, "Packed JS not found on page for $url. Cloudflare might have blocked the request.")
         }
     }
 }
@@ -68,20 +70,20 @@ private class Forafile : ExtractorApi() {
     override var mainUrl = "forafile.com"
     override val requiresReferer = true
 
-    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val document = app.get(url, referer = referer, headers = BROWSER_HEADERS).document
+    override suspend fun getUrl(url: String, referer: String, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        val document = app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = CloudflareParser()).document
 
         val packedJs = document.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
             val unpacked = getAndUnpack(packedJs)
-            val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)"""").find(unpacked)?.groupValues?.get(1)
+            val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
             if (mp4Link != null) {
                 loadExtractor(mp4Link, url, subtitleCallback, callback)
             } else {
                  Log.e(name, "mp4 link not found in unpacked JS for $url")
             }
         } else {
-             Log.e(name, "Packed JS not found on page for $url. Check for Cloudflare.")
+             Log.e(name, "Packed JS not found on page for $url. Cloudflare might have blocked the request.")
         }
     }
 }
@@ -90,12 +92,12 @@ private class Forafile : ExtractorApi() {
 private abstract class DoodStreamBase : ExtractorApi() {
     override var name = "DoodStream"
     override val requiresReferer = true
-    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+    override suspend fun getUrl(url: String, referer: String, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val newUrl = if (url.contains("/e/")) url else url.replace("/d/", "/e/")
-        val responseText = app.get(newUrl, referer = referer, headers = BROWSER_HEADERS).text
+        val responseText = app.get(newUrl, referer = referer, headers = BROWSER_HEADERS, interceptor = CloudflareParser()).text
         val doodToken = responseText.substringAfter("'/pass_md5/").substringBefore("',")
         if (doodToken.isBlank()) {
-            Log.e(name, "Could not find doodToken for $url. Check for Cloudflare.")
+            Log.e(name, "Could not find doodToken for $url. Cloudflare might have blocked the request.")
             return
         }
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
@@ -110,8 +112,8 @@ private class DsvPlay : DoodStreamBase() { override var mainUrl = "dsvplay.com" 
 private abstract class MixdropBase : ExtractorApi() {
     override var name = "Mixdrop"
     override val requiresReferer = true
-    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val res = app.get(url, referer = referer, headers = BROWSER_HEADERS).document
+    override suspend fun getUrl(url: String, referer: String, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        val res = app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = CloudflareParser()).document
         val script = res.selectFirst("script:containsData(eval(function(p,a,c,k,e,d)))")?.data()
         if (script != null) {
             val unpacked = getAndUnpack(script)
@@ -123,7 +125,7 @@ private abstract class MixdropBase : ExtractorApi() {
                 Log.e(name, "MDCore.wurl not found in unpacked JS for $url")
             }
         } else {
-             Log.e(name, "Packed JS not found on page for $url. Check for Cloudflare.")
+             Log.e(name, "Packed JS not found on page for $url. Cloudflare might have blocked the request.")
         }
     }
 }
