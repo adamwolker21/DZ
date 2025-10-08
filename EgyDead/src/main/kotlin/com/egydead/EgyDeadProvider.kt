@@ -4,6 +4,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import android.util.Log
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -32,11 +33,16 @@ class EgyDeadProvider : MainAPI() {
             // Check if the button form exists on the page
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
+                // Add the missing sec-fetch headers to mimic a real browser request
                 val headers = mapOf(
                     "Content-Type" to "application/x-www-form-urlencoded",
                     "Referer" to url,
                     "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
                     "Origin" to mainUrl,
+                    "sec-fetch-dest" to "document",
+                    "sec-fetch-mode" to "navigate",
+                    "sec-fetch-site" to "same-origin",
+                    "sec-fetch-user" to "?1"
                 )
                 val data = mapOf("View" to "1")
                 // Perform the POST request to get the real watch page with servers
@@ -159,14 +165,11 @@ class EgyDeadProvider : MainAPI() {
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // Use our new function to get the correct page document
         val watchPageDoc = getWatchPage(data) ?: return false
 
-        // Select server links from the correct container and attribute
         watchPageDoc.select("div.mob-servers li").apmap { serverLi ->
             val link = serverLi.attr("data-link")
             if (link.isNotBlank()) {
-                // Find a matching extractor from our list and invoke it
                 extractorList.find { extractor -> link.contains(extractor.mainUrl) }?.getUrl(link, data, subtitleCallback, callback)
             }
         }
