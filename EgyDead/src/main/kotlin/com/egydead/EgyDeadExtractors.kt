@@ -7,6 +7,7 @@ import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.network.CloudflareKiller
+import com.lagradost.cloudstream3.utils.Qualities // Import for quality enum
 import org.jsoup.nodes.Document
 import android.util.Log
 
@@ -37,12 +38,6 @@ private val BROWSER_HEADERS = mapOf(
 
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
-// =================================================================================
-// START of v4 FIX
-// Added verify = false to bypass the SSLHandshakeException.
-// This tells the HTTP client to not validate the server's SSL certificate,
-// which is necessary when the server uses a self-signed or untrusted certificate.
-// =================================================================================
 private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
     return try {
         app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false).document
@@ -62,9 +57,6 @@ private suspend fun safeGetAsText(url: String, referer: String? = null): String?
         null
     }
 }
-// =================================================================================
-// END of v4 FIX
-// =================================================================================
 
 
 private abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
@@ -78,6 +70,12 @@ private abstract class StreamHGBase(override var name: String, override var main
         "haxloppd.com"
     )
 
+    // =================================================================================
+    // START of v5 FIX
+    // The extractor now calls the callback directly with the found m3u8 link
+    // instead of passing the job to loadExtractor again. This fixes the timing issue
+    // (race condition) where the parent function would finish before the link was processed.
+    // =================================================================================
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         Log.d(name, "->->-> StreamHGBase getUrl function CALLED for URL: $url <-<-<-")
 
@@ -101,8 +99,18 @@ private abstract class StreamHGBase(override var name: String, override var main
                 val m3u8Link = Regex("""(https?://.*?/master\.m3u8)""").find(unpacked)?.groupValues?.get(1)
 
                 if (m3u8Link != null) {
-                    Log.d(name, "Found m3u8 link: $m3u8Link")
-                    loadExtractor(m3u8Link, finalPageUrl, subtitleCallback, callback)
+                    Log.d(name, "Found m3u8 link: $m3u8Link. Calling callback directly.")
+                    callback(
+                        ExtractorLink(
+                            this.name,                               // source name
+                            this.name,                               // display name
+                            m3u8Link,                                 // the URL
+                            finalPageUrl,                             // referer
+                            Qualities.Unknown.value,                  // quality, player will determine it
+                            isM3u8 = true
+                        )
+                    )
+                    // We found a working link, so we exit the loop and the function immediately.
                     return
                 } else {
                     Log.e(name, "Found packed JS on $finalPageUrl but failed to extract m3u8 link.")
@@ -114,6 +122,9 @@ private abstract class StreamHGBase(override var name: String, override var main
 
         Log.e(name, "Failed to find a working link for video ID $videoId after trying all hosts.")
     }
+    // =================================================================================
+    // END of v5 FIX
+    // =================================================================================
 }
 
 private class StreamHG : StreamHGBase("StreamHG", "hglink.to")
@@ -133,9 +144,19 @@ private class Forafile : ExtractorApi() {
         val packedJs = document?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
             val unpacked = getAndUnpack(packedJs)
+            // Forafile seems to use mp4 directly
             val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
             if (mp4Link != null) {
-                loadExtractor(mp4Link, url, subtitleCallback, callback)
+                 callback(
+                    ExtractorLink(
+                        this.name,
+                        this.name,
+                        mp4Link,
+                        url, // Referer is the forafile page itself
+                        Qualities.Unknown.value,
+                        isM3u8 = false
+                    )
+                )
             } else {
                  Log.e(name, "mp4 link not found in unpacked JS for $url")
             }
@@ -153,7 +174,7 @@ private abstract class DoodStreamBase : ExtractorApi() {
         val responseText = safeGetAsText(newUrl, referer)
 
         if (responseText.isNullOrBlank()) {
-            Log.e(name, "Response text was null or blank for $newUrl. Cloudflare bypass likely failed.")
+            Log.e(name, "Response text was null or blank for $newUrl.")
             return
         }
 
@@ -163,8 +184,9 @@ private abstract class DoodStreamBase : ExtractorApi() {
             return
         }
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
-        val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z"
-        loadExtractor(trueUrl, newUrl, subtitleCallback, callback)
+        // Doodstream requires a specific User-Agent for the final link
+        val trueUrl = app.get(md5PassUrl, referer = newUrl, headers = mapOf("User-Agent" to "Mozilla/5.0")).text + "z"
+        callback(ExtractorLink(this.name, this.name, trueUrl, newUrl, Qualities.Unknown.value, isM3u8 = false))
     }
 }
 private class DoodStream : DoodStreamBase() { override var mainUrl = "doodstream.com" }
@@ -184,22 +206,22 @@ private abstract class PackedJsExtractorBase(
             val videoUrl = regex.find(unpacked)?.groupValues?.get(1)
             if (videoUrl != null && videoUrl.isNotBlank()) {
                 val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
-                loadExtractor(finalUrl, url, subtitleCallback, callback)
+                callback(ExtractorLink(this.name, this.name, finalUrl, url, Qualities.Unknown.value))
             } else {
                 Log.e(name, "Regex failed to find video URL in unpacked JS for $url")
             }
         } else {
-             Log.e(name, "Packed JS not found for $url. Cloudflare bypass likely failed.")
+             Log.e(name, "Packed JS not found for $url.")
         }
     }
 }
 
 private class Mixdrop : PackedJsExtractorBase("Mixdrop", "mixdrop.ag", """MDCore\.wurl="([^"]+)""".toRegex())
-private class Mdfx9dc8n : PackedJsExtractorBase("Mdfx9dc8n", "mdfx9dc8n.net", """MDCore\.wurl="([^"]+)""".toRegex())
-private class Mxdrop : PackedJsExtractorBase("Mxdrop", "mxdrop.to", """MDCore\.wurl="([^"]+)""".toRegex())
+private class Mdfx9dc8n : Packed_JsExtractorBase("Mdfx9dc8n", "mdfx9dc8n.net", """MDCore\.wurl="([^"]+)""".toRegex())
+private class Mxdrop : Packed_JsExtractorBase("Mxdrop", "mxdrop.to", """MDCore\.wurl="([^"]+)""".toRegex())
 
-private class Bigwarp : PackedJsExtractorBase("Bigwarp", "bigwarp.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
-private class BigwarpPro : PackedJsExtractorBase("Bigwarp Pro", "bigwarp.pro", """\s*file\s*:\s*"([^"]+)""".toRegex())
+private class Bigwarp : Packed_JsExtractorBase("Bigwarp", "bigwarp.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
+private class BigwarpPro : Packed_JsExtractorBase("Bigwarp Pro", "bigwarp.pro", """\s*file\s*:\s*"([^"]+)""".toRegex())
 
 private open class PlaceholderExtractor(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
