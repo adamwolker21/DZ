@@ -57,7 +57,7 @@ private suspend fun safeGetAsText(url: String, referer: String? = null): String?
 }
 
 // =================================================================================================
-// START OF THE FINAL STREAMHG EXTRACTOR (v37)
+// START OF THE FINAL STREAMHG EXTRACTOR (v38)
 // =================================================================================================
 private abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
