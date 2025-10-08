@@ -35,7 +35,7 @@ class EgyDeadProvider : MainAPI() {
             app.post(
                 url,
                 // This interceptor is crucial for bypassing Cloudflare on the main site
-                interceptor = cloudflareKiller, 
+                interceptor = cloudflareKiller,
                 headers = mapOf(
                     "Content-Type" to "application/x-www-form-urlencoded",
                     "Referer" to url,
@@ -147,7 +147,7 @@ class EgyDeadProvider : MainAPI() {
     }
 
     // =================================================================================================
-    // START OF THE FINAL, ROBUST loadLinks FUNCTION (v38)
+    // START OF THE FINAL, ROBUST loadLinks FUNCTION (v39)
     // =================================================================================================
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
@@ -170,17 +170,17 @@ class EgyDeadProvider : MainAPI() {
             callback(link)
         }
 
-        val servers = document.select("div.mob-servers li")
+        val servers: List<Element> = document.select("div.mob-servers li")
         Log.d("EgyDead", "Found ${servers.size} potential server elements")
         servers.forEachIndexed { index, server ->
-            val link = server.attr("data-link")
-            val name = server.text()
+            val link: String = server.attr("data-link")
+            val name: String = server.text()
             Log.d("EgyDead", "Server #$index | Name: $name | Link: $link")
         }
 
         // Use apmap to process all servers in parallel. It will wait for all of them to finish.
         servers.apmap { server ->
-            val link = server.attr("data-link")
+            val link: String = server.attr("data-link")
             if (link.isNotBlank()) {
                 // We pass our new, enhanced callback to loadExtractor
                 loadExtractor(link, data, subtitleCallback, newCallback)
