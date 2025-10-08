@@ -38,22 +38,8 @@ private val BROWSER_HEADERS = mapOf(
 // The definitive solution: A dedicated safe networking function with CloudflareKiller
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
-// This function now returns the full response object to allow access to headers
-private suspend fun safeGet(url: String, referer: String? = null) = try {
-    app.get(
-        url,
-        referer = referer,
-        headers = BROWSER_HEADERS,
-        interceptor = cloudflareKiller,
-        allowRedirects = false // Crucial for capturing the 'Location' header
-    )
-} catch (e: Exception) {
-    Log.e("SafeGet", "Request failed for $url. Error: ${e.message}")
-    null
-}
-
 private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
-    // This is a normal GET request that follows redirects
+    // This GET request now automatically follows JS redirects thanks to the interceptor
     return try {
         app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller).document
     } catch (e: Exception) {
@@ -72,49 +58,42 @@ private suspend fun safeGetAsText(url: String, referer: String? = null): String?
 }
 
 // =================================================================================================
-// START OF NEW, MULTI-STEP STREAMHG EXTRACTOR
+// START OF REVISED, SIMPLIFIED STREAMHG EXTRACTOR (v34)
 // =================================================================================================
 private abstract class StreamHGBase : ExtractorApi() {
     override var name = "StreamHG"
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        // Step 1: Make the initial request to the hglink.to URL to get the redirect location
-        val initialResponse = safeGet(url, referer)
-        val redirectUrl = initialResponse?.headers?.get("Location")
+        // Step 1: Directly request the hglink URL. The safeGetAsDocument function
+        // with CloudflareKiller will handle the JS redirect and return the FINAL page document.
+        val finalPageDoc = safeGetAsDocument(url, referer)
 
-        if (redirectUrl.isNullOrBlank()) {
-            Log.e(name, "Step 1 Failed: Could not get redirect URL from $url")
-            return
-        }
-
-        Log.d(name, "Step 1 Success: Redirecting to $redirectUrl")
-
-        // Step 2: Make the request to the new URL (e.g., kravaxxa.com), using the *original* URL as the referer
-        val finalPageDoc = safeGetAsDocument(redirectUrl, url)
         if (finalPageDoc == null) {
-            Log.e(name, "Step 2 Failed: Could not get document from final page $redirectUrl")
+            Log.e(name, "Failed to get final page document, Cloudflare bypass might have failed for $url")
             return
         }
 
-        Log.d(name, "Step 2 Success: Got final page document")
+        // The current URL of the document after the redirect is the correct referer for the video.
+        val finalPageUrl = finalPageDoc.location()
+        Log.d(name, "Successfully landed on final page: $finalPageUrl")
 
-        // Step 3: Find and unpack the JS to get the m3u8 link
+        // Step 2: Find and unpack the JS on the final page to get the m3u8 link
         val packedJs = finalPageDoc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
             val unpacked = getAndUnpack(packedJs)
             val m3u8Link = Regex("""(https?://.*?/master\.m3u8)""").find(unpacked)?.groupValues?.get(1)
             
             if (m3u8Link != null) {
-                 Log.d(name, "Step 3 Success: Found m3u8 link: $m3u8Link")
-                // Step 4: Use the safe, compatible loadExtractor function
-                loadExtractor(m3u8Link, redirectUrl, subtitleCallback, callback)
+                 Log.d(name, "Found m3u8 link: $m3u8Link")
+                // Step 3: Use the safe, compatible loadExtractor function, providing the final page URL as the referer
+                loadExtractor(m3u8Link, finalPageUrl, subtitleCallback, callback)
 
             } else {
-                 Log.e(name, "Step 3 Failed: m3u8 link not found in unpacked JS")
+                 Log.e(name, "m3u8 link not found in unpacked JS on page $finalPageUrl")
             }
         } else {
-            Log.e(name, "Step 3 Failed: Packed JS not found on page $redirectUrl")
+            Log.e(name, "Packed JS not found on page $finalPageUrl")
         }
     }
 }
@@ -125,7 +104,7 @@ private class Kravaxxa : StreamHGBase() { override var mainUrl = "kravaxxa.com" 
 private class Cavanhabg : StreamHGBase() { override var mainUrl = "cavanhabg.com"}
 
 // =================================================================================================
-// END OF NEW STREAMHG EXTRACTOR
+// END OF REVISED STREAMHG EXTRACTOR
 // =================================================================================================
 
 
