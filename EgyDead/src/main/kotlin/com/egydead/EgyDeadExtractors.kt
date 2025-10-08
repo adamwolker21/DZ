@@ -38,15 +38,13 @@ private abstract class StreamHGBase : ExtractorApi() {
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val doc = app.get(url, referer = referer).document
-        // Find the script with the packed JS code
         val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
-            // Unpack it to reveal the real source link
             val unpacked = getAndUnpack(packedJs)
-            // Regex to find the master.m3u8 link inside the unpacked script
             val m3u8Link = Regex("""(https?://.*?/master\.m3u8)""").find(unpacked)?.groupValues?.get(1)
             if (m3u8Link != null) {
-                loadExtractor(httpsify(m3u8Link), referer, subtitleCallback, callback)
+                // FIX: Use the extractor's own URL as the referer for the final link
+                loadExtractor(httpsify(m3u8Link), url, subtitleCallback, callback)
             }
         }
     }
@@ -76,21 +74,20 @@ private class Forafile : ExtractorApi() {
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val document = app.get(url, referer = referer).document
 
-        // First, try the direct and easiest method: find the video tag src
-        val videoUrl = document.selectFirst("video.jw-video")?.attr("src")
-        if (videoUrl?.isNotBlank() == true) {
-            loadExtractor(videoUrl, referer, subtitleCallback, callback)
+        val videoUrlDirect = document.selectFirst("video.jw-video")?.attr("src")
+        if (videoUrlDirect?.isNotBlank() == true) {
+            // FIX: Use the extractor's own URL as the referer
+            loadExtractor(videoUrlDirect, url, subtitleCallback, callback)
             return
         }
 
-        // If the direct method fails, fall back to unpacking the JS
         val packedJs = document.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
             val unpacked = getAndUnpack(packedJs)
-            // Regex to find the video.mp4 link
             val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)"""").find(unpacked)?.groupValues?.get(1)
             if (mp4Link != null) {
-                loadExtractor(mp4Link, referer, subtitleCallback, callback)
+                // FIX: Use the extractor's own URL as the referer
+                loadExtractor(mp4Link, url, subtitleCallback, callback)
             }
         }
     }
