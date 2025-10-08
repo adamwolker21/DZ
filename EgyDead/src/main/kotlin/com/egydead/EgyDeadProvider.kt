@@ -2,10 +2,11 @@ package com.egydead
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.network.CloudflareKiller // The correct import
+import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import android.util.Log 
+import android.util.Log
+import java.util.concurrent.atomic.AtomicBoolean // Import required for the fix
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -23,10 +24,8 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
-    // The interceptor to be used for the main site requests
     private val cloudflareKiller by lazy { CloudflareKiller() }
 
-    // This function will now use CloudflareKiller to get the real watch page
     private suspend fun getWatchPage(url: String): Document? {
         try {
             val initialResponse = app.get(url, interceptor = cloudflareKiller)
@@ -44,7 +43,6 @@ class EgyDeadProvider : MainAPI() {
                     "sec-fetch-user" to "?1"
                 )
                 val data = mapOf("View" to "1")
-                // The POST request also needs the interceptor
                 return app.post(url, headers = headers, data = data, cookies = cookies, interceptor = cloudflareKiller).document
             }
             return document
@@ -159,6 +157,9 @@ class EgyDeadProvider : MainAPI() {
         }
     }
     
+    // =================================================================================
+    // START of v2 FIX
+    // =================================================================================
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
@@ -173,7 +174,6 @@ class EgyDeadProvider : MainAPI() {
         
         Log.d("EgyDead", "Document title: ${watchPageDoc.title()}")
 
-        // We only use the streaming servers as requested
         val servers = watchPageDoc.select("div.mob-servers li")
         
         Log.d("EgyDead", "Found ${servers.size} potential server elements.")
@@ -181,12 +181,30 @@ class EgyDeadProvider : MainAPI() {
             Log.d("EgyDead", "Server data-link $index: ${server.attr("data-link")}")
         }
 
+        // A thread-safe boolean to track if any links were found.
+        // This is necessary because apmap runs tasks in parallel.
+        val linksFound = AtomicBoolean(false)
+
         servers.apmap { serverLi ->
             val link = serverLi.attr("data-link")
             if (link.isNotBlank()) {
-                loadExtractor(link, data, subtitleCallback, callback)
+                // We create a new callback that wraps the original one.
+                val newCallback = { extractorLink: ExtractorLink ->
+                    // When a link is found, we set our flag to true.
+                    linksFound.set(true)
+                    // Then we call the original callback to pass the link to the UI.
+                    callback(extractorLink)
+                }
+                // We pass the new wrapped callback to the extractor.
+                loadExtractor(link, data, subtitleCallback, newCallback)
             }
         }
-        return true
+
+        // The function now returns the value of our flag. It will be true
+        // only if at least one extractor successfully called the callback.
+        return linksFound.get()
     }
+    // =================================================================================
+    // END of v2 FIX
+    // =================================================================================
 }
