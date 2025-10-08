@@ -11,13 +11,16 @@ import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import android.util.Log
 
-// A list to hold all our extractors
+// Updated the main extractorList in the Provider, this file is now for defining the extractors themselves.
+// We will still define the list here for clarity and potential future use.
 val extractorList = listOf(
     StreamHG(), Davioad(), Haxloppd(), Kravaxxa(), Cavanhabg(),
     Forafile(),
     DoodStream(), DsvPlay(),
-    Mixdrop(), Mdfx9dc8n(),
-    Bigwarp()
+    Mixdrop(), Mdfx9dc8n(), Mxdrop(),
+    Bigwarp(), BigwarpPro(),
+    EarnVids(),
+    VidGuard()
 )
 
 // --- Full headers to perfectly mimic a browser ---
@@ -37,10 +40,6 @@ private val BROWSER_HEADERS = mapOf(
 // The definitive solution: A dedicated safe networking function with CloudflareKiller
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
-// =================================================================================================
-// START OF THE CRASH-PROOF NETWORKING FUNCTIONS
-// These functions will prevent the app from crashing even if Cloudflare bypass fails.
-// =================================================================================================
 private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
     return try {
         val response = app.get(
@@ -49,7 +48,6 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
             headers = BROWSER_HEADERS,
             interceptor = cloudflareKiller
         )
-        // Check for a successful response code before trying to parse the document
         if (response.code == 200) response.document else null
     } catch (e: Exception) {
         Log.e("SafeGetAsDocument", "Request failed for $url. Error: ${e.message}")
@@ -71,10 +69,6 @@ private suspend fun safeGetAsText(url: String, referer: String? = null): String?
         null
     }
 }
-// =================================================================================================
-// END OF THE CRASH-PROOF NETWORKING FUNCTIONS
-// =================================================================================================
-
 
 // --- StreamHG Handlers ---
 private abstract class StreamHGBase : ExtractorApi() {
@@ -145,7 +139,6 @@ private abstract class DoodStreamBase : ExtractorApi() {
             return
         }
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
-        // This second request usually doesn't have cloudflare
         val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z"
         loadExtractor(trueUrl, newUrl, subtitleCallback, callback)
     }
@@ -178,6 +171,22 @@ private abstract class PackedJsExtractorBase(
     }
 }
 
+// Defining the extractors for the new domains
 private class Mixdrop : PackedJsExtractorBase("Mixdrop", "mixdrop.ag", """MDCore\.wurl="([^"]+)""".toRegex())
 private class Mdfx9dc8n : PackedJsExtractorBase("Mdfx9dc8n", "mdfx9dc8n.net", """MDCore\.wurl="([^"]+)""".toRegex())
+private class Mxdrop : PackedJsExtractorBase("Mxdrop", "mxdrop.to", """MDCore\.wurl="([^"]+)""".toRegex())
+
 private class Bigwarp : PackedJsExtractorBase("Bigwarp", "bigwarp.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
+private class BigwarpPro : PackedJsExtractorBase("Bigwarp Pro", "bigwarp.pro", """\s*file\s*:\s*"([^"]+)""".toRegex())
+
+// Placeholder extractors for new servers - they won't work yet but prevent crashes
+private open class PlaceholderExtractor(override var name: String, override var mainUrl: String) : ExtractorApi() {
+    override val requiresReferer = true
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        Log.e(name, "Extractor not yet implemented for $url")
+        // Does nothing, just prevents crashes
+    }
+}
+
+private class EarnVids : PlaceholderExtractor("EarnVids", "dingtezuni.com")
+private class VidGuard : PlaceholderExtractor("VidGuard", "listeamed.net")
