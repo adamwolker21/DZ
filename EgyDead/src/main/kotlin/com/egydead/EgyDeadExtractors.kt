@@ -57,7 +57,7 @@ private suspend fun safeGetAsText(url: String, referer: String? = null): String?
 }
 
 // =================================================================================================
-// START OF THE MANUAL REDIRECT STREAMHG EXTRACTOR (v35)
+// START OF THE MANUAL REDIRECT STREAMHG EXTRACTOR (v36)
 // =================================================================================================
 private abstract class StreamHGBase : ExtractorApi() {
     override var name = "StreamHG"
@@ -73,6 +73,9 @@ private abstract class StreamHGBase : ExtractorApi() {
     )
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        // Diagnostic Log: Check if this function is ever called.
+        Log.d("StreamHG_Extractor", "->->-> StreamHGBase getUrl function CALLED for URL: $url <-<-<-")
+
         // Step 1: Extract the unique video ID from the original URL.
         val videoId = url.substringAfterLast("/")
         if (videoId.isBlank()) {
