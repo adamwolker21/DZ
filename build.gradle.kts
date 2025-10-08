@@ -1,97 +1,154 @@
-import com.android.build.gradle.BaseExtension
-import com.lagradost.cloudstream3.gradle.CloudstreamExtension
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
+package com.egydead
 
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-        // Shitpack repo which contains our tools and dependencies
-        maven("https://jitpack.io")
-    }
+import com.lagradost.cloudstream3.app
+import com.lagradost.cloudstream3.utils.ExtractorApi
+import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.SubtitleFile
+import com.lagradost.cloudstream3.utils.getAndUnpack
+import com.lagradost.cloudstream3.utils.httpsify
+import com.lagradost.cloudstream3.utils.loadExtractor
+import android.util.Log
+import kotlinx.coroutines.delay
+import org.jsoup.Jsoup // Import Jsoup for parsing HTML
 
-    dependencies {
-        classpath("com.android.tools.build:gradle:8.7.3")
-        // Cloudstream gradle plugin which makes everything work and builds plugins
-        classpath("com.github.recloudstream:gradle:-SNAPSHOT")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.0")
+// A list to hold all our extractors
+val extractorList = listOf(
+    StreamHG(), Davioad(), Haxloppd(), Kravaxxa(), Cavanhabg(),
+    Forafile(),
+    DoodStream(), DsvPlay(),
+    Mixdrop(), Mdfx9dc8n(),
+)
+
+// --- Full headers from your cURL data to perfectly mimic a browser ---
+private val BROWSER_HEADERS = mapOf(
+    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+    "Accept-Language" to "en-US,en;q=0.9",
+    "Sec-Ch-Ua" to "\"Chromium\";v=\"137\", \"Not/A)Brand\";v=\"24\"",
+    "Sec-Ch-Ua-Mobile" to "?0",
+    "Sec-Ch-Ua-Platform" to "\"Linux\"",
+    "Sec-Fetch-Dest" to "iframe",
+    "Sec-Fetch-Mode" to "navigate",
+    "Sec-Fetch-Site" to "cross-site",
+    "Upgrade-Insecure-Requests" to "1",
+    "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+)
+
+
+/**
+ * A manual Cloudflare bypass function.
+ * It makes a request, checks for Cloudflare protection, waits 5 seconds if found,
+ * and then makes the request again.
+ */
+private suspend fun appRequestWithManualCloudflare(url: String, referer: String?): String {
+    val initialResponse = app.get(url, referer = referer, headers = BROWSER_HEADERS)
+    // Check for common Cloudflare protection phrases
+    if (initialResponse.text.contains("Just a moment...") || initialResponse.text.contains("Verifying you are not a robot")) {
+        Log.d("CloudflareBypass", "Cloudflare detected for $url. Waiting 5 seconds...")
+        delay(5000) // Wait for 5 seconds
+        Log.d("CloudflareBypass", "Retrying request for $url...")
+        return app.get(url, referer = referer, headers = BROWSER_HEADERS).text
     }
+    return initialResponse.text
 }
 
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-        maven("https://jitpack.io")
-    }
-}
 
-fun Project.cloudstream(configuration: CloudstreamExtension.() -> Unit) = extensions.getByName<CloudstreamExtension>("cloudstream").configuration()
+// --- StreamHG Handlers ---
+private abstract class StreamHGBase : ExtractorApi() {
+    override var name = "StreamHG"
+    override val requiresReferer = true
 
-fun Project.android(configuration: BaseExtension.() -> Unit) = extensions.getByName<BaseExtension>("android").configuration()
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        val html = appRequestWithManualCloudflare(url, referer)
+        val doc = Jsoup.parse(html) // FIX: Use Jsoup.parse instead of app.parseHTML
+        
+        Log.d(name, "Successfully fetched page for $url")
 
-subprojects {
-    apply(plugin = "com.android.library")
-    apply(plugin = "kotlin-android")
-    apply(plugin = "com.lagradost.cloudstream3.gradle")
-
-    cloudstream {
-        // when running through github workflow, GITHUB_REPOSITORY should contain current repository name
-        setRepo(System.getenv("GITHUB_REPOSITORY") ?: "https://github.com/SaurabhKaperwan/CSX")
-
-        authors = listOf("megix")
-    }
-
-    android {
-        namespace = "com.megix"
-
-        defaultConfig {
-            minSdk = 21
-            compileSdkVersion(35)
-            targetSdk = 35
-        }
-
-        compileOptions {
-            sourceCompatibility = JavaVersion.VERSION_1_8
-            targetCompatibility = JavaVersion.VERSION_1_8
-        }
-
-        tasks.withType<KotlinJvmCompile> {
-            compilerOptions {
-                jvmTarget.set(JvmTarget.JVM_1_8)
-                freeCompilerArgs.addAll(
-                    "-Xno-call-assertions",
-                    "-Xno-param-assertions",
-                    "-Xno-receiver-assertions"
-                )
+        val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
+        if (packedJs != null) {
+            val unpacked = getAndUnpack(packedJs)
+            val m3u8Link = Regex("""(https?://.*?/master\.m3u8)""").find(unpacked)?.groupValues?.get(1)
+            if (m3u8Link != null) {
+                loadExtractor(httpsify(m3u8Link), url, subtitleCallback, callback)
+            } else {
+                 Log.e(name, "m3u8 link not found in unpacked JS for $url")
             }
+        } else {
+            Log.e(name, "Packed JS not found on page for $url. Page content was:\n$html")
         }
     }
+}
+private class StreamHG : StreamHGBase() { override var mainUrl = "hglink.to" }
+private class Davioad : StreamHGBase() { override var mainUrl = "davioad.com" }
+private class Haxloppd : StreamHGBase() { override var mainUrl = "haxloppd.com" }
+private class Kravaxxa : StreamHGBase() { override var mainUrl = "kravaxxa.com" }
+private class Cavanhabg : StreamHGBase() { override var mainUrl = "cavanhabg.com"}
 
-    dependencies {
-        val cloudstream by configurations
-        val implementation by configurations
+// --- Forafile Handler ---
+private class Forafile : ExtractorApi() {
+    override var name = "Forafile"
+    override var mainUrl = "forafile.com"
+    override val requiresReferer = true
 
-        // Stubs for all Cloudstream classes
-        cloudstream("com.lagradost:cloudstream3:pre-release")
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        val html = appRequestWithManualCloudflare(url, referer)
+        val document = Jsoup.parse(html) // FIX: Use Jsoup.parse instead of app.parseHTML
 
-        // these dependencies can include any of those which are added by the app,
-        // but you dont need to include any of them if you dont need them
-        // https://github.com/recloudstream/cloudstream/blob/master/app/build.gradle.kts
-
-        implementation(kotlin("stdlib")) // adds standard kotlin features, like listOf, mapOf etc
-        implementation("com.github.Blatzar:NiceHttp:0.4.13") // http library
-        implementation("org.jsoup:jsoup:1.18.3") // html parser
-        implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.16.0")
-        implementation("com.squareup.okhttp3:okhttp:4.12.0")
-        implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
-        implementation("org.mozilla:rhino:1.8.0") //run JS
-        implementation("com.google.code.gson:gson:2.11.0")
-
+        val packedJs = document.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
+        if (packedJs != null) {
+            val unpacked = getAndUnpack(packedJs)
+            val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)"""").find(unpacked)?.groupValues?.get(1)
+            if (mp4Link != null) {
+                loadExtractor(mp4Link, url, subtitleCallback, callback)
+            } else {
+                 Log.e(name, "mp4 link not found in unpacked JS for $url")
+            }
+        } else {
+             Log.e(name, "Packed JS not found on page for $url. Page content was:\n$html")
+        }
     }
 }
 
-task<Delete>("clean") {
-    delete(rootProject.layout.buildDirectory)
+// --- DoodStream Handlers ---
+private abstract class DoodStreamBase : ExtractorApi() {
+    override var name = "DoodStream"
+    override val requiresReferer = true
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        val newUrl = if (url.contains("/e/")) url else url.replace("/d/", "/e/")
+        val response = appRequestWithManualCloudflare(newUrl, referer)
+        val doodToken = response.substringAfter("'/pass_md5/").substringBefore("',")
+        if (doodToken.isBlank()) {
+            Log.e(name, "Could not find doodToken for $url")
+            return
+        }
+        val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
+        val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z"
+        loadExtractor(trueUrl, newUrl, subtitleCallback, callback)
+    }
 }
+private class DoodStream : DoodStreamBase() { override var mainUrl = "doodstream.com" }
+private class DsvPlay : DoodStreamBase() { override var mainUrl = "dsvplay.com" }
+
+// --- Mixdrop Handlers ---
+private abstract class MixdropBase : ExtractorApi() {
+    override var name = "Mixdrop"
+    override val requiresReferer = true
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        val html = appRequestWithManualCloudflare(url, referer)
+        val res = Jsoup.parse(html) // FIX: Use Jsoup.parse instead of app.parseHTML
+        val script = res.selectFirst("script:containsData(eval(function(p,a,c,k,e,d)))")?.data()
+        if (script != null) {
+            val unpacked = getAndUnpack(script)
+            val videoUrl = Regex("""MDCore\.wurl="([^"]+)""").find(unpacked)?.groupValues?.get(1)
+            if (videoUrl != null) {
+                val finalUrl = "https:${videoUrl}"
+                loadExtractor(finalUrl, url, subtitleCallback, callback)
+            } else {
+                Log.e(name, "MDCore.wurl not found in unpacked JS for $url")
+            }
+        } else {
+             Log.e(name, "Packed JS not found on page for $url. Page content was:\n$html")
+        }
+    }
+}
+private class Mixdrop : MixdropBase() { override var mainUrl = "mixdrop.ag" }
+private class Mdfx9dc8n : MixdropBase() { override var mainUrl = "mdfx9dc8n.net" }
