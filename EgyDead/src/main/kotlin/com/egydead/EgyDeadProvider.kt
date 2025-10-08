@@ -4,7 +4,6 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import android.util.Log
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -22,18 +21,15 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
-    /**
-     * This function handles the "Watch and Download" button logic.
-     * It performs a POST request to reveal the server links.
-     */
+    // Function to handle the POST request to get the real watch page
     private suspend fun getWatchPage(url: String): Document? {
         try {
             val initialResponse = app.get(url)
             val document = initialResponse.document
-            // Check if the button form exists on the page
+            // Check if the "Watch Now" button exists
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
-                // Add the missing sec-fetch headers to mimic a real browser request
+                // Full headers to mimic a real browser request
                 val headers = mapOf(
                     "Content-Type" to "application/x-www-form-urlencoded",
                     "Referer" to url,
@@ -45,10 +41,8 @@ class EgyDeadProvider : MainAPI() {
                     "sec-fetch-user" to "?1"
                 )
                 val data = mapOf("View" to "1")
-                // Perform the POST request to get the real watch page with servers
                 return app.post(url, headers = headers, data = data, cookies = cookies).document
             }
-            // If no button is found, return the initial document
             return document
         } catch (e: Exception) {
             e.printStackTrace()
@@ -106,7 +100,7 @@ class EgyDeadProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
-
+        
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
         val plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
@@ -129,11 +123,11 @@ class EgyDeadProvider : MainAPI() {
                     this.episode = epNum
                 }
             }.distinctBy { it.episode }.toMutableList()
-
+            
             val seriesTitle = pageTitle
                 .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
                 .trim()
-
+            
             val currentEpNum = pageTitle.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
             if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
                  episodes.add(newEpisode(url) {
@@ -141,7 +135,7 @@ class EgyDeadProvider : MainAPI() {
                     this.episode = currentEpNum
                 })
             }
-
+            
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
                 this.posterUrl = posterUrl
                 this.plot = plot
@@ -160,17 +154,27 @@ class EgyDeadProvider : MainAPI() {
             }
         }
     }
-
+    
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        // Get the page with server links by simulating the button click
         val watchPageDoc = getWatchPage(data) ?: return false
-
+        
+        // Find all server links
         watchPageDoc.select("div.mob-servers li").apmap { serverLi ->
             val link = serverLi.attr("data-link")
             if (link.isNotBlank()) {
-                extractorList.find { extractor -> link.contains(extractor.mainUrl) }?.getUrl(link, data, subtitleCallback, callback)
+                // Find the appropriate extractor from our list
+                val matchingExtractor = extractorList.find { extractor -> link.contains(extractor.mainUrl) }
+                if (matchingExtractor != null) {
+                    // Let the extractor handle the link
+                    matchingExtractor.getUrl(link, data, subtitleCallback, callback)
+                } else {
+                    // Fallback for any other servers
+                    loadExtractor(link, data, subtitleCallback, callback)
+                }
             }
         }
         return true
