@@ -7,7 +7,7 @@ import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.utils.httpsify
 import com.lagradost.cloudstream3.utils.loadExtractor
-import com.lagradost.cloudstream3.network.CloudflareKiller // The correct import!
+import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import android.util.Log
 
@@ -17,6 +17,7 @@ val extractorList = listOf(
     Forafile(),
     DoodStream(), DsvPlay(),
     Mixdrop(), Mdfx9dc8n(),
+    Bigwarp()
 )
 
 // --- Full headers to perfectly mimic a browser ---
@@ -36,19 +37,44 @@ private val BROWSER_HEADERS = mapOf(
 // The definitive solution: A dedicated safe networking function with CloudflareKiller
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
-private suspend fun safeGet(url: String, referer: String? = null): Document? {
+// =================================================================================================
+// START OF THE CRASH-PROOF NETWORKING FUNCTIONS
+// These functions will prevent the app from crashing even if Cloudflare bypass fails.
+// =================================================================================================
+private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
     return try {
-        app.get(
+        val response = app.get(
             url,
             referer = referer,
             headers = BROWSER_HEADERS,
-            interceptor = cloudflareKiller // Using the correct interceptor
-        ).document
+            interceptor = cloudflareKiller
+        )
+        // Check for a successful response code before trying to parse the document
+        if (response.code == 200) response.document else null
     } catch (e: Exception) {
-        Log.e("SafeGet", "Failed to get document for url: $url", e)
+        Log.e("SafeGetAsDocument", "Request failed for $url. Error: ${e.message}")
         null
     }
 }
+
+private suspend fun safeGetAsText(url: String, referer: String? = null): String? {
+     return try {
+        val response = app.get(
+            url,
+            referer = referer,
+            headers = BROWSER_HEADERS,
+            interceptor = cloudflareKiller
+        )
+        if (response.code == 200) response.text else null
+    } catch (e: Exception) {
+        Log.e("SafeGetAsText", "Request failed for $url. Error: ${e.message}")
+        null
+    }
+}
+// =================================================================================================
+// END OF THE CRASH-PROOF NETWORKING FUNCTIONS
+// =================================================================================================
+
 
 // --- StreamHG Handlers ---
 private abstract class StreamHGBase : ExtractorApi() {
@@ -56,7 +82,7 @@ private abstract class StreamHGBase : ExtractorApi() {
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val doc = safeGet(url, referer)
+        val doc = safeGetAsDocument(url, referer)
         val packedJs = doc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
             val unpacked = getAndUnpack(packedJs)
@@ -67,7 +93,7 @@ private abstract class StreamHGBase : ExtractorApi() {
                  Log.e(name, "m3u8 link not found in unpacked JS for $url")
             }
         } else {
-            Log.e(name, "Packed JS not found on page for $url. Check for Cloudflare.")
+            Log.e(name, "Packed JS not found for $url. Cloudflare bypass likely failed.")
         }
     }
 }
@@ -84,7 +110,7 @@ private class Forafile : ExtractorApi() {
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val document = safeGet(url, referer)
+        val document = safeGetAsDocument(url, referer)
         val packedJs = document?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
             val unpacked = getAndUnpack(packedJs)
@@ -95,7 +121,7 @@ private class Forafile : ExtractorApi() {
                  Log.e(name, "mp4 link not found in unpacked JS for $url")
             }
         } else {
-             Log.e(name, "Packed JS not found on page for $url. Check for Cloudflare.")
+             Log.e(name, "Packed JS not found for $url. Cloudflare bypass likely failed.")
         }
     }
 }
@@ -106,15 +132,10 @@ private abstract class DoodStreamBase : ExtractorApi() {
     override val requiresReferer = true
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val newUrl = if (url.contains("/e/")) url else url.replace("/d/", "/e/")
-        val responseText = try {
-            app.get(newUrl, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller).text
-        } catch (e: Exception) {
-            Log.e(name, "Failed to get text for url: $newUrl", e)
-            null
-        }
+        val responseText = safeGetAsText(newUrl, referer)
 
         if (responseText.isNullOrBlank()) {
-            Log.e(name, "Response text was null or blank for $newUrl.")
+            Log.e(name, "Response text was null or blank for $newUrl. Cloudflare bypass likely failed.")
             return
         }
 
@@ -124,6 +145,7 @@ private abstract class DoodStreamBase : ExtractorApi() {
             return
         }
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
+        // This second request usually doesn't have cloudflare
         val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z"
         loadExtractor(trueUrl, newUrl, subtitleCallback, callback)
     }
@@ -131,26 +153,31 @@ private abstract class DoodStreamBase : ExtractorApi() {
 private class DoodStream : DoodStreamBase() { override var mainUrl = "doodstream.com" }
 private class DsvPlay : DoodStreamBase() { override var mainUrl = "dsvplay.com" }
 
-// --- Mixdrop Handlers ---
-private abstract class MixdropBase : ExtractorApi() {
-    override var name = "Mixdrop"
+// --- Packed JS Extractor Base for Mixdrop, Bigwarp, etc. ---
+private abstract class PackedJsExtractorBase(
+    override var name: String,
+    override var mainUrl: String,
+    private val regex: Regex
+) : ExtractorApi() {
     override val requiresReferer = true
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val res = safeGet(url, referer)
-        val script = res?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d)))")?.data()
+        val doc = safeGetAsDocument(url, referer)
+        val script = doc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d)))")?.data()
         if (script != null) {
             val unpacked = getAndUnpack(script)
-            val videoUrl = Regex("""MDCore\.wurl="([^"]+)""").find(unpacked)?.groupValues?.get(1)
-            if (videoUrl != null) {
-                val finalUrl = "https:${videoUrl}"
+            val videoUrl = regex.find(unpacked)?.groupValues?.get(1)
+            if (videoUrl != null && videoUrl.isNotBlank()) {
+                val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
                 loadExtractor(finalUrl, url, subtitleCallback, callback)
             } else {
-                Log.e(name, "MDCore.wurl not found in unpacked JS for $url")
+                Log.e(name, "Regex failed to find video URL in unpacked JS for $url")
             }
         } else {
-             Log.e(name, "Packed JS not found on page for $url. Check for Cloudflare.")
+             Log.e(name, "Packed JS not found for $url. Cloudflare bypass likely failed.")
         }
     }
 }
-private class Mixdrop : MixdropBase() { override var mainUrl = "mixdrop.ag" }
-private class Mdfx9dc8n : MixdropBase() { override var mainUrl = "mdfx9dc8n.net" }
+
+private class Mixdrop : PackedJsExtractorBase("Mixdrop", "mixdrop.ag", """MDCore\.wurl="([^"]+)""".toRegex())
+private class Mdfx9dc8n : PackedJsExtractorBase("Mdfx9dc8n", "mdfx9dc8n.net", """MDCore\.wurl="([^"]+)""".toRegex())
+private class Bigwarp : PackedJsExtractorBase("Bigwarp", "bigwarp.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
