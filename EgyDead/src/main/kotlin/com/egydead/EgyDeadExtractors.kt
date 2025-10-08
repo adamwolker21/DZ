@@ -8,7 +8,8 @@ import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.utils.httpsify
 import com.lagradost.cloudstream3.utils.loadExtractor
 import android.util.Log
-import kotlinx.coroutines.delay // Import delay for our manual Cloudflare bypass
+import kotlinx.coroutines.delay
+import org.jsoup.nodes.Document // Import Document class explicitly
 
 // A list to hold all our extractors
 val extractorList = listOf(
@@ -32,22 +33,22 @@ private val BROWSER_HEADERS = mapOf(
     "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
 )
 
-
 /**
  * A manual Cloudflare bypass function.
- * It makes a request, checks for Cloudflare protection, waits 5 seconds if found,
- * and then makes the request again.
+ * This version now returns a parsed Document directly.
  */
-private suspend fun appRequestWithManualCloudflare(url: String, referer: String?): String {
+private suspend fun appRequestWithManualCloudflare(url: String, referer: String?): Document {
     val initialResponse = app.get(url, referer = referer, headers = BROWSER_HEADERS)
     // Check for common Cloudflare protection phrases
     if (initialResponse.text.contains("Just a moment...") || initialResponse.text.contains("Verifying you are not a robot")) {
         Log.d("CloudflareBypass", "Cloudflare detected for $url. Waiting 5 seconds...")
         delay(5000) // Wait for 5 seconds
         Log.d("CloudflareBypass", "Retrying request for $url...")
-        return app.get(url, referer = referer, headers = BROWSER_HEADERS).text
+        // Return the parsed document from the second request
+        return app.get(url, referer = referer, headers = BROWSER_HEADERS).document
     }
-    return initialResponse.text
+    // Return the parsed document from the first request
+    return initialResponse.document
 }
 
 
@@ -57,9 +58,8 @@ private abstract class StreamHGBase : ExtractorApi() {
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        // Use our manual bypass function
-        val html = appRequestWithManualCloudflare(url, referer)
-        val doc = app.parseHTML(html)
+        // The helper function now directly returns a parsed Document
+        val doc = appRequestWithManualCloudflare(url, referer)
         
         Log.d(name, "Successfully fetched page for $url")
 
@@ -73,7 +73,8 @@ private abstract class StreamHGBase : ExtractorApi() {
                  Log.e(name, "m3u8 link not found in unpacked JS for $url")
             }
         } else {
-            Log.e(name, "Packed JS not found on page for $url. Page content was:\n$html")
+            // Use doc.html() to get the string content for logging
+            Log.e(name, "Packed JS not found on page for $url. Page content was:\n${doc.html()}")
         }
     }
 }
@@ -90,20 +91,19 @@ private class Forafile : ExtractorApi() {
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val html = appRequestWithManualCloudflare(url, referer)
-        val document = app.parseHTML(html)
+        val document = appRequestWithManualCloudflare(url, referer)
 
         val packedJs = document.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
             val unpacked = getAndUnpack(packedJs)
-            val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)"""").find(unpacked)?.groupValues?.get(1)
+            val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
             if (mp4Link != null) {
                 loadExtractor(mp4Link, url, subtitleCallback, callback)
             } else {
                  Log.e(name, "mp4 link not found in unpacked JS for $url")
             }
         } else {
-             Log.e(name, "Packed JS not found on page for $url. Page content was:\n$html")
+             Log.e(name, "Packed JS not found on page for $url. Page content was:\n${document.html()}")
         }
     }
 }
@@ -114,8 +114,10 @@ private abstract class DoodStreamBase : ExtractorApi() {
     override val requiresReferer = true
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val newUrl = if (url.contains("/e/")) url else url.replace("/d/", "/e/")
-        val response = appRequestWithManualCloudflare(newUrl, referer)
-        val doodToken = response.substringAfter("'/pass_md5/").substringBefore("',")
+        // Doodstream needs the text content, so we still get it from the document
+        val document = appRequestWithManualCloudflare(newUrl, referer)
+        val responseText = document.html()
+        val doodToken = responseText.substringAfter("'/pass_md5/").substringBefore("',")
         if (doodToken.isBlank()) {
             Log.e(name, "Could not find doodToken for $url")
             return
@@ -133,8 +135,7 @@ private abstract class MixdropBase : ExtractorApi() {
     override var name = "Mixdrop"
     override val requiresReferer = true
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val html = appRequestWithManualCloudflare(url, referer)
-        val res = app.parseHTML(html)
+        val res = appRequestWithManualCloudflare(url, referer)
         val script = res.selectFirst("script:containsData(eval(function(p,a,c,k,e,d)))")?.data()
         if (script != null) {
             val unpacked = getAndUnpack(script)
@@ -146,7 +147,7 @@ private abstract class MixdropBase : ExtractorApi() {
                 Log.e(name, "MDCore.wurl not found in unpacked JS for $url")
             }
         } else {
-             Log.e(name, "Packed JS not found on page for $url. Page content was:\n$html")
+             Log.e(name, "Packed JS not found on page for $url. Page content was:\n${res.html()}")
         }
     }
 }
