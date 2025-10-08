@@ -7,6 +7,8 @@ import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.utils.httpsify
 import com.lagradost.cloudstream3.utils.loadExtractor
+import com.lagradost.cloudstream3.utils.CloudflareParser
+import org.jsoup.nodes.Document
 import android.util.Log
 
 // A list to hold all our extractors
@@ -31,19 +33,41 @@ private val BROWSER_HEADERS = mapOf(
     "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
 )
 
+// =================================================================================================
+// START OF THE NEW SOLUTION: A dedicated safe networking function with Cloudflare bypass
+// This function will be used for all network requests to ensure Cloudflare is handled.
+// =================================================================================================
+private suspend fun safeGet(url: String, referer: String? = null): Document? {
+    return try {
+        app.get(
+            url,
+            referer = referer,
+            headers = BROWSER_HEADERS,
+            // This is the key: The interceptor will solve the Cloudflare challenge
+            interceptor = CloudflareParser() 
+        ).document
+    } catch (e: Exception) {
+        // Log the error and return null to prevent the app from crashing
+        Log.e("SafeGet", "Failed to get document for url: $url", e)
+        null
+    }
+}
+// =================================================================================================
+// END OF THE NEW SOLUTION
+// =================================================================================================
+
+
 // --- StreamHG Handlers ---
 private abstract class StreamHGBase : ExtractorApi() {
     override var name = "StreamHG"
     override val requiresReferer = true
 
-    // Reverted to nullable referer to match parent signature
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        // Removed CloudflareParser, using standard request
-        val doc = app.get(url, referer = referer, headers = BROWSER_HEADERS).document
+        // Use the new safe networking function
+        val doc = safeGet(url, referer)
         
         Log.d(name, "Page requested for $url")
 
-        // Using safe call ?. to prevent crash if doc is null or element not found
         val packedJs = doc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
             val unpacked = getAndUnpack(packedJs)
@@ -71,7 +95,7 @@ private class Forafile : ExtractorApi() {
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val document = app.get(url, referer = referer, headers = BROWSER_HEADERS).document
+        val document = safeGet(url, referer)
 
         val packedJs = document?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
@@ -94,13 +118,26 @@ private abstract class DoodStreamBase : ExtractorApi() {
     override val requiresReferer = true
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val newUrl = if (url.contains("/e/")) url else url.replace("/d/", "/e/")
-        val responseText = app.get(newUrl, referer = referer, headers = BROWSER_HEADERS).text
+        // Doodstream needs the response as text, not document
+        val responseText = try {
+            app.get(newUrl, referer = referer, headers = BROWSER_HEADERS, interceptor = CloudflareParser()).text
+        } catch (e: Exception) {
+            Log.e(name, "Failed to get text for url: $newUrl", e)
+            null
+        }
+
+        if (responseText.isNullOrBlank()) {
+            Log.e(name, "Response text was null or blank for $newUrl. Cloudflare might have blocked the request.")
+            return
+        }
+
         val doodToken = responseText.substringAfter("'/pass_md5/").substringBefore("',")
         if (doodToken.isBlank()) {
             Log.e(name, "Could not find doodToken for $url. Check for Cloudflare.")
             return
         }
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
+        // The second request to get the true URL doesn't seem to have cloudflare
         val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z"
         loadExtractor(trueUrl, newUrl, subtitleCallback, callback)
     }
@@ -113,7 +150,7 @@ private abstract class MixdropBase : ExtractorApi() {
     override var name = "Mixdrop"
     override val requiresReferer = true
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val res = app.get(url, referer = referer, headers = BROWSER_HEADERS).document
+        val res = safeGet(url, referer)
         val script = res?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d)))")?.data()
         if (script != null) {
             val unpacked = getAndUnpack(script)
