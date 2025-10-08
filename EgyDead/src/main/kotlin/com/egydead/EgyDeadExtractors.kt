@@ -5,9 +5,9 @@ import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
-import com.lagradost.cloudstream3.utils.httpsify
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.network.CloudflareKiller
+import com.lagradost.cloudstream3.Qualities // Import the Qualities enum
 import org.jsoup.nodes.Document
 import android.util.Log
 
@@ -39,15 +39,24 @@ private val BROWSER_HEADERS = mapOf(
 // The definitive solution: A dedicated safe networking function with CloudflareKiller
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
+// This function now returns the full response object to allow access to headers
+private suspend fun safeGet(url: String, referer: String? = null) = try {
+    app.get(
+        url,
+        referer = referer,
+        headers = BROWSER_HEADERS,
+        interceptor = cloudflareKiller,
+        allowRedirects = false // Crucial for capturing the 'Location' header
+    )
+} catch (e: Exception) {
+    Log.e("SafeGet", "Request failed for $url. Error: ${e.message}")
+    null
+}
+
 private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
+    // This is a normal GET request that follows redirects
     return try {
-        val response = app.get(
-            url,
-            referer = referer,
-            headers = BROWSER_HEADERS,
-            interceptor = cloudflareKiller
-        )
-        if (response.code == 200) response.document else null
+        app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller).document
     } catch (e: Exception) {
         Log.e("SafeGetAsDocument", "Request failed for $url. Error: ${e.message}")
         null
@@ -56,39 +65,67 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
 
 private suspend fun safeGetAsText(url: String, referer: String? = null): String? {
      return try {
-        val response = app.get(
-            url,
-            referer = referer,
-            headers = BROWSER_HEADERS,
-            interceptor = cloudflareKiller
-        )
-        if (response.code == 200) response.text else null
+        app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller).text
     } catch (e: Exception) {
         Log.e("SafeGetAsText", "Request failed for $url. Error: ${e.message}")
         null
     }
 }
 
-// --- StreamHG Handlers ---
+// =================================================================================================
+// START OF NEW, MULTI-STEP STREAMHG EXTRACTOR
+// =================================================================================================
 private abstract class StreamHGBase : ExtractorApi() {
     override var name = "StreamHG"
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val doc = safeGetAsDocument(url, url) 
-        
-        val packedJs = doc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
+        // Step 1: Make the initial request to the hglink.to URL to get the redirect location
+        val initialResponse = safeGet(url, referer)
+        val redirectUrl = initialResponse?.headers?.get("Location")
+
+        if (redirectUrl.isNullOrBlank()) {
+            Log.e(name, "Step 1 Failed: Could not get redirect URL from $url")
+            return
+        }
+
+        Log.d(name, "Step 1 Success: Redirecting to $redirectUrl")
+
+        // Step 2: Make the request to the new URL (e.g., kravaxxa.com), using the *original* URL as the referer
+        val finalPageDoc = safeGetAsDocument(redirectUrl, url)
+        if (finalPageDoc == null) {
+            Log.e(name, "Step 2 Failed: Could not get document from final page $redirectUrl")
+            return
+        }
+
+        Log.d(name, "Step 2 Success: Got final page document")
+
+        // Step 3: Find and unpack the JS to get the m3u8 link
+        val packedJs = finalPageDoc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
             val unpacked = getAndUnpack(packedJs)
             val m3u8Link = Regex("""(https?://.*?/master\.m3u8)""").find(unpacked)?.groupValues?.get(1)
+            
             if (m3u8Link != null) {
-                // Using the safe loadExtractor function to prevent build errors
-                loadExtractor(m3u8Link, url, subtitleCallback, callback)
+                 Log.d(name, "Step 3 Success: Found m3u8 link: $m3u8Link")
+                // Step 4: Provide the final link with the correct referer for the video stream itself
+                callback.invoke(
+                    ExtractorLink(
+                        this.name,
+                        this.name,
+                        m3u8Link,
+                        redirectUrl, // The referer must be the page containing the video player
+                        Qualities.Unknown.value,
+                        isM3u8 = true,
+                        // Pass the final page URL as the referer in the headers for the stream
+                        headers = mapOf("Referer" to redirectUrl)
+                    )
+                )
             } else {
-                 Log.e(name, "m3u8 link not found in unpacked JS for $url")
+                 Log.e(name, "Step 3 Failed: m3u8 link not found in unpacked JS")
             }
         } else {
-            Log.e(name, "Packed JS not found for $url. Cloudflare bypass likely failed.")
+            Log.e(name, "Step 3 Failed: Packed JS not found on page $redirectUrl")
         }
     }
 }
@@ -98,6 +135,11 @@ private class Haxloppd : StreamHGBase() { override var mainUrl = "haxloppd.com" 
 private class Kravaxxa : StreamHGBase() { override var mainUrl = "kravaxxa.com" }
 private class Cavanhabg : StreamHGBase() { override var mainUrl = "cavanhabg.com"}
 
+// =================================================================================================
+// END OF NEW STREAMHG EXTRACTOR
+// =================================================================================================
+
+
 // --- Forafile Handler ---
 private class Forafile : ExtractorApi() {
     override var name = "Forafile"
@@ -105,13 +147,12 @@ private class Forafile : ExtractorApi() {
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val document = safeGetAsDocument(url, url)
+        val document = safeGetAsDocument(url, referer)
         val packedJs = document?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
             val unpacked = getAndUnpack(packedJs)
             val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
             if (mp4Link != null) {
-                // Using the safe loadExtractor function
                 loadExtractor(mp4Link, url, subtitleCallback, callback)
             } else {
                  Log.e(name, "mp4 link not found in unpacked JS for $url")
@@ -156,7 +197,7 @@ private abstract class PackedJsExtractorBase(
 ) : ExtractorApi() {
     override val requiresReferer = true
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val doc = safeGetAsDocument(url, url)
+        val doc = safeGetAsDocument(url, referer)
         val script = doc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d)))")?.data()
         if (script != null) {
             val unpacked = getAndUnpack(script)
