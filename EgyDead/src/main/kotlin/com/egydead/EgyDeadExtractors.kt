@@ -75,29 +75,15 @@ private abstract class StreamHGBase : ExtractorApi() {
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        // The key change based on user's cURL analysis:
-        // The referer for the final request must be the server URL itself to mimic the redirect chain.
         val doc = safeGetAsDocument(url, url) 
         
         val packedJs = doc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
             val unpacked = getAndUnpack(packedJs)
-            // This regex is flexible and will find the m3u8 link regardless of the domain.
             val m3u8Link = Regex("""(https?://.*?/master\.m3u8)""").find(unpacked)?.groupValues?.get(1)
             if (m3u8Link != null) {
-                // We need to provide the correct referer for the video stream itself
-                val streamHeaders = mapOf("Referer" to url)
-                callback.invoke(
-                    ExtractorLink(
-                        this.name,
-                        this.name,
-                        m3u8Link,
-                        url,
-                        Qualities.Unknown.value,
-                        isM3u8 = true,
-                        headers = streamHeaders
-                    )
-                )
+                // Using the safe loadExtractor function to prevent build errors
+                loadExtractor(m3u8Link, url, subtitleCallback, callback)
             } else {
                  Log.e(name, "m3u8 link not found in unpacked JS for $url")
             }
@@ -119,21 +105,14 @@ private class Forafile : ExtractorApi() {
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val document = safeGetAsDocument(url, url) // Using url as referer here too for consistency
+        val document = safeGetAsDocument(url, url)
         val packedJs = document?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
             val unpacked = getAndUnpack(packedJs)
             val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
             if (mp4Link != null) {
-                callback.invoke(
-                    ExtractorLink(
-                        this.name,
-                        this.name,
-                        mp4Link,
-                        url,
-                        Qualities.Unknown.value
-                    )
-                )
+                // Using the safe loadExtractor function
+                loadExtractor(mp4Link, url, subtitleCallback, callback)
             } else {
                  Log.e(name, "mp4 link not found in unpacked JS for $url")
             }
@@ -162,7 +141,6 @@ private abstract class DoodStreamBase : ExtractorApi() {
             return
         }
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
-        // This second request usually doesn't have cloudflare
         val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z"
         loadExtractor(trueUrl, newUrl, subtitleCallback, callback)
     }
@@ -178,7 +156,7 @@ private abstract class PackedJsExtractorBase(
 ) : ExtractorApi() {
     override val requiresReferer = true
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val doc = safeGetAsDocument(url, url) // Using url as referer here too
+        val doc = safeGetAsDocument(url, url)
         val script = doc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d)))")?.data()
         if (script != null) {
             val unpacked = getAndUnpack(script)
