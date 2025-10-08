@@ -7,7 +7,6 @@ import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.network.CloudflareKiller
-import com.lagradost.cloudstream3.Qualities // Import the Qualities enum
 import org.jsoup.nodes.Document
 import android.util.Log
 
@@ -108,19 +107,9 @@ private abstract class StreamHGBase : ExtractorApi() {
             
             if (m3u8Link != null) {
                  Log.d(name, "Step 3 Success: Found m3u8 link: $m3u8Link")
-                // Step 4: Provide the final link with the correct referer for the video stream itself
-                callback.invoke(
-                    ExtractorLink(
-                        this.name,
-                        this.name,
-                        m3u8Link,
-                        redirectUrl, // The referer must be the page containing the video player
-                        Qualities.Unknown.value,
-                        isM3u8 = true,
-                        // Pass the final page URL as the referer in the headers for the stream
-                        headers = mapOf("Referer" to redirectUrl)
-                    )
-                )
+                // Step 4: Use the safe, compatible loadExtractor function
+                loadExtractor(m3u8Link, redirectUrl, subtitleCallback, callback)
+
             } else {
                  Log.e(name, "Step 3 Failed: m3u8 link not found in unpacked JS")
             }
