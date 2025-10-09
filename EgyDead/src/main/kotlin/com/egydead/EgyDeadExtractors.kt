@@ -13,7 +13,7 @@ import android.util.Log
 
 // قائمة المستخرجات المستخدمة من قبل المزود
 val extractorList = listOf(
-    StreamHG(), Davioad(), Haxloppd(), Kravxa(), Cavanhabg(), Dumbalag(),
+    StreamHG(), Davioad(), Haxloppd(), Kravaxxa(), Cavanhabg(), Dumbalag(),
     Forafile(),
     DoodStream(), DsvPlay(),
     Mixdrop(), Mdfx9dc8n(), Mxdrop(),
@@ -87,22 +87,25 @@ private abstract class StreamHGBase(override var name: String, override var main
                 val m3u8Link = Regex("""(https?://.*?/master\.m3u8)""").find(unpacked)?.groupValues?.get(1)
 
                 if (m3u8Link != null) {
+                    // الإصلاح النهائي: تمرير الترويسات والـ Referer إلى المساعد
                     M3u8Helper.generateM3u8(
-                        this.name,
-                        m3u8Link,
-                        finalPageUrl
+                        name = this.name,
+                        m3u8Url = m3u8Link,
+                        referer = finalPageUrl, // Referer هو الصفحة التي وجدنا فيها الرابط
+                        headers = BROWSER_HEADERS // استخدام نفس الترويسات الناجحة
                     ).forEach(callback)
-                    return
+                    return // الخروج فورًا بعد النجاح
                 }
             }
         }
     }
 }
 
+// إصلاح الخطأ المطبعي في الاسم
 private class StreamHG : StreamHGBase("StreamHG", "hglink.to")
 private class Davioad : StreamHGBase("StreamHG (Davioad)", "davioad.com")
 private class Haxloppd : StreamHGBase("StreamHG (Haxloppd)", "haxloppd.com")
-private class Kravxa : StreamHGBase("StreamHG (Kravxa)", "kravaxxa.com")
+private class Kravaxxa : StreamHGBase("StreamHG (Kravaxxa)", "kravaxxa.com")
 private class Cavanhabg : StreamHGBase("StreamHG (Cavanhabg)", "cavanhabg.com")
 private class Dumbalag : StreamHGBase("StreamHG (Dumbalag)", "dumbalag.com" )
 
@@ -123,7 +126,7 @@ private class Forafile : ExtractorApi() {
                         source = this.name,
                         name = this.name,
                         url = mp4Link
-                    )
+                    ).copy(referer = url) // الطريقة الصحيحة لإضافة Referer
                 )
             }
         }
@@ -146,7 +149,7 @@ private abstract class DoodStreamBase : ExtractorApi() {
                 source = this.name,
                 name = this.name,
                 url = trueUrl
-            )
+            ).copy(referer = newUrl) // الطريقة الصحيحة لإضافة Referer
         )
     }
 }
@@ -172,7 +175,7 @@ private abstract class PackedJsExtractorBase(
                         source = this.name,
                         name = this.name,
                         url = finalUrl
-                    )
+                    ).copy(referer = url) // الطريقة الصحيحة لإضافة Referer
                 )
             }
         }
