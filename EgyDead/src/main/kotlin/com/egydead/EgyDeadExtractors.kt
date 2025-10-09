@@ -66,7 +66,8 @@ private abstract class StreamHGBase(override var name: String, override var main
     override val requiresReferer = true
 
     private val potentialHosts = listOf(
-        "kravaxxa.com",
+        "streamhg.xyz",
+        "kravaxxa.com", 
         "cavanhabg.com",
         "dumbalag.com",
         "davioad.com",
@@ -75,29 +76,119 @@ private abstract class StreamHGBase(override var name: String, override var main
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val videoId = url.substringAfterLast("/")
-        if (videoId.isBlank()) return
+        if (videoId.isBlank()) {
+            Log.e(name, "Empty video ID from URL: $url")
+            return
+        }
 
         for (host in potentialHosts) {
-            val finalPageUrl = "https://$host/e/$videoId"
-            val finalPageText = safeGetAsText(finalPageUrl, referer = url)
+            try {
+                val finalPageUrl = "https://$host/e/$videoId"
+                Log.d(name, "Trying host: $host with URL: $finalPageUrl")
+                
+                // جلب محتوى الصفحة كنص
+                val finalPageText = safeGetAsText(finalPageUrl, referer = referer ?: url)
+                
+                if (finalPageText == null) {
+                    Log.e(name, "Failed to get page content from $finalPageUrl")
+                    continue
+                }
 
-            if (finalPageText != null) {
-                // Regex الصحيح الذي يستهدف الرابط داخل jwplayer_setup
-                val m3u8Link = Regex("""jwplayer_setup\("([^"]+)""").find(finalPageText)?.groupValues?.get(1)
+                // البحث عن روابط m3u8 بأنماط مختلفة - محدث ليطابق الرابط الفعلي
+                val m3u8Patterns = listOf(
+                    """(https?://[^"'\s<>]+?/stream/[^"'\s<>]+?/master\.m3u8)""",
+                    """(https?://[^"'\s<>]+?\.m3u8)""",
+                    """file:\s*["'](https?://[^"'\s<>]+?\.m3u8)["']""",
+                    """sources:\s*\[\s*\{[^}]*?file:\s*["'](https?://[^"'\s<>]+?\.m3u8)["']""",
+                    """(https?://$host/stream/[^"'\s<>]+?/master\.m3u8)""" // نمط خاص بالنطاق الحالي
+                )
 
-                if (m3u8Link != null) {
-                    Log.d(name, "Found m3u8 link: $m3u8Link")
-                    // الاستدعاء الصحيح للمساعد الحديث
+                var foundM3u8: String? = null
+
+                for (pattern in m3u8Patterns) {
+                    val matches = Regex(pattern).findAll(finalPageText)
+                    matches.forEach { match ->
+                        val m3u8Link = match.groupValues[1]
+                        if (m3u8Link.contains(".m3u8") && m3u8Link.contains(host)) {
+                            Log.d(name, "Found m3u8 link with pattern '$pattern': $m3u8Link")
+                            foundM3u8 = m3u8Link
+                        }
+                    }
+                    if (foundM3u8 != null) break
+                }
+
+                // إذا لم نجد بالأنماط العادية، نبحث في السكريبت المشفر
+                if (foundM3u8 == null) {
+                    Log.d(name, "Searching in encoded scripts...")
+                    
+                    // البحث في جميع السكريبتات
+                    val scriptPattern = """<script[^>]*>(.*?)</script>""".toRegex(RegexOption.DOT_MATCHES_ALL)
+                    val scripts = scriptPattern.findAll(finalPageText)
+                    
+                    scripts.forEach { scriptMatch ->
+                        val scriptContent = scriptMatch.groupValues[1]
+                        
+                        // البحث عن روابط m3u8 في السكريبت مباشرة
+                        for (pattern in m3u8Patterns) {
+                            val matches = Regex(pattern).findAll(scriptContent)
+                            matches.forEach { match ->
+                                val m3u8Link = match.groupValues[1]
+                                if (m3u8Link.contains(".m3u8") && m3u8Link.contains(host)) {
+                                    Log.d(name, "Found m3u8 link in script with pattern '$pattern': $m3u8Link")
+                                    foundM3u8 = m3u8Link
+                                }
+                            }
+                        }
+                        
+                        // إذا لم نجد، نحاول فك الضغط
+                        if (foundM3u8 == null && scriptContent.contains("eval(function(p,a,c,k,e,d)")) {
+                            try {
+                                Log.d(name, "Found packed script, attempting to unpack")
+                                val unpacked = getAndUnpack(scriptContent)
+                                
+                                // البحث في النص المفكوك
+                                for (pattern in m3u8Patterns) {
+                                    val matches = Regex(pattern).findAll(unpacked)
+                                    matches.forEach { match ->
+                                        val m3u8Link = match.groupValues[1]
+                                        if (m3u8Link.contains(".m3u8") && m3u8Link.contains(host)) {
+                                            Log.d(name, "Found m3u8 link in unpacked script with pattern '$pattern': $m3u8Link")
+                                            foundM3u8 = m3u8Link
+                                        }
+                                    }
+                                    if (foundM3u8 != null) break
+                                }
+                            } catch (e: Exception) {
+                                Log.e(name, "Failed to unpack script: ${e.message}")
+                            }
+                        }
+                    }
+                }
+
+                if (foundM3u8 != null) {
+                    Log.d(name, "Success! Final m3u8 link: $foundM3u8")
+                    
+                    // استخدام M3u8Helper لتوليد الروابط
                     M3u8Helper.generateM3u8(
-                        this.name,
-                        m3u8Link,
+                        name,
+                        foundM3u8!!,
                         finalPageUrl,
                         headers = BROWSER_HEADERS
-                    ).forEach(callback)
-                    return // الخروج فورًا بعد النجاح
+                    ).forEach { link ->
+                        callback(link)
+                    }
+                    return // الخروج بعد النجاح
                 }
+
+                Log.e(name, "No m3u8 link found in page from $host")
+
+            } catch (e: Exception) {
+                Log.e(name, "Error processing host $host: ${e.message}")
+                e.printStackTrace()
             }
         }
+        
+        Log.e(name, "All hosts failed for video ID: $videoId")
     }
 }
 
