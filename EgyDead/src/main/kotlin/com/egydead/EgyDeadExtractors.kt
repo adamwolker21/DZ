@@ -80,8 +80,7 @@ private abstract class StreamHGBase(override var name: String, override var main
                     val fullUrl = "https://$host$relativeLink"
                     Log.d(name, "Found final m3u8 link: $fullUrl")
                     
-                    // الحل النهائي: newExtractorLink البسيط بدون كتلة تهيئة
-                    callback(
+                    // الحل   
                         callback(
     newExtractorLink(
         this.name,
