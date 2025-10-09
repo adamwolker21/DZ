@@ -51,7 +51,7 @@ private suspend fun safeGetAsText(url: String, referer: String? = null): String?
     }
 }
 
-// ===== StreamHGBase: الطريقة 1 - التوقيع الأساسي =====
+// ===== الحل النهائي: newExtractorLink البسيط =====
 private abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
 
@@ -80,17 +80,13 @@ private abstract class StreamHGBase(override var name: String, override var main
                     val fullUrl = "https://$host$relativeLink"
                     Log.d(name, "Found final m3u8 link: $fullUrl")
                     
-                    // الطريقة 1: التوقيع الأساسي مع quality كمعامل
+                    // الحل النهائي: newExtractorLink البسيط بدون كتلة تهيئة
                     callback(
                         newExtractorLink(
-                            source = this.name,
-                            name = "${this.name} - HLS",
-                            url = fullUrl,
-                            quality = Qualities.Unknown.value,
-                        ) {
-                            referer = finalPageUrl
-                            isM3u8 = true
-                        }
+                            this.name,
+                            "${this.name} - HLS", 
+                            fullUrl
+                        )
                     )
                     return
                 }
@@ -106,7 +102,7 @@ private class Kravaxxa : StreamHGBase("StreamHG (Kravaxxa)", "kravaxxa.com")
 private class Cavanhabg : StreamHGBase("StreamHG (Cavanhabg)", "cavanhabg.com")
 private class Dumbalag : StreamHGBase("StreamHG (Dumbalag)", "dumbalag.com")
 
-// ===== Forafile: الطريقة 2 - بدون معامل quality =====
+// ===== Forafile =====
 private class Forafile : ExtractorApi() {
     override var name = "Forafile"
     override var mainUrl = "forafile.com"
@@ -119,24 +115,19 @@ private class Forafile : ExtractorApi() {
             val unpacked = getAndUnpack(packedJs)
             val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
             if (mp4Link != null) {
-                // الطريقة 2: بدون معامل quality في القائمة الرئيسية
                 callback(
                     newExtractorLink(
-                        source = this.name,
-                        name = "${this.name} - MP4",
-                        url = mp4Link,
-                    ) {
-                        referer = url
-                        isM3u8 = false
-                        quality = Qualities.Unknown.value
-                    }
+                        this.name,
+                        "${this.name} - MP4",
+                        mp4Link
+                    )
                 )
             }
         }
     }
 }
 
-// ===== DoodStreamBase: الطريقة 3 - مع headers فقط =====
+// ===== DoodStreamBase =====
 private abstract class DoodStreamBase : ExtractorApi() {
     override var name = "DoodStream"
     override val requiresReferer = true
@@ -150,19 +141,12 @@ private abstract class DoodStreamBase : ExtractorApi() {
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
         val trueUrl = app.get(md5PassUrl, referer = newUrl, headers = mapOf("User-Agent" to "Mozilla/5.0")).text + "z"
         
-        // الطريقة 3: مع headers فقط
         callback(
             newExtractorLink(
-                source = this.name,
-                name = "${this.name} - Video",
-                url = trueUrl,
-            ) {
-                headers = mapOf(
-                    "Referer" to newUrl
-                )
-                isM3u8 = false
-                quality = Qualities.Unknown.value
-            }
+                this.name,
+                "${this.name} - Video",
+                trueUrl
+            )
         )
     }
 }
@@ -175,7 +159,7 @@ private class DsvPlay : DoodStreamBase() {
     override var mainUrl = "dsvplay.com" 
 }
 
-// ===== PackedJsExtractorBase: الطريقة 4 - الأبسط =====
+// ===== PackedJsExtractorBase =====
 private abstract class PackedJsExtractorBase(
     override var name: String,
     override var mainUrl: String,
@@ -192,17 +176,12 @@ private abstract class PackedJsExtractorBase(
             if (videoUrl != null && videoUrl.isNotBlank()) {
                 val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
                 
-                // الطريقة 4: الأبسط - 3 معاملات فقط
                 callback(
                     newExtractorLink(
                         this.name,
                         "${this.name} - Video", 
                         finalUrl
-                    ) {
-                        referer = url
-                        isM3u8 = false
-                        quality = Qualities.Unknown.value
-                    }
+                    )
                 )
             }
         }
