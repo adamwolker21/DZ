@@ -1,172 +1,235 @@
-package com.Coflix
+package com.egydead
 
-import com.lagradost.api.Log
-import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.extractors.Filesim
-import com.lagradost.cloudstream3.extractors.StreamSB
-import com.lagradost.cloudstream3.extractors.VidhideExtractor
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.INFER_TYPE
-import com.lagradost.cloudstream3.utils.M3u8Helper
+import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.utils.newExtractorLink
-import kotlin.text.Regex
-import com.google.gson.JsonObject
-import com.google.gson.JsonParser
-import com.lagradost.cloudstream3.base64Decode
+import com.lagradost.cloudstream3.network.CloudflareKiller
+import org.jsoup.nodes.Document
+import android.util.Log
 
-open class darkibox : ExtractorApi() {
-    override var name = "Darkibox"
-    override var mainUrl = "https://darkibox.com"
+// قائمة المستخرجات المستخدمة من قبل المزود
+val extractorList = listOf(
+    StreamHG(), Davioad(), Haxloppd(), Kravaxxa(), Cavanhabg(), Dumbalag(),
+    Forafile(),
+    DoodStream(), DsvPlay(),
+    Mixdrop(), Mdfx9dc8n(), Mxdrop(),
+    Bigwarp(), BigwarpPro(),
+    EarnVids(),
+    VidGuard()
+)
+
+// ترويسات متصفح كاملة للمحاكاة
+private val BROWSER_HEADERS = mapOf(
+    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
+    "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+)
+
+private val cloudflareKiller by lazy { CloudflareKiller() }
+
+// دالة آمنة لجلب الصفحة كـ Document
+private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
+    return try {
+        app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false).document
+    } catch (e: Exception) {
+        Log.e("SafeGetAsDocument", "Request failed for $url. Error: ${e.message}")
+        null
+    }
+}
+
+// دالة آمنة لجلب الصفحة كنص
+private suspend fun safeGetAsText(url: String, referer: String? = null): String? {
+     return try {
+        app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false).text
+    } catch (e: Exception) {
+        Log.e("SafeGetAsText", "Request failed for $url. Error: ${e.message}")
+        null
+    }
+}
+
+private abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
 
-    override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
-            val response = app.get(url,referer=mainUrl).toString()
-            Regex("""sources:\s*\[\{src:\s*"(.*?)"""").find(response)?.groupValues?.get(1)?.let { link ->
-                return listOf(
+    private val potentialHosts = listOf(
+        "kravaxxa.com",
+        "cavanhabg.com",
+        "dumbalag.com",
+        "davioad.com",
+        "haxloppd.com"
+    )
+
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        val videoId = url.substringAfterLast("/")
+        if (videoId.isBlank()) return
+
+        for (host in potentialHosts) {
+            val finalPageUrl = "https://$host/e/$videoId"
+            val doc = safeGetAsDocument(finalPageUrl, referer = url)
+
+            val packedJs = doc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
+            if (packedJs != null) {
+                val unpacked = getAndUnpack(packedJs)
+                
+                // التحسين: البحث عن كائن links كامل كما في الكود المفكوك
+                val linksMatch = Regex("""var links = \{([^}]+)\}""").find(unpacked)?.groupValues?.get(1)
+                if (linksMatch != null) {
+                    // استخراج جميع الروابط المتاحة
+                    val hls4Link = Regex("""\"hls4\"\s*:\s*\"([^\"]+)\"""").find(linksMatch)?.groupValues?.get(1)
+                    val hls3Link = Regex("""\"hls3\"\s*:\s*\"([^\"]+)\"""").find(linksMatch)?.groupValues?.get(1)
+                    val hls2Link = Regex("""\"hls2\"\s*:\s*\"([^\"]+)\"""").find(linksMatch)?.groupValues?.get(1)
+                    
+                    // إعطاء الأولوية لـ hls4، ثم hls3، ثم hls2
+                    val finalUrl = when {
+                        hls4Link != null -> {
+                            if (hls4Link.startsWith("/")) "https://$host$hls4Link" else hls4Link
+                        }
+                        hls3Link != null -> hls3Link
+                        hls2Link != null -> hls2Link
+                        else -> null
+                    }
+                    
+                    if (finalUrl != null) {
+                        Log.d(name, "Found streaming link: $finalUrl")
+                        
+                        // استخدام التوقيع الصحيح مع إضافة الجودة والنوع
+                        callback(
+                            newExtractorLink(
+                                this.name,
+                                "${this.name} - ${if (finalUrl.contains(".m3u8")) "HLS" else "Stream"}",
+                                finalUrl
+                            )
+                        )
+                        return
+                    }
+                }
+                
+                // Fallback: البحث القديم عن hls4 فقط
+                val relativeLink = Regex("""hls4"\s*:\s*"([^"]+)"""").find(unpacked)?.groupValues?.get(1)
+                if (relativeLink != null) {
+                    val fullUrl = "https://$host$relativeLink"
+                    Log.d(name, "Found fallback m3u8 link: $fullUrl")
+                    
+                    callback(
+                        newExtractorLink(
+                            this.name,
+                            "${this.name} - HLS", 
+                            fullUrl
+                        )
+                    )
+                    return
+                }
+            }
+        }
+    }
+}
+
+private class StreamHG : StreamHGBase("StreamHG", "hglink.to")
+private class Davioad : StreamHGBase("StreamHG (Davioad)", "davioad.com")
+private class Haxloppd : StreamHGBase("StreamHG (Haxloppd)", "haxloppd.com")
+private class Kravaxxa : StreamHGBase("StreamHG (Kravaxxa)", "kravaxxa.com")
+private class Cavanhabg : StreamHGBase("StreamHG (Cavanhabg)", "cavanhabg.com")
+private class Dumbalag : StreamHGBase("StreamHG (Dumbalag)", "dumbalag.com")
+
+private class Forafile : ExtractorApi() {
+    override var name = "Forafile"
+    override var mainUrl = "forafile.com"
+    override val requiresReferer = true
+
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        val document = safeGetAsDocument(url, referer)
+        val packedJs = document?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
+        if (packedJs != null) {
+            val unpacked = getAndUnpack(packedJs)
+            val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
+            if (mp4Link != null) {
+                callback(
                     newExtractorLink(
                         this.name,
-                        this.name,
-                        url = link,
-                        ExtractorLinkType.M3U8
-                    ) {
-                        this.referer = referer ?: ""
-                        this.quality = Qualities.P1080.value
-                    }
+                        "${this.name} - MP4",
+                        mp4Link
+                    )
                 )
             }
-        return null
+        }
     }
 }
 
-open class Videzz : ExtractorApi() {
-    override var name = "Videzz"
-    override var mainUrl = "https://videzz.net"
+private abstract class DoodStreamBase : ExtractorApi() {
+    override var name = "DoodStream"
     override val requiresReferer = true
+    
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        val newUrl = if (url.contains("/e/")) url else url.replace("/d/", "/e/")
+        val responseText = safeGetAsText(newUrl, referer) ?: return
+        val doodToken = responseText.substringAfter("'/pass_md5/").substringBefore("',")
+        if (doodToken.isBlank()) return
 
-    override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
-            val mp4 = app.get(url,referer=mainUrl).document.select("#vplayer > #player source").attr("src")
-            return listOf(
-                newExtractorLink(
-                    this.name,
-                    this.name,
-                    url = mp4,
-                    type = INFER_TYPE
-                ) {
-                    this.referer = referer ?: ""
-                    this.quality = Qualities.P1080.value
-                }
+        val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
+        val trueUrl = app.get(md5PassUrl, referer = newUrl, headers = mapOf("User-Agent" to "Mozilla/5.0")).text + "z"
+        
+        callback(
+            newExtractorLink(
+                this.name,
+                "${this.name} - Video",
+                trueUrl
             )
+        )
     }
 }
 
-class VidHideplus : VidhideExtractor() {
-    override var mainUrl = "https://vidhideplus.com"
+private class DoodStream : DoodStreamBase() { 
+    override var mainUrl = "doodstream.com" 
 }
 
-
-class waaw : StreamSB() {
-    override var mainUrl = "https://waaw.to"
+private class DsvPlay : DoodStreamBase() { 
+    override var mainUrl = "dsvplay.com" 
 }
 
-class FileMoonSx : Filesim() {
-    override val mainUrl = "https://filemoon.sx"
-    override val name = "FileMoonSx"
-}
-
-open class Voe : ExtractorApi() {
-    override val name = "Voe"
-    override val mainUrl = "https://voe.sx"
+private abstract class PackedJsExtractorBase(
+    override var name: String,
+    override var mainUrl: String,
+    private val regex: Regex
+) : ExtractorApi() {
     override val requiresReferer = true
-    private val redirectRegex = Regex("""window.location.href\s*=\s*'([^']+)';""")
-
-    override suspend fun getUrl(
-        url: String,
-        referer: String?,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ) {
-        var res = app.get(url, referer = referer)
-        val redirectUrl = redirectRegex.find(res.document.data())?.groupValues?.get(1)
-        if (redirectUrl != null) {
-            res = app.get(redirectUrl, referer = referer)
-        }
-        val encodedString = res.document.selectFirst("script[type=application/json]")?.data()?.trim()?.substringAfter("[\"")?.substringBeforeLast("\"]")
-        if (encodedString == null) {
-            println("encoded string not found.")
-            return
-        }
-        val decryptedJson = decryptF7(encodedString)
-        val m3u8 = decryptedJson.get("source")?.asString
-        val mp4 = decryptedJson.get("direct_access_url")?.asString
-
-        if (m3u8 != null) {
-            M3u8Helper.generateM3u8(
-                name,
-                m3u8,
-                "$mainUrl/",
-                headers = mapOf("Origin" to "$mainUrl/")
-            ).forEach(callback)
-        }
-        if (mp4!=null)
-        {
-            callback.invoke(
-                newExtractorLink(
-                    source = "$name MP4",
-                    name = "$name MP4",
-                    url = mp4,
-                    INFER_TYPE
-                ) {
-                    this.referer = url
-                    this.quality = Qualities.Unknown.value
-                }
-            )
-        }
-    }
-
-    private fun decryptF7(p8: String): JsonObject {
-        return try {
-            val vF = rot13(p8)
-            val vF2 = replacePatterns(vF)
-            val vF3 = removeUnderscores(vF2)
-            val vF4 = base64Decode(vF3)
-            val vF5 = charShift(vF4, 3)
-            val vF6 = reverse(vF5)
-            val vAtob = base64Decode(vF6)
-
-            JsonParser.parseString(vAtob).asJsonObject
-        } catch (e: Exception) {
-            println("Decryption error: ${e.message}")
-            JsonObject()
-        }
-    }
-
-    private fun rot13(input: String): String {
-        return input.map { c ->
-            when (c) {
-                in 'A'..'Z' -> ((c - 'A' + 13) % 26 + 'A'.code).toChar()
-                in 'a'..'z' -> ((c - 'a' + 13) % 26 + 'a'.code).toChar()
-                else -> c
+    
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        val doc = safeGetAsDocument(url, referer)
+        val script = doc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d)))")?.data()
+        if (script != null) {
+            val unpacked = getAndUnpack(script)
+            val videoUrl = regex.find(unpacked)?.groupValues?.get(1)
+            if (videoUrl != null && videoUrl.isNotBlank()) {
+                val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
+                
+                callback(
+                    newExtractorLink(
+                        this.name,
+                        "${this.name} - Video", 
+                        finalUrl
+                    )
+                )
             }
-        }.joinToString("")
-    }
-
-    private fun replacePatterns(input: String): String {
-        val patterns = listOf("@$", "^^", "~@", "%?", "*~", "!!", "#&")
-        return patterns.fold(input) { result, pattern ->
-            result.replace(Regex(Regex.escape(pattern)), "_")
         }
     }
-
-    private fun removeUnderscores(input: String): String = input.replace("_", "")
-
-    private fun charShift(input: String, shift: Int): String {
-        return input.map { (it.code - shift).toChar() }.joinToString("")
-    }
-
-    private fun reverse(input: String): String = input.reversed()
-
 }
+
+private class Mixdrop : PackedJsExtractorBase("Mixdrop", "mixdrop.ag", """MDCore\.wurl="([^"]+)""".toRegex())
+private class Mdfx9dc8n : PackedJsExtractorBase("Mdfx9dc8n", "mdfx9dc8n.net", """MDCore\.wurl="([^"]+)""".toRegex())
+private class Mxdrop : PackedJsExtractorBase("Mxdrop", "mxdrop.to", """MDCore\.wurl="([^"]+)""".toRegex())
+private class Bigwarp : PackedJsExtractorBase("Bigwarp", "bigwarp.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
+private class BigwarpPro : PackedJsExtractorBase("Bigwarp Pro", "bigwarp.pro", """\s*file\s*:\s*"([^"]+)""".toRegex())
+
+private open class PlaceholderExtractor(override var name: String, override var mainUrl: String) : ExtractorApi() {
+    override val requiresReferer = true
+    
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        Log.e(name, "Extractor not yet implemented for $url")
+    }
+}
+
+private class EarnVids : PlaceholderExtractor("EarnVids", "dingtezuni.com")
+private class VidGuard : PlaceholderExtractor("VidGuard", "listeamed.net")
