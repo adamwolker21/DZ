@@ -93,7 +93,7 @@ private abstract class StreamHGBase(override var name: String, override var main
                         val foundUrl = match.groupValues[1]
                         Log.d(name, "✅ SUCCESS (Packed): Found m3u8 link: $foundUrl")
                         callback(
-                            newExtractorLink(this.name, "${this.name} - HLS", foundUrl, referer = finalPageUrl)
+                            newExtractorLink(this.name, "${this.name} - HLS", foundUrl)
                         )
                         return // تم العثور على الرابط، قم بإنهاء الدالة
                     }
@@ -129,8 +129,7 @@ private abstract class StreamHGBase(override var name: String, override var main
                             newExtractorLink(
                                 this.name,
                                 "${this.name} - HLS (Fallback)",
-                                finalUrl,
-                                referer = finalPageUrl
+                                finalUrl
                             )
                         )
                         return // تم العثور على الرابط، قم بإنهاء الدالة
@@ -168,8 +167,7 @@ private class Forafile : ExtractorApi() {
                     newExtractorLink(
                         this.name,
                         "${this.name} - MP4",
-                        mp4Link,
-                        referer = url
+                        mp4Link
                     )
                 )
             }
@@ -194,8 +192,7 @@ private abstract class DoodStreamBase : ExtractorApi() {
             newExtractorLink(
                 this.name,
                 "${this.name} - Video",
-                trueUrl,
-                referer = newUrl
+                trueUrl
             )
         )
     }
@@ -229,8 +226,7 @@ private abstract class PackedJsExtractorBase(
                     newExtractorLink(
                         this.name,
                         "${this.name} - Video", 
-                        finalUrl,
-                        referer = url
+                        finalUrl
                     )
                 )
             }
