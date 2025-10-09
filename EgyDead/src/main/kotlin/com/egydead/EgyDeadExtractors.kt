@@ -83,13 +83,12 @@ private abstract class StreamHGBase(override var name: String, override var main
                     callback(
                         newExtractorLink(
                             source = this.name,
-                            name = "${this.name} - HLS",
+                            name = "${this.name} - HLS", 
                             url = fullUrl,
-                            quality = Qualities.Unknown.value,
                         ) {
-                            // إعداد الخصائص الإضافية هنا
                             referer = finalPageUrl
                             isM3u8 = true
+                            quality = Qualities.Unknown.value
                         }
                     )
                     return
@@ -169,27 +168,12 @@ private class Forafile : ExtractorApi() {
                         source = this.name,
                         name = "${this.name} - MP4",
                         url = mp4Link,
-                        quality = Qualities.Unknown.value,
-                    ) {
-                        referer = url
-                        isM3u8 = false
-                    }
-                )
-                
-                /* ===== الطريقة 2 =====
-                callback(
-                    newExtractorLink(
-                        source = this.name,
-                        name = "${this.name} - MP4",
-                        url = mp4Link,
                     ) {
                         referer = url
                         isM3u8 = false
                         quality = Qualities.Unknown.value
                     }
                 )
-                */
-            }
         }
     }
 }
