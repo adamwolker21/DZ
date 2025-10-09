@@ -6,7 +6,6 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.network.CloudflareKiller
-import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import org.jsoup.nodes.Document
 import android.util.Log
@@ -89,11 +88,9 @@ private abstract class StreamHGBase(override var name: String, override var main
                 if (m3u8Link != null) {
                     callback(
                         newExtractorLink(
-                            this.name,
-                            this.name,
-                            m3u8Link,
-                            quality = Qualities.Unknown.value
-                        ).copy(
+                            source = this.name,
+                            name = this.name,
+                            url = m3u8Link,
                             referer = finalPageUrl,
                             isM3u8 = true
                         )
@@ -126,11 +123,9 @@ private class Forafile : ExtractorApi() {
             if (mp4Link != null) {
                  callback(
                     newExtractorLink(
-                        this.name,
-                        this.name,
-                        mp4Link,
-                        quality = Qualities.Unknown.value
-                    ).copy(
+                        source = this.name,
+                        name = this.name,
+                        url = mp4Link,
                         referer = url,
                         isM3u8 = false
                     )
@@ -153,11 +148,9 @@ private abstract class DoodStreamBase : ExtractorApi() {
         val trueUrl = app.get(md5PassUrl, referer = newUrl, headers = mapOf("User-Agent" to "Mozilla/5.0")).text + "z"
         callback(
             newExtractorLink(
-                this.name,
-                this.name,
-                trueUrl,
-                quality = Qualities.Unknown.value
-            ).copy(
+                source = this.name,
+                name = this.name,
+                url = trueUrl,
                 referer = newUrl,
                 isM3u8 = false
             )
@@ -183,11 +176,9 @@ private abstract class PackedJsExtractorBase(
                 val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
                 callback(
                     newExtractorLink(
-                        this.name,
-                        this.name,
-                        finalUrl,
-                        quality = Qualities.Unknown.value
-                    ).copy(
+                        source = this.name,
+                        name = this.name,
+                        url = finalUrl,
                         referer = url
                     )
                 )
