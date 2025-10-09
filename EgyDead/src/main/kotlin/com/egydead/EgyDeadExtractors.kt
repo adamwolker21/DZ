@@ -7,11 +7,11 @@ import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.newExtractorLink // Import the new function
+import com.lagradost.cloudstream3.utils.newExtractorLink // المسار الصحيح للدالة
 import org.jsoup.nodes.Document
 import android.util.Log
 
-// The list of extractors, used by the provider
+// قائمة المستخرجات المستخدمة من قبل المزود
 val extractorList = listOf(
     StreamHG(), Davioad(), Haxloppd(), Kravaxxa(), Cavanhabg(), Dumbalag(),
     Forafile(),
@@ -22,6 +22,7 @@ val extractorList = listOf(
     VidGuard()
 )
 
+// ترويسات متصفح كاملة للمحاكاة
 private val BROWSER_HEADERS = mapOf(
     "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
     "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
@@ -33,11 +34,12 @@ private val BROWSER_HEADERS = mapOf(
     "Sec-Fetch-Site" to "cross-site",
     "Sec-Fetch-User" to "?1",
     "Upgrade-Insecure-Requests" to "1",
-    "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/5.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+    "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
 )
 
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
+// دالة آمنة لجلب الصفحة كـ Document
 private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
     return try {
         app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false).document
@@ -48,6 +50,7 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
     }
 }
 
+// دالة آمنة لجلب الصفحة كنص
 private suspend fun safeGetAsText(url: String, referer: String? = null): String? {
      return try {
         app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false).text
@@ -72,10 +75,7 @@ private abstract class StreamHGBase(override var name: String, override var main
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val videoId = url.substringAfterLast("/")
-        if (videoId.isBlank()) {
-            Log.e(name, "Could not extract video ID from $url")
-            return
-        }
+        if (videoId.isBlank()) return
 
         for (host in potentialHosts) {
             val finalPageUrl = "https://$host/e/$videoId"
@@ -97,7 +97,7 @@ private abstract class StreamHGBase(override var name: String, override var main
                             isM3u8 = true
                         )
                     )
-                    return
+                    return // الخروج فورًا عند العثور على رابط
                 }
             }
         }
