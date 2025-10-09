@@ -88,11 +88,15 @@ private abstract class StreamHGBase(override var name: String, override var main
 
                 if (m3u8Link != null) {
                     callback(
-                        newExtractorLink(this.name, this.name, m3u8Link) {
-                            this.referer = finalPageUrl
-                            this.quality = Qualities.Unknown.value
-                            this.isM3u8 = true
-                        }
+                        newExtractorLink(
+                            this.name,
+                            this.name,
+                            m3u8Link,
+                            quality = Qualities.Unknown.value
+                        ).copy(
+                            referer = finalPageUrl,
+                            isM3u8 = true
+                        )
                     )
                     return
                 }
@@ -121,11 +125,15 @@ private class Forafile : ExtractorApi() {
             val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
             if (mp4Link != null) {
                  callback(
-                    newExtractorLink(this.name, this.name, mp4Link) {
-                        this.referer = url
-                        this.quality = Qualities.Unknown.value
-                        this.isM3u8 = false
-                    }
+                    newExtractorLink(
+                        this.name,
+                        this.name,
+                        mp4Link,
+                        quality = Qualities.Unknown.value
+                    ).copy(
+                        referer = url,
+                        isM3u8 = false
+                    )
                 )
             }
         }
@@ -144,11 +152,15 @@ private abstract class DoodStreamBase : ExtractorApi() {
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
         val trueUrl = app.get(md5PassUrl, referer = newUrl, headers = mapOf("User-Agent" to "Mozilla/5.0")).text + "z"
         callback(
-            newExtractorLink(this.name, this.name, trueUrl) {
-                this.referer = newUrl
-                this.quality = Qualities.Unknown.value
-                this.isM3u8 = false
-            }
+            newExtractorLink(
+                this.name,
+                this.name,
+                trueUrl,
+                quality = Qualities.Unknown.value
+            ).copy(
+                referer = newUrl,
+                isM3u8 = false
+            )
         )
     }
 }
@@ -170,10 +182,14 @@ private abstract class PackedJsExtractorBase(
             if (videoUrl != null && videoUrl.isNotBlank()) {
                 val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
                 callback(
-                    newExtractorLink(this.name, this.name, finalUrl) {
-                        this.referer = url
-                        this.quality = Qualities.Unknown.value
-                    }
+                    newExtractorLink(
+                        this.name,
+                        this.name,
+                        finalUrl,
+                        quality = Qualities.Unknown.value
+                    ).copy(
+                        referer = url
+                    )
                 )
             }
         }
