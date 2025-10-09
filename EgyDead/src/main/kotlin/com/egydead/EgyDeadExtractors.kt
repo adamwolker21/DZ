@@ -4,9 +4,10 @@ import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
+import com.lagradost.cloudstream3.utils.M3u8Helper
+import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.network.CloudflareKiller
-import com.lagradost.cloudstream3.utils.Qualities // تم استيراده لاستخدام Qualities.Unknown
 import org.jsoup.nodes.Document
 import android.util.Log
 
@@ -81,22 +82,18 @@ private abstract class StreamHGBase(override var name: String, override var main
             val finalPageText = safeGetAsText(finalPageUrl, referer = url)
 
             if (finalPageText != null) {
-                // التعبير البرمجي الجديد والدقيق الذي يستهدف الرابط داخل استدعاء الدالة
+                // Regex الصحيح الذي يستهدف الرابط داخل jwplayer_setup
                 val m3u8Link = Regex("""jwplayer_setup\("([^"]+)""").find(finalPageText)?.groupValues?.get(1)
 
                 if (m3u8Link != null) {
                     Log.d(name, "Found m3u8 link: $m3u8Link")
-                    // استخدام المنشئ القديم والمتوافق مع بيئة العمل
-                    callback(
-                        ExtractorLink(
-                            source = this.name,
-                            name = this.name,
-                            url = m3u8Link,
-                            referer = finalPageUrl,
-                            quality = Qualities.Unknown.value,
-                            isM3u8 = true
-                        )
-                    )
+                    // الاستدعاء الصحيح للمساعد الحديث
+                    M3u8Helper.generateM3u8(
+                        this.name,
+                        m3u8Link,
+                        finalPageUrl,
+                        headers = BROWSER_HEADERS
+                    ).forEach(callback)
                     return // الخروج فورًا بعد النجاح
                 }
             }
@@ -124,7 +121,7 @@ private class Forafile : ExtractorApi() {
             val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
             if (mp4Link != null) {
                  callback(
-                    ExtractorLink(this.name, this.name, mp4Link, url, Qualities.Unknown.value)
+                    newExtractorLink(this.name, this.name, mp4Link, referer = url, isM3u8 = false)
                 )
             }
         }
@@ -143,7 +140,7 @@ private abstract class DoodStreamBase : ExtractorApi() {
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
         val trueUrl = app.get(md5PassUrl, referer = newUrl, headers = mapOf("User-Agent" to "Mozilla/5.0")).text + "z"
         callback(
-            ExtractorLink(this.name, this.name, trueUrl, newUrl, Qualities.Unknown.value)
+            newExtractorLink(this.name, this.name, trueUrl, referer = newUrl, isM3u8 = false)
         )
     }
 }
@@ -165,7 +162,7 @@ private abstract class PackedJsExtractorBase(
             if (videoUrl != null && videoUrl.isNotBlank()) {
                 val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
                 callback(
-                    ExtractorLink(this.name, this.name, finalUrl, url, Qualities.Unknown.value)
+                    newExtractorLink(this.name, this.name, finalUrl, referer = url)
                 )
             }
         }
