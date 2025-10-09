@@ -6,6 +6,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.network.CloudflareKiller
+import com.lagradost.cloudstream3.utils.M3u8Helper // <- المفتاح للروابط M3U8
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import org.jsoup.nodes.Document
 import android.util.Log
@@ -86,15 +87,12 @@ private abstract class StreamHGBase(override var name: String, override var main
                 val m3u8Link = Regex("""(https?://.*?/master\.m3u8)""").find(unpacked)?.groupValues?.get(1)
 
                 if (m3u8Link != null) {
-                    callback(
-                        newExtractorLink(
-                            source = this.name,
-                            name = this.name,
-                            url = m3u8Link,
-                            referer = finalPageUrl,
-                            isM3u8 = true
-                        )
-                    )
+                    // الطريقة الصحيحة والحديثة للتعامل مع M3U8
+                    M3u8Helper.generateM3u8(
+                        this.name,
+                        m3u8Link,
+                        finalPageUrl
+                    ).forEach(callback)
                     return
                 }
             }
@@ -126,8 +124,8 @@ private class Forafile : ExtractorApi() {
                         source = this.name,
                         name = this.name,
                         url = mp4Link,
-                        referer = url,
-                        isM3u8 = false
+                        // الطريقة الصحيحة لتمرير Referer
+                        headers = mapOf("Referer" to url)
                     )
                 )
             }
@@ -151,8 +149,7 @@ private abstract class DoodStreamBase : ExtractorApi() {
                 source = this.name,
                 name = this.name,
                 url = trueUrl,
-                referer = newUrl,
-                isM3u8 = false
+                headers = mapOf("Referer" to newUrl)
             )
         )
     }
@@ -179,7 +176,7 @@ private abstract class PackedJsExtractorBase(
                         source = this.name,
                         name = this.name,
                         url = finalUrl,
-                        referer = url
+                        headers = mapOf("Referer" to url)
                     )
                 )
             }
