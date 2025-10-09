@@ -8,5 +8,4 @@ pluginManagement {
 
 rootProject.name = "CSX"
 
-
-include(":Coflix")
+include(":EgyDead")
