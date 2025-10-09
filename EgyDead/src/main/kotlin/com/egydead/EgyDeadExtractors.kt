@@ -6,7 +6,6 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.getAndUnpack
-import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import android.util.Log
@@ -81,16 +80,16 @@ private abstract class StreamHGBase(override var name: String, override var main
                     val fullUrl = "https://$host$relativeLink"
                     Log.d(name, "Found final m3u8 link: $fullUrl")
                     
-                    // التصحيح: استخدام newExtractorLink بالطريقة الصحيحة
+                    // التصحيح: استخدام ExtractorLink التقليدي
                     callback(
-                        newExtractorLink(
-                            this.name,
-                            this.name,
-                            fullUrl,
-                            "",
-                            Qualities.Unknown.value,
-                            true,
-                            mapOf("Referer" to finalPageUrl)
+                        ExtractorLink(
+                            source = this.name,
+                            name = "${this.name} - HLS",
+                            url = fullUrl,
+                            referer = finalPageUrl,
+                            quality = Qualities.Unknown.value,
+                            isM3u8 = true,
+                            headers = mapOf("Referer" to finalPageUrl)
                         )
                     )
                     return // الخروج فورًا بعد النجاح
@@ -119,16 +118,15 @@ private class Forafile : ExtractorApi() {
             val unpacked = getAndUnpack(packedJs)
             val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
             if (mp4Link != null) {
-                 // التصحيح: استخدام newExtractorLink بالطريقة الصحيحة
+                 // التصحيح: استخدام ExtractorLink التقليدي
                  callback(
-                    newExtractorLink(
-                        this.name,
-                        this.name,
-                        mp4Link,
-                        "",
-                        Qualities.Unknown.value,
-                        false,
-                        mapOf("Referer" to url)
+                    ExtractorLink(
+                        source = this.name,
+                        name = "${this.name} - MP4",
+                        url = mp4Link,
+                        referer = url,
+                        quality = Qualities.Unknown.value,
+                        isM3u8 = false
                     )
                 )
             }
@@ -147,16 +145,15 @@ private abstract class DoodStreamBase : ExtractorApi() {
 
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
         val trueUrl = app.get(md5PassUrl, referer = newUrl, headers = mapOf("User-Agent" to "Mozilla/5.0")).text + "z"
-        // التصحيح: استخدام newExtractorLink بالطريقة الصحيحة
+        // التصحيح: استخدام ExtractorLink التقليدي
         callback(
-            newExtractorLink(
-                this.name,
-                this.name,
-                trueUrl,
-                "",
-                Qualities.Unknown.value,
-                false,
-                mapOf("Referer" to newUrl)
+            ExtractorLink(
+                source = this.name,
+                name = "${this.name} - Video",
+                url = trueUrl,
+                referer = newUrl,
+                quality = Qualities.Unknown.value,
+                isM3u8 = false
             )
         )
     }
@@ -178,16 +175,15 @@ private abstract class PackedJsExtractorBase(
             val videoUrl = regex.find(unpacked)?.groupValues?.get(1)
             if (videoUrl != null && videoUrl.isNotBlank()) {
                 val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
-                // التصحيح: استخدام newExtractorLink بالطريقة الصحيحة
+                // التصحيح: استخدام ExtractorLink التقليدي
                 callback(
-                    newExtractorLink(
-                        this.name,
-                        this.name,
-                        finalUrl,
-                        "",
-                        Qualities.Unknown.value,
-                        false,
-                        mapOf("Referer" to url)
+                    ExtractorLink(
+                        source = this.name,
+                        name = "${this.name} - Video",
+                        url = finalUrl,
+                        referer = url,
+                        quality = Qualities.Unknown.value,
+                        isM3u8 = false
                     )
                 )
             }
