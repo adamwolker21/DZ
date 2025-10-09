@@ -82,15 +82,18 @@ private abstract class StreamHGBase(override var name: String, override var main
                     
                     // الحل النهائي: newExtractorLink البسيط بدون كتلة تهيئة
                     callback(
-                        newExtractorLink(
-                            this.name,                    // source
-                            "${this.name} - HLS",         // name
-                            fullUrl,                      // url
-                            finalPageUrl,                 // referer
-                            Qualities.Unknown.value,      // quality
-                            true                          // isM3u8
-                        )
-                    )
+                        callback(
+    newExtractorLink(
+        this.name,
+        "${this.name} - HLS", 
+        fullUrl,
+        type = null,
+    ) {
+        referer = finalPageUrl
+        quality = Qualities.Unknown.value
+        isM3u8 = true
+    }
+)
                     return
                 }
             }
