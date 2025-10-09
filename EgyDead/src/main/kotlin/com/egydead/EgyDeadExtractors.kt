@@ -79,16 +79,20 @@ private abstract class StreamHGBase(override var name: String, override var main
                     val fullUrl = "https://$host$relativeLink"
                     Log.d(name, "Found final m3u8 link: $fullUrl")
                     
+                    // الحل الجديد: استخدام newExtractorLink بالطريقة الصحيحة
                     callback(
                         newExtractorLink(
                             source = this.name,
                             name = "${this.name} - HLS",
                             url = fullUrl,
+                            type = null, // أو يمكنك استخدام النوع المناسب
                             quality = Qualities.Unknown.value,
-                            isM3u8 = true,
-                            referer = finalPageUrl,
-                            headers = mapOf("Referer" to finalPageUrl)
-                        )
+                        ) {
+                            // إعداد الخصائص الإضافية هنا
+                            this.referer = finalPageUrl
+                            this.isM3u8 = true
+                            this.headers = mapOf("Referer" to finalPageUrl)
+                        }
                     )
                     return
                 }
@@ -119,12 +123,14 @@ private class Forafile : ExtractorApi() {
                 callback(
                     newExtractorLink(
                         source = this.name,
-                        name = "${this.name} - MP4", 
+                        name = "${this.name} - MP4",
                         url = mp4Link,
+                        type = null,
                         quality = Qualities.Unknown.value,
-                        isM3u8 = false,
-                        referer = url
-                    )
+                    ) {
+                        this.referer = url
+                        this.isM3u8 = false
+                    }
                 )
             }
         }
@@ -134,6 +140,7 @@ private class Forafile : ExtractorApi() {
 private abstract class DoodStreamBase : ExtractorApi() {
     override var name = "DoodStream"
     override val requiresReferer = true
+    
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val newUrl = if (url.contains("/e/")) url else url.replace("/d/", "/e/")
         val responseText = safeGetAsText(newUrl, referer) ?: return
@@ -142,15 +149,18 @@ private abstract class DoodStreamBase : ExtractorApi() {
 
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
         val trueUrl = app.get(md5PassUrl, referer = newUrl, headers = mapOf("User-Agent" to "Mozilla/5.0")).text + "z"
+        
         callback(
             newExtractorLink(
                 source = this.name,
                 name = "${this.name} - Video",
                 url = trueUrl,
+                type = null,
                 quality = Qualities.Unknown.value,
-                isM3u8 = false,
-                referer = newUrl
-            )
+            ) {
+                this.referer = newUrl
+                this.isM3u8 = false
+            }
         )
     }
 }
@@ -169,6 +179,7 @@ private abstract class PackedJsExtractorBase(
     private val regex: Regex
 ) : ExtractorApi() {
     override val requiresReferer = true
+    
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val doc = safeGetAsDocument(url, referer)
         val script = doc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d)))")?.data()
@@ -177,15 +188,18 @@ private abstract class PackedJsExtractorBase(
             val videoUrl = regex.find(unpacked)?.groupValues?.get(1)
             if (videoUrl != null && videoUrl.isNotBlank()) {
                 val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
+                
                 callback(
                     newExtractorLink(
                         source = this.name,
                         name = "${this.name} - Video",
                         url = finalUrl,
+                        type = null,
                         quality = Qualities.Unknown.value,
-                        isM3u8 = false,
-                        referer = url
-                    )
+                    ) {
+                        this.referer = url
+                        this.isM3u8 = false
+                    }
                 )
             }
         }
@@ -200,6 +214,7 @@ private class BigwarpPro : PackedJsExtractorBase("Bigwarp Pro", "bigwarp.pro", "
 
 private open class PlaceholderExtractor(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
+    
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         Log.e(name, "Extractor not yet implemented for $url")
     }
