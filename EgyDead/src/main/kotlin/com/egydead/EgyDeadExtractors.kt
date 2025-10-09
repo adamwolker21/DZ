@@ -54,12 +54,9 @@ private suspend fun safeGetAsText(url: String, referer: String? = null): String?
 private abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
 
+    // تم تقليص القائمة للتركيز على المضيف المحدد
     private val potentialHosts = listOf(
-        "kravaxxa.com",
-        "cavanhabg.com", 
-        "dumbalag.com",
-        "davioad.com",
-        "haxloppd.com"
+        "kravaxxa.com"
     )
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
@@ -70,228 +67,83 @@ private abstract class StreamHGBase(override var name: String, override var main
         }
 
         Log.d(name, "Starting extraction for video ID: $videoId")
-        
+
+        // التكرار على كل مضيف محتمل للعثور على رابط صالح
         for (host in potentialHosts) {
             val finalPageUrl = "https://$host/e/$videoId"
             Log.d(name, "Trying host: $host with URL: $finalPageUrl")
-            
+
             val doc = safeGetAsDocument(finalPageUrl, referer = url)
             if (doc == null) {
                 Log.e(name, "Failed to get document from: $finalPageUrl")
-                continue
+                continue // انتقل إلى المضيف التالي إذا فشل جلب الصفحة
             }
 
             Log.d(name, "Successfully retrieved document from: $host")
-            
-            // البحث عن السكريبت المعبأ
+
+            // --- الطريقة الأساسية: البحث عن الجافاسكريبت المعبأ ---
             val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
-            if (packedJs == null) {
-                Log.e(name, "No packed JavaScript found on: $host")
-                // حاول البحث عن أي سكريبت يحتوي على روابط
-                val allScripts = doc.select("script")
-                allScripts.forEachIndexed { index, script ->
-                    val scriptContent = script.data()
-                    if (scriptContent.contains("hls") || scriptContent.contains("m3u8")) {
-                        Log.d(name, "Found potential script #$index with hls/m3u8 content on: $host")
-                    }
-                }
-                continue
-            }
-
-            Log.d(name, "Found packed JavaScript on: $host, length: ${packedJs.length}")
-            
-            try {
-                val unpacked = getAndUnpack(packedJs)
-                Log.d(name, "Unpacked JavaScript length: ${unpacked.length}")
-                
-                // التحسين 1: اطبع جزء من unpacked للتحليل
-                if (unpacked.length > 500) {
-                    Log.d(name, "First 500 chars of unpacked: ${unpacked.substring(0, 500)}")
-                }
-
-                // التحسين 2: بحث موسع عن جميع الأنماط المحتملة
-                val patterns = listOf(
-                    """hls4"\s*:\s*"([^"]+)"""",
-                    """var links = \{([^}]+)\}""",
-                    """file.*?:\s*"([^"]+\.m3u8[^"]*)"""",
-                    """src.*?:\s*"([^"]+\.m3u8[^"]*)"""",
-                    """hls.*?:\s*"([^"]+\.m3u8[^"]*)""""
-                )
-
-                var foundUrl: String? = null
-                
-                for (pattern in patterns) {
-                    val regex = Regex(pattern)
-                    val match = regex.find(unpacked)
-                    if (match != null) {
-                        val extractedUrl = match.groupValues[1]
-                        Log.d(name, "Pattern '$pattern' matched: $extractedUrl")
-                        
-                        // معالجة الرابط المستخرج
-                        foundUrl = when {
-                            extractedUrl.startsWith("//") -> "https:$extractedUrl"
-                            extractedUrl.startsWith("/") -> "https://$host$extractedUrl"
-                            else -> extractedUrl
-                        }
-                        break
-                    }
-                }
-
-private abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
-    override val requiresReferer = true
-
-    private val potentialHosts = listOf(
-        "kravaxxa.com",
-        "cavanhabg.com",
-        "dumbalag.com", 
-        "davioad.com",
-        "haxloppd.com"
-    )
-
-    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val videoId = url.substringAfterLast("/")
-        if (videoId.isBlank()) {
-            Log.e(name, "Video ID is blank for URL: $url")
-            return
-        }
-
-        Log.d(name, "Starting extraction for video ID: $videoId")
-        
-        for (host in potentialHosts) {
-            val finalPageUrl = "https://$host/e/$videoId"
-            Log.d(name, "Trying host: $host with URL: $finalPageUrl")
-            
-            val doc = safeGetAsDocument(finalPageUrl, referer = url)
-            if (doc == null) {
-                Log.e(name, "Failed to get document from: $finalPageUrl")
-                continue
-            }
-
-            Log.d(name, "Successfully retrieved document from: $host")
-            
-            // البحث عن السكريبت المعبأ
-            val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
-            if (packedJs == null) {
-                Log.e(name, "No packed JavaScript found on: $host")
-                continue
-            }
-
-            Log.d(name, "Found packed JavaScript on: $host, length: ${packedJs.length}")
-            
-            try {
-                val unpacked = getAndUnpack(packedJs)
-                Log.d(name, "Unpacked JavaScript length: ${unpacked.length}")
-                
-                // الحل الجديد: البحث عن أنماط الروابط في الكود المفكوك
-                val foundUrl = extractUrlFromUnpacked(unpacked, host)
-                
-                if (foundUrl != null) {
-                    Log.d(name, "✅ SUCCESS: Found streaming link: $foundUrl")
-                    
-                    callback(
-                        newExtractorLink(
-                            this.name,
-                            "${this.name} - ${if (foundUrl.contains(".m3u8")) "HLS" else "Video"}", 
-                            foundUrl
-                        )
-                    )
-                    return
-                } else {
-                    Log.e(name, "❌ No valid streaming link found")
-                }
-
-            } catch (e: Exception) {
-                Log.e(name, "Error during unpacking or extraction: ${e.message}")
-            }
-        }
-        
-        Log.e(name, "❌ FAILED: No working hosts found for video: $videoId")
-    }
-    
-    private fun extractUrlFromUnpacked(unpacked: String, host: String): String? {
-        // النمط 1: البحث عن كائن links المشفر (كما في السجلات)
-        val encodedLinksMatch = Regex("""var o=(\{[^}]+\})""").find(unpacked)
-        if (encodedLinksMatch != null) {
-            val linksObject = encodedLinksMatch.groupValues[1]
-            Log.d(name, "Found encoded links object: $linksObject")
-            
-            // استخراج الروابط المشفرة - الترميز قد يختلف
-            val encodedUrls = listOf(
-                Regex(""""1c":"([^"]+)""").find(linksObject)?.groupValues?.get(1), // hls3
-                Regex(""""1g":"([^"]+)""").find(linksObject)?.groupValues?.get(1), // hls4  
-                Regex(""""1b":"([^"]+)""").find(linksObject)?.groupValues?.get(1)  // hls2
-            ).filterNotNull()
-            
-            Log.d(name, "Extracted encoded URLs: $encodedUrls")
-            
-            // محاولة فك التشفير البسيط - قد يحتاج للتعديل
-            for (encodedUrl in encodedUrls) {
+            if (packedJs != null) {
+                Log.d(name, "Found packed JavaScript on: $host, length: ${packedJs.length}")
                 try {
-                    // فك التشفير الأساسي - استبدال الأنماط الشائعة
-                    var decodedUrl = encodedUrl
-                        .replace("16://", "https://")
-                        .replace("67.cx.cw", "g6m5vwc8rl.zonesynapticwebscale.store")
-                        .replace("67.cq.26", "g6m5vwc8rl.premilkyway.com")
-                        .replace("2y", "01")
-                        .replace("66", "11944")
-                        .replace("65", "1woe41gjgjoq_")
-                        .replace("64,l,n,h,.63", "urlset/master")
-                        .replace("3r.cv", "txt")
-                        .replace("3r.61", "m3u8")
-                        .replace("\\u002F", "/") // فك ترميز Unicode
-                    
-                    // إذا كان الرابط نسبيًا، أضف النطاق
-                    if (decodedUrl.startsWith("/")) {
-                        decodedUrl = "https://$host$decodedUrl"
-                    }
-                    
-                    // التحقق إذا كان الرابط صالحًا
-                    if (isValidStreamUrl(decodedUrl)) {
-                        Log.d(name, "✅ Decoded valid URL: $decodedUrl")
-                        return decodedUrl
+                    val unpacked = getAndUnpack(packedJs)
+                    val m3u8Regex = Regex("""file.*?:\s*"([^"]+\.m3u8[^"]*)"""")
+                    val match = m3u8Regex.find(unpacked)
+                    if (match != null) {
+                        val foundUrl = match.groupValues[1]
+                        Log.d(name, "✅ SUCCESS (Packed): Found m3u8 link: $foundUrl")
+                        callback(
+                            newExtractorLink(this.name, "${this.name} - HLS", foundUrl, referer = finalPageUrl)
+                        )
+                        return // تم العثور على الرابط، قم بإنهاء الدالة
                     }
                 } catch (e: Exception) {
-                    Log.e(name, "Error decoding URL: $e")
+                    Log.e(name, "Error during unpacking or regex on packed JS: ${e.message}")
                 }
             }
-        }
-        
-        // النمط 2: البحث المباشر عن روابط m3u8 في الكود
-        val directM3u8Matches = Regex("""(https?://[^\s"']+\.m3u8[^\s"']*)""").findAll(unpacked).toList()
-        if (directM3u8Matches.isNotEmpty()) {
-            Log.d(name, "Found ${directM3u8Matches.size} direct m3u8 URLs")
-            directM3u8Matches.forEach { match ->
-                val url = match.value
-                if (isValidStreamUrl(url)) {
-                    Log.d(name, "✅ Using direct m3u8 URL: $url")
-                    return url
+
+            // --- الطريقة الاحتياطية: البحث في جميع السكريبتات عن رابط مباشر ---
+            Log.d(name, "Packed JS not found or failed. Starting fallback search on $host.")
+            val allScripts = doc.select("script")
+            for (script in allScripts) {
+                val scriptContent = script.data()
+                // Regex للبحث عن أي رابط ينتهي بـ .m3u8 داخل علامات الاقتباس
+                val m3u8Regex = Regex("""["']([^"']+\.m3u8[^"']*)["']""")
+                val match = m3u8Regex.find(scriptContent)
+
+                if (match != null) {
+                    val extractedUrl = match.groupValues[1]
+                    Log.d(name, "Fallback found potential m3u8 link: $extractedUrl")
+
+                    // بناء الرابط الكامل
+                    val finalUrl = when {
+                        extractedUrl.startsWith("//") -> "https:$extractedUrl"
+                        extractedUrl.startsWith("/") -> "https://$host$extractedUrl"
+                        extractedUrl.startsWith("http") -> extractedUrl
+                        else -> null
+                    }
+
+                    if (finalUrl != null) {
+                        Log.d(name, "✅ SUCCESS (Fallback): Final m3u8 link: $finalUrl")
+                        callback(
+                            newExtractorLink(
+                                this.name,
+                                "${this.name} - HLS (Fallback)",
+                                finalUrl,
+                                referer = finalPageUrl
+                            )
+                        )
+                        return // تم العثور على الرابط، قم بإنهاء الدالة
+                    }
                 }
             }
+            Log.e(name, "No m3u8 link found on $host with either method.")
         }
-        
-        // النمط 3: البحث عن روابط نسبية
-        val relativeMatches = Regex("""(/[^\s"']+\.m3u8[^\s"']*)""").findAll(unpacked).toList()
-        if (relativeMatches.isNotEmpty()) {
-            Log.d(name, "Found ${relativeMatches.size} relative m3u8 URLs")
-            relativeMatches.forEach { match ->
-                val relativeUrl = match.value
-                val fullUrl = "https://$host$relativeUrl"
-                if (isValidStreamUrl(fullUrl)) {
-                    Log.d(name, "✅ Using relative m3u8 URL: $fullUrl")
-                    return fullUrl
-                }
-            }
-        }
-        
-        return null
-    }
-    
-    private fun isValidStreamUrl(url: String): Boolean {
-        return url.contains("m3u8") && 
-               (url.startsWith("https://") || url.startsWith("http://")) &&
-               url.length > 10 // طول معقول للرابط
+
+        Log.e(name, "❌ FAILED: No working hosts found for video: $videoId")
     }
 }
+
 
 private class StreamHG : StreamHGBase("StreamHG", "hglink.to")
 private class Davioad : StreamHGBase("StreamHG (Davioad)", "davioad.com")
@@ -316,7 +168,8 @@ private class Forafile : ExtractorApi() {
                     newExtractorLink(
                         this.name,
                         "${this.name} - MP4",
-                        mp4Link
+                        mp4Link,
+                        referer = url
                     )
                 )
             }
@@ -341,7 +194,8 @@ private abstract class DoodStreamBase : ExtractorApi() {
             newExtractorLink(
                 this.name,
                 "${this.name} - Video",
-                trueUrl
+                trueUrl,
+                referer = newUrl
             )
         )
     }
@@ -375,7 +229,8 @@ private abstract class PackedJsExtractorBase(
                     newExtractorLink(
                         this.name,
                         "${this.name} - Video", 
-                        finalUrl
+                        finalUrl,
+                        referer = url
                     )
                 )
             }
