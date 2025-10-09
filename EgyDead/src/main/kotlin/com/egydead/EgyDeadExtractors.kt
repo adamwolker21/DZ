@@ -7,7 +7,7 @@ import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.newExtractorLink // المسار الصحيح للدالة
+import com.lagradost.cloudstream3.utils.newExtractorLink
 import org.jsoup.nodes.Document
 import android.util.Log
 
@@ -88,16 +88,13 @@ private abstract class StreamHGBase(override var name: String, override var main
 
                 if (m3u8Link != null) {
                     callback(
-                        newExtractorLink(
-                            source = this.name,
-                            name = this.name,
-                            url = m3u8Link,
-                            referer = finalPageUrl,
-                            quality = Qualities.Unknown.value,
-                            isM3u8 = true
-                        )
+                        newExtractorLink(this.name, this.name, m3u8Link) {
+                            this.referer = finalPageUrl
+                            this.quality = Qualities.Unknown.value
+                            this.isM3u8 = true
+                        }
                     )
-                    return // الخروج فورًا عند العثور على رابط
+                    return
                 }
             }
         }
@@ -124,14 +121,11 @@ private class Forafile : ExtractorApi() {
             val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
             if (mp4Link != null) {
                  callback(
-                    newExtractorLink(
-                        source = this.name,
-                        name = this.name,
-                        url = mp4Link,
-                        referer = url,
-                        quality = Qualities.Unknown.value,
-                        isM3u8 = false
-                    )
+                    newExtractorLink(this.name, this.name, mp4Link) {
+                        this.referer = url
+                        this.quality = Qualities.Unknown.value
+                        this.isM3u8 = false
+                    }
                 )
             }
         }
@@ -150,14 +144,11 @@ private abstract class DoodStreamBase : ExtractorApi() {
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
         val trueUrl = app.get(md5PassUrl, referer = newUrl, headers = mapOf("User-Agent" to "Mozilla/5.0")).text + "z"
         callback(
-            newExtractorLink(
-                source = this.name,
-                name = this.name,
-                url = trueUrl,
-                referer = newUrl,
-                quality = Qualities.Unknown.value,
-                isM3u8 = false
-            )
+            newExtractorLink(this.name, this.name, trueUrl) {
+                this.referer = newUrl
+                this.quality = Qualities.Unknown.value
+                this.isM3u8 = false
+            }
         )
     }
 }
@@ -179,13 +170,10 @@ private abstract class PackedJsExtractorBase(
             if (videoUrl != null && videoUrl.isNotBlank()) {
                 val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
                 callback(
-                    newExtractorLink(
-                        source = this.name,
-                        name = this.name,
-                        url = finalUrl,
-                        referer = url,
-                        quality = Qualities.Unknown.value
-                    )
+                    newExtractorLink(this.name, this.name, finalUrl) {
+                        this.referer = url
+                        this.quality = Qualities.Unknown.value
+                    }
                 )
             }
         }
