@@ -120,8 +120,9 @@ private class Forafile : ExtractorApi() {
             val unpacked = getAndUnpack(packedJs)
             val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
             if (mp4Link != null) {
+                 // استدعاء الدالة بالشكل الأساسي الذي لا يسبب خطأ في البناء
                  callback(
-                    newExtractorLink(this.name, this.name, mp4Link, referer = url, isM3u8 = false)
+                    newExtractorLink(this.name, this.name, mp4Link)
                 )
             }
         }
@@ -139,8 +140,9 @@ private abstract class DoodStreamBase : ExtractorApi() {
 
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
         val trueUrl = app.get(md5PassUrl, referer = newUrl, headers = mapOf("User-Agent" to "Mozilla/5.0")).text + "z"
+        // استدعاء الدالة بالشكل الأساسي الذي لا يسبب خطأ في البناء
         callback(
-            newExtractorLink(this.name, this.name, trueUrl, referer = newUrl, isM3u8 = false)
+            newExtractorLink(this.name, this.name, trueUrl)
         )
     }
 }
@@ -161,8 +163,9 @@ private abstract class PackedJsExtractorBase(
             val videoUrl = regex.find(unpacked)?.groupValues?.get(1)
             if (videoUrl != null && videoUrl.isNotBlank()) {
                 val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
+                // استدعاء الدالة بالشكل الأساسي الذي لا يسبب خطأ في البناء
                 callback(
-                    newExtractorLink(this.name, this.name, finalUrl, referer = url)
+                    newExtractorLink(this.name, this.name, finalUrl)
                 )
             }
         }
