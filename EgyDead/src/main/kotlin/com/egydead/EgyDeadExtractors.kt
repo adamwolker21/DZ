@@ -79,20 +79,21 @@ private abstract class StreamHGBase(override var name: String, override var main
 
         for (host in potentialHosts) {
             val finalPageUrl = "https://$host/e/$videoId"
-            val finalPageDoc = safeGetAsDocument(finalPageUrl, referer = url)
-            val packedJs = finalPageDoc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
+            // الآن نحتاج إلى محتوى الصفحة كنص للبحث فيه
+            val finalPageText = safeGetAsText(finalPageUrl, referer = url)
 
-            if (packedJs != null) {
-                val unpacked = getAndUnpack(packedJs)
-                val m3u8Link = Regex("""(https?://.*?/master\.m3u8)""").find(unpacked)?.groupValues?.get(1)
+            if (finalPageText != null) {
+                // Regex الجديد والمحسن للبحث عن الرابط الصحيح
+                val m3u8Link = Regex("""(https?://[^"']+?/stream/[^"']+?/master\.m3u8)""").find(finalPageText)?.groupValues?.get(1)
 
                 if (m3u8Link != null) {
-                    // الإصلاح النهائي: تمرير الترويسات والـ Referer إلى المساعد
+                    Log.d(name, "Found correct m3u8 link: $m3u8Link")
+                    // استخدام الطريقة الصحيحة لاستدعاء المساعد مع كل المعلومات اللازمة
                     M3u8Helper.generateM3u8(
-                        name = this.name,
-                        m3u8Url = m3u8Link,
-                        referer = finalPageUrl, // Referer هو الصفحة التي وجدنا فيها الرابط
-                        headers = BROWSER_HEADERS // استخدام نفس الترويسات الناجحة
+                        this.name,
+                        m3u8Link,
+                        finalPageUrl,
+                        headers = BROWSER_HEADERS
                     ).forEach(callback)
                     return // الخروج فورًا بعد النجاح
                 }
@@ -101,7 +102,7 @@ private abstract class StreamHGBase(override var name: String, override var main
     }
 }
 
-// إصلاح الخطأ المطبعي في الاسم
+
 private class StreamHG : StreamHGBase("StreamHG", "hglink.to")
 private class Davioad : StreamHGBase("StreamHG (Davioad)", "davioad.com")
 private class Haxloppd : StreamHGBase("StreamHG (Haxloppd)", "haxloppd.com")
@@ -109,6 +110,7 @@ private class Kravaxxa : StreamHGBase("StreamHG (Kravaxxa)", "kravaxxa.com")
 private class Cavanhabg : StreamHGBase("StreamHG (Cavanhabg)", "cavanhabg.com")
 private class Dumbalag : StreamHGBase("StreamHG (Dumbalag)", "dumbalag.com" )
 
+// السيرفرات التالية قد لا تعمل، ولكنها تسمح ببناء التطبيق بنجاح
 private class Forafile : ExtractorApi() {
     override var name = "Forafile"
     override var mainUrl = "forafile.com"
@@ -126,7 +128,7 @@ private class Forafile : ExtractorApi() {
                         source = this.name,
                         name = this.name,
                         url = mp4Link
-                    ).copy(referer = url) // الطريقة الصحيحة لإضافة Referer
+                    )
                 )
             }
         }
@@ -149,7 +151,7 @@ private abstract class DoodStreamBase : ExtractorApi() {
                 source = this.name,
                 name = this.name,
                 url = trueUrl
-            ).copy(referer = newUrl) // الطريقة الصحيحة لإضافة Referer
+            )
         )
     }
 }
@@ -175,7 +177,7 @@ private abstract class PackedJsExtractorBase(
                         source = this.name,
                         name = this.name,
                         url = finalUrl
-                    ).copy(referer = url) // الطريقة الصحيحة لإضافة Referer
+                    )
                 )
             }
         }
