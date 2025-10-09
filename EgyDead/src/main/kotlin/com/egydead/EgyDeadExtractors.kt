@@ -79,22 +79,65 @@ private abstract class StreamHGBase(override var name: String, override var main
                     val fullUrl = "https://$host$relativeLink"
                     Log.d(name, "Found final m3u8 link: $fullUrl")
                     
-                    // الحل الجديد: استخدام newExtractorLink بالطريقة الصحيحة
+                    // ===== الطريقة 1: التوقيع الأساسي (الأكثر شيوعاً) =====
                     callback(
                         newExtractorLink(
                             source = this.name,
                             name = "${this.name} - HLS",
                             url = fullUrl,
-                            type = null, // أو يمكنك استخدام النوع المناسب
                             quality = Qualities.Unknown.value,
                         ) {
                             // إعداد الخصائص الإضافية هنا
-                            this.referer = finalPageUrl
-                            this.isM3u8 = true
-                            this.headers = mapOf("Referer" to finalPageUrl)
+                            referer = finalPageUrl
+                            isM3u8 = true
                         }
                     )
                     return
+                    
+                    /* ===== الطريقة 2: بدون معامل quality =====
+                    callback(
+                        newExtractorLink(
+                            source = this.name,
+                            name = "${this.name} - HLS", 
+                            url = fullUrl,
+                        ) {
+                            referer = finalPageUrl
+                            isM3u8 = true
+                            quality = Qualities.Unknown.value
+                        }
+                    )
+                    return
+                    */
+                    
+                    /* ===== الطريقة 3: مع headers فقط =====
+                    callback(
+                        newExtractorLink(
+                            source = this.name,
+                            name = "${this.name} - HLS",
+                            url = fullUrl,
+                        ) {
+                            headers = mapOf(
+                                "Referer" to finalPageUrl
+                            )
+                            isM3u8 = true
+                        }
+                    )
+                    return
+                    */
+                    
+                    /* ===== الطريقة 4: الأبسط =====
+                    callback(
+                        newExtractorLink(
+                            this.name,
+                            "${this.name} - HLS", 
+                            fullUrl
+                        ) {
+                            referer = finalPageUrl
+                            isM3u8 = true
+                        }
+                    )
+                    return
+                    */
                 }
             }
         }
@@ -120,18 +163,32 @@ private class Forafile : ExtractorApi() {
             val unpacked = getAndUnpack(packedJs)
             val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
             if (mp4Link != null) {
+                // ===== الطريقة 1 =====
                 callback(
                     newExtractorLink(
                         source = this.name,
                         name = "${this.name} - MP4",
                         url = mp4Link,
-                        type = null,
                         quality = Qualities.Unknown.value,
                     ) {
-                        this.referer = url
-                        this.isM3u8 = false
+                        referer = url
+                        isM3u8 = false
                     }
                 )
+                
+                /* ===== الطريقة 2 =====
+                callback(
+                    newExtractorLink(
+                        source = this.name,
+                        name = "${this.name} - MP4",
+                        url = mp4Link,
+                    ) {
+                        referer = url
+                        isM3u8 = false
+                        quality = Qualities.Unknown.value
+                    }
+                )
+                */
             }
         }
     }
@@ -150,18 +207,32 @@ private abstract class DoodStreamBase : ExtractorApi() {
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
         val trueUrl = app.get(md5PassUrl, referer = newUrl, headers = mapOf("User-Agent" to "Mozilla/5.0")).text + "z"
         
+        // ===== الطريقة 1 =====
         callback(
             newExtractorLink(
                 source = this.name,
                 name = "${this.name} - Video",
                 url = trueUrl,
-                type = null,
                 quality = Qualities.Unknown.value,
             ) {
-                this.referer = newUrl
-                this.isM3u8 = false
+                referer = newUrl
+                isM3u8 = false
             }
         )
+        
+        /* ===== الطريقة 2 =====
+        callback(
+            newExtractorLink(
+                source = this.name,
+                name = "${this.name} - Video",
+                url = trueUrl,
+            ) {
+                referer = newUrl
+                isM3u8 = false
+                quality = Qualities.Unknown.value
+            }
+        )
+        */
     }
 }
 
@@ -189,18 +260,32 @@ private abstract class PackedJsExtractorBase(
             if (videoUrl != null && videoUrl.isNotBlank()) {
                 val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
                 
+                // ===== الطريقة 1 =====
                 callback(
                     newExtractorLink(
                         source = this.name,
                         name = "${this.name} - Video",
                         url = finalUrl,
-                        type = null,
                         quality = Qualities.Unknown.value,
                     ) {
-                        this.referer = url
-                        this.isM3u8 = false
+                        referer = url
+                        isM3u8 = false
                     }
                 )
+                
+                /* ===== الطريقة 2 =====
+                callback(
+                    newExtractorLink(
+                        source = this.name,
+                        name = "${this.name} - Video",
+                        url = finalUrl,
+                    ) {
+                        referer = url
+                        isM3u8 = false
+                        quality = Qualities.Unknown.value
+                    }
+                )
+                */
             }
         }
     }
