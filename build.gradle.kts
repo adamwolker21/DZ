@@ -69,7 +69,7 @@ subprojects {
     dependencies {
         val implementation by configurations
         val cloudstream by configurations
-        cloudstream("com.lagradost:cloudstream3:4.5.4")
+        cloudstream("com.lagradost:cloudstream3:pre-release")
 
         // Other dependencies
         implementation(kotlin("stdlib"))
