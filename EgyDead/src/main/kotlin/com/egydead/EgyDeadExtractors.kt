@@ -6,14 +6,14 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.network.CloudflareKiller
-import com.lagradost.cloudstream3.utils.M3u8Helper // <- المفتاح للروابط M3U8
+import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import org.jsoup.nodes.Document
 import android.util.Log
 
 // قائمة المستخرجات المستخدمة من قبل المزود
 val extractorList = listOf(
-    StreamHG(), Davioad(), Haxloppd(), Kravaxxa(), Cavanhabg(), Dumbalag(),
+    StreamHG(), Davioad(), Haxloppd(), Kravxa(), Cavanhabg(), Dumbalag(),
     Forafile(),
     DoodStream(), DsvPlay(),
     Mixdrop(), Mdfx9dc8n(), Mxdrop(),
@@ -87,7 +87,6 @@ private abstract class StreamHGBase(override var name: String, override var main
                 val m3u8Link = Regex("""(https?://.*?/master\.m3u8)""").find(unpacked)?.groupValues?.get(1)
 
                 if (m3u8Link != null) {
-                    // الطريقة الصحيحة والحديثة للتعامل مع M3U8
                     M3u8Helper.generateM3u8(
                         this.name,
                         m3u8Link,
@@ -103,7 +102,7 @@ private abstract class StreamHGBase(override var name: String, override var main
 private class StreamHG : StreamHGBase("StreamHG", "hglink.to")
 private class Davioad : StreamHGBase("StreamHG (Davioad)", "davioad.com")
 private class Haxloppd : StreamHGBase("StreamHG (Haxloppd)", "haxloppd.com")
-private class Kravaxxa : StreamHGBase("StreamHG (Kravaxxa)", "kravaxxa.com")
+private class Kravxa : StreamHGBase("StreamHG (Kravxa)", "kravaxxa.com")
 private class Cavanhabg : StreamHGBase("StreamHG (Cavanhabg)", "cavanhabg.com")
 private class Dumbalag : StreamHGBase("StreamHG (Dumbalag)", "dumbalag.com" )
 
@@ -123,9 +122,7 @@ private class Forafile : ExtractorApi() {
                     newExtractorLink(
                         source = this.name,
                         name = this.name,
-                        url = mp4Link,
-                        // الطريقة الصحيحة لتمرير Referer
-                        headers = mapOf("Referer" to url)
+                        url = mp4Link
                     )
                 )
             }
@@ -148,8 +145,7 @@ private abstract class DoodStreamBase : ExtractorApi() {
             newExtractorLink(
                 source = this.name,
                 name = this.name,
-                url = trueUrl,
-                headers = mapOf("Referer" to newUrl)
+                url = trueUrl
             )
         )
     }
@@ -175,8 +171,7 @@ private abstract class PackedJsExtractorBase(
                     newExtractorLink(
                         source = this.name,
                         name = this.name,
-                        url = finalUrl,
-                        headers = mapOf("Referer" to url)
+                        url = finalUrl
                     )
                 )
             }
