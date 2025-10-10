@@ -79,36 +79,38 @@ private abstract class StreamHGBase(override var name: String, override var main
 
             Log.d(name, "Successfully retrieved document from: $host")
 
-            // الخطوة 1: البحث عن السكريبت المعبأ
             val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
             if (packedJs == null) {
                 Log.e(name, "No packed 'eval' JavaScript found on: $host")
                 continue
             }
 
-            Log.d(name, "Found packed JavaScript, starting manual extraction.")
+            Log.d(name, "Found packed JavaScript, starting advanced manual extraction.")
             
             try {
-                // الخطوة 2: استخراج "قاموس" الكلمات من السكريبت المعبأ
-                val dictionaryRegex = Regex("""'((?:[^']|\\'){1000,})'\.split\('\|'\)""")
-                val dictionaryMatch = dictionaryRegex.find(packedJs)
-                if (dictionaryMatch == null) {
-                    Log.e(name, "Regex failed: Could not find dictionary string in packed JS.")
+                // الخطوة 1: Regex جديد لتحليل بنية دالة eval واستخراج القاموس (k)
+                // يبحث عن النمط الكامل لاستدعاء الدالة لضمان الدقة
+                val evalArgsRegex = Regex("""\}\s*\((?:'|")((?:[^'"]|\\['"])*)(?:'|"),\d+,\d+,(?:'|")((?:[^'"]|\\['"])*)(?:'|")\.split\('\|'\)""")
+                
+                val evalMatch = evalArgsRegex.find(packedJs)
+                if (evalMatch == null) {
+                    Log.e(name, "Regex failed: Could not parse eval() arguments structure.")
                     continue
                 }
-                
-                val dictionary = dictionaryMatch.groupValues[1]
-                Log.d(name, "Successfully extracted dictionary string (length: ${dictionary.length}).")
 
-                // الخطوة 3: البحث عن أجزاء الرابط داخل القاموس
+                // القاموس هو المجموعة الثانية التي تم التقاطها
+                val dictionary = evalMatch.groupValues[2]
+                Log.d(name, "Successfully extracted dictionary via structure parsing (length: ${dictionary.length}).")
+
+                // الخطوة 2: البحث عن أجزاء الرابط داخل القاموس المستخرج
                 val partsRegex = Regex("""stream\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|master\|m3u8""")
                 val partsMatch = partsRegex.find(dictionary)
 
                 if (partsMatch != null) {
                     val (p1, p2, p3, p4, p5) = partsMatch.destructured
-                    Log.d(name, "Found URL parts: $p1, $p2, $p3, $p4, $p5")
+                    Log.d(name, "Found URL parts in dictionary: $p1, $p2, $p3, $p4, $p5")
 
-                    // الخطوة 4: إعادة بناء الرابط
+                    // الخطوة 3: إعادة بناء الرابط النهائي
                     val reconstructedPath = "/stream/$p1-$p2/$p3/$p4/$p5/master.m3u8"
                     val finalUrl = "https://$host$reconstructedPath"
                     Log.d(name, "✅ SUCCESS: Reconstructed final m3u8 link: $finalUrl")
@@ -122,7 +124,7 @@ private abstract class StreamHGBase(override var name: String, override var main
                     )
                     return 
                 } else {
-                    Log.e(name, "❌ Regex failed: Could not find URL parts sequence in dictionary.")
+                    Log.e(name, "❌ Regex failed: Could not find URL parts sequence in the extracted dictionary.")
                 }
 
             } catch (e: Exception) {
