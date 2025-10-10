@@ -1,50 +1,35 @@
-// استيراد الأدوات اللازمة من CloudStream
+// استيراد الأداة الصحيحة والمخصصة لهذه المهمة
+import com.lagradost.cloudstream3.utils.JsUnpacker.jsUnpacker
 import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.utils.AppUtils.quickJs
-import kotlinx.coroutines.runBlocking
 
-fun extractHls2LinkFromPackedJs(packedJs: String): String? {
-    val deobfuscatorJs = """
-        function deobfuscate(p, a, c, k) {
-            k = k.split('|');
-            while (c--) {
-                if (k[c]) {
-                    p = p.replace(new RegExp('\\b' + c.toString(a) + '\\b', 'g'), k[c]);
-                }
-            }
-            return p;
-        }
-    """.trimIndent()
-
+// الدالة الآن أبسط بكثير
+// ستحتاج إلى تمرير محتوى الصفحة (HTML) كاملاً لهذه الدالة
+fun extractHls2LinkFromHtml(htmlContent: String): String? {
     try {
-        val pattern = """eval\(function\(p,a,c,k,e,d\)\{.*?\}\('([^']*)',(\d+),(\d+),'([^']*)'\.split\('\|'\)\)\)""".toRegex()
-        val matchResult = pattern.find(packedJs) ?: run {
-            println("CS3 QuickJS: Pattern not found in packed JS")
+        // الخطوة 1: ابحث عن السكريبت المشفر داخل محتوى الـ HTML
+        val packedJsRegex = """eval\(function\(p,a,c,k,e,d\).*?\)""".toRegex()
+        val packedJsScript = packedJsRegex.find(htmlContent)?.value ?: run {
+            println("JsUnpacker: لم يتم العثور على سكريبت eval.")
             return null
         }
 
-        val p = matchResult.groupValues[1]
-        val a = matchResult.groupValues[2]
-        val c = matchResult.groupValues[3]
-        val k = matchResult.groupValues[4]
-        
-        val fullJsCode = """
-            $deobfuscatorJs
-            deobfuscate('$p', $a, $c, '$k'); 
-        """.trimIndent()
+        // الخطوة 2: استخدم دالة jsUnpacker الجاهزة لفك التشفير
+        // هذه الدالة ستقوم بكل العمل تلقائياً
+        val deobfuscatedCode = app.jsUnpacker(packedJsScript)
 
-        // ====> هنا كان التصحيح <====
-        val deobfuscatedCode = runBlocking {
-             app.quickJs(fullJsCode)
+        if (deobfuscatedCode.isBlank()) {
+            println("JsUnpacker: فشلت عملية فك التشفير.")
+            return null
         }
-        
+
+        // الخطوة 3: ابحث عن الرابط في الكود المفكوك كالمعتاد
         val linkRegex = """"hls2"\s*:\s*"([^"]+)"""".toRegex()
         val linkMatch = linkRegex.find(deobfuscatedCode)
 
         return linkMatch?.groupValues?.get(1)
 
     } catch (e: Exception) {
-        println("CS3 QuickJS Error: ${e.message}")
+        println("JsUnpacker Error: ${e.message}")
         e.printStackTrace()
         return null
     }
