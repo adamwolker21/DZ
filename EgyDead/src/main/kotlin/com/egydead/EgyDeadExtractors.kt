@@ -53,31 +53,20 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
     }
 }
 
-// A single, powerful, multi-strategy extractor class
-private class StreamHGMultiMethod : ExtractorApi() {
-    // We override these properties in the class itself
+// Fixed the visibility from private to internal to solve the build error.
+internal class StreamHGMultiMethod : ExtractorApi() {
     override var name = "StreamHG"
-    override var mainUrl = "kravaxxa.com" // We can change this if the main domain changes
+    override var mainUrl = "kravaxxa.com"
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        // Since this extractor handles multiple potential domains, let's get the host from the URL
         val currentHost = java.net.URI(url).host ?: mainUrl
-
         val doc = safeGetAsDocument(url, referer) ?: return
         Log.d(name, "Page loaded successfully from $url")
 
         val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs == null) {
-            // --- ATTEMPT 4 (Fallback): Direct Page Scan ---
-            Log.d(name, "No packed JS found. Trying Attempt 4: Direct Page Scan...")
-            val directLink = doc.html().let { Regex("""(https?://[^'"]+\.m3u8[^'"]*)""").find(it)?.value }
-            if (directLink != null) {
-                Log.d(name, "✅ SUCCESS with Direct Page Scan. Link: $directLink")
-                callback(createLink(this.name, "${this.name} - Direct", directLink, url, Qualities.Unknown.value))
-            } else {
-                Log.e(name, "No packed JS and no direct .m3u8 link found on the page.")
-            }
+            Log.e(name, "No packed 'eval' JavaScript found on the page.")
             return
         }
         Log.d(name, "Found packed JS. Starting multi-layered extraction...")
@@ -88,8 +77,6 @@ private class StreamHGMultiMethod : ExtractorApi() {
         try {
             Log.d(name, "Attempt 1: Classic Unpacker (getAndUnpack)...")
             unpackedScript = getAndUnpack(packedJs)
-            Log.d(name, "Classic Unpacker succeeded.")
-            // --- ATTEMPT 1.1: Look for "hls4" specifically ---
             val hls4Link = Regex("""["']hls4["']\s*:\s*["']([^"']+\.m3u8[^"']*)""").find(unpackedScript)?.groupValues?.get(1)
             if (hls4Link != null) {
                 val finalUrl = "https://$currentHost$hls4Link".takeIf { hls4Link.startsWith('/') } ?: hls4Link
@@ -101,20 +88,18 @@ private class StreamHGMultiMethod : ExtractorApi() {
             Log.e(name, "Attempt 1 FAILED: Classic Unpacker crashed. Error: ${e.message}")
         }
 
-        // --- ATTEMPT 2: Smart Dictionary Regex (on packed script) ---
+        // --- ATTEMPT 2: Smart Dictionary Regex ---
         try {
             Log.d(name, "Attempt 2: Smart Dictionary Regex...")
             val dictionaryRegex = Regex("'((?:[^']|\\\\'){100,})'\\.split\\('\\|'\\)")
             val dictionaryMatch = dictionaryRegex.find(packedJs)
             if (dictionaryMatch != null) {
                 val dictionary = dictionaryMatch.groupValues[1]
-                Log.d(name, "Successfully extracted dictionary (length: ${dictionary.length}).")
                 val partsRegex = Regex("""stream\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|master\|m3u8""")
                 val partsMatch = partsRegex.find(dictionary)
                 if (partsMatch != null) {
                     val (p1, p2, p3, p4) = partsMatch.destructured
-                    val reconstructedPath = "/stream/$p1/$p2/$p3/$p4/master.m3u8"
-                    val finalUrl = "https://$currentHost$reconstructedPath"
+                    val finalUrl = "https://$currentHost/stream/$p1/$p2/$p3/$p4/master.m3u8"
                     Log.d(name, "✅ SUCCESS with Smart Dictionary Regex. Link: $finalUrl")
                     callback(createLink(this.name, "${this.name} - Regex", finalUrl, url, Qualities.Unknown.value))
                     return
@@ -124,25 +109,34 @@ private class StreamHGMultiMethod : ExtractorApi() {
             Log.e(name, "Attempt 2 FAILED: Smart Dictionary Regex crashed. Error: ${e.message}")
         }
         
-        // --- ATTEMPT 3: Generic Player Patterns (on unpacked script, if available) ---
-        if (unpackedScript != null) {
-            try {
-                Log.d(name, "Attempt 3: Generic Player Patterns...")
-                // Pattern 1: sources:[{file:"..."}]
-                // Pattern 2: file:"..."
-                val genericLink = Regex("""sources\s*:\s*\[\s*\{\s*file\s*:\s*["']([^"']+\.m3u8[^"']*)""").find(unpackedScript)?.groupValues?.get(1)
-                    ?: Regex("""file\s*:\s*["']([^"']+\.m3u8[^"']*)""").find(unpackedScript)?.groupValues?.get(1)
-                
-                if (genericLink != null) {
-                    val finalUrl = "https://$currentHost$genericLink".takeIf { genericLink.startsWith('/') } ?: genericLink
-                    Log.d(name, "✅ SUCCESS with Generic Player Patterns. Link: $finalUrl")
-                    callback(createLink(this.name, "${this.name} - Generic", finalUrl, url, Qualities.Unknown.value))
+        // --- ATTEMPT 3: Experimental External Deobfuscator (de4js.kshift.me) ---
+        try {
+            Log.d(name, "Attempt 3: External Deobfuscator (de4js.kshift.me)...")
+            // Send a POST request to the external site with the packed code
+            val responseDoc = app.post(
+                "https://de4js.kshift.me/",
+                data = mapOf("input_code" to packedJs, "autodecode" to "1"),
+                headers = mapOf("Content-Type" to "application/x-www-form-urlencoded")
+            ).document
+            
+            // Extract the result from the textarea
+            val deobfuscatedResult = responseDoc.selectFirst("textarea#result_code")?.text()
+            
+            if (!deobfuscatedResult.isNullOrBlank()) {
+                Log.d(name, "External deobfuscator returned a result.")
+                val externalLink = Regex("""["']hls4["']\s*:\s*["']([^"']+\.m3u8[^"']*)""").find(deobfuscatedResult)?.groupValues?.get(1)
+                if (externalLink != null) {
+                    val finalUrl = "https://$currentHost$externalLink".takeIf { externalLink.startsWith('/') } ?: externalLink
+                    Log.d(name, "✅ SUCCESS with External Deobfuscator. Link: $finalUrl")
+                    callback(createLink(this.name, "${this.name} - External", finalUrl, url, Qualities.Unknown.value))
                     return
                 }
-                Log.w(name, "Generic Player Patterns ran but found no matching link.")
-            } catch (e: Exception) {
-                 Log.e(name, "Attempt 3 FAILED: Generic Player Patterns crashed. Error: ${e.message}")
+                Log.w(name, "External deobfuscator result did not contain a valid hls4 link.")
+            } else {
+                Log.w(name, "External deobfuscator did not return any result.")
             }
+        } catch (e: Exception) {
+            Log.e(name, "Attempt 3 FAILED: External Deobfuscator crashed. Error: ${e.message}")
         }
 
         Log.e(name, "❌ ALL EXTRACTION METHODS FAILED for $url")
