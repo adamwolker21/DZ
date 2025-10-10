@@ -6,7 +6,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.getAndUnpack
-import com.lagradost.cloudstream3.utils.newExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import android.util.Log
@@ -30,6 +30,28 @@ private val BROWSER_HEADERS = mapOf(
 )
 
 private val cloudflareKiller by lazy { CloudflareKiller() }
+
+// البديل الثاني: دالة مساعدة خاصة بنا لتجاوز قيود البناء
+// نقوم بعزل التحذير "deprecated" في هذا المكان فقط
+@Suppress("DEPRECATION")
+private fun createLink(
+    source: String,
+    name: String,
+    url: String,
+    referer: String,
+    quality: Int,
+    type: ExtractorLinkType = ExtractorLinkType.M3U8
+): ExtractorLink {
+    return ExtractorLink(
+        source = source,
+        name = name,
+        url = url,
+        referer = referer,
+        quality = quality,
+        type = type
+    )
+}
+
 
 // دالة آمنة لجلب الصفحة كـ Document
 private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
@@ -71,7 +93,6 @@ private abstract class StreamHGBase(override var name: String, override var main
             val finalPageUrl = "https://$host/e/$videoId"
             Log.d(name, "Trying host: $host with URL: $finalPageUrl")
 
-            // This is the critical step: we use the referer here to get the page
             val doc = safeGetAsDocument(finalPageUrl, referer = url)
             if (doc == null) {
                 Log.e(name, "Failed to get document from: $finalPageUrl")
@@ -114,14 +135,14 @@ private abstract class StreamHGBase(override var name: String, override var main
                     val finalUrl = "https://$host$reconstructedPath"
                     Log.d(name, "✅ SUCCESS: Reconstructed final m3u8 link: $finalUrl")
                     
-                    // **THE FINAL BUILD FIX**
-                    // We call the simplest version of newExtractorLink that your project accepts.
-                    // (source, name, url) - No quality, no referer.
+                    // Call our new, clean helper function
                     callback(
-                        newExtractorLink(
-                            this.name,
-                            "${this.name} - HLS",
-                            finalUrl
+                        createLink(
+                            source = this.name,
+                            name = "${this.name} - HLS",
+                            url = finalUrl,
+                            referer = finalPageUrl, // The crucial part that fixes everything
+                            quality = Qualities.Unknown.value
                         )
                     )
                     return 
@@ -159,10 +180,13 @@ private class Forafile : ExtractorApi() {
             val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
             if (mp4Link != null) {
                 callback(
-                    newExtractorLink(
+                    createLink(
                         this.name,
                         "${this.name} - MP4",
-                        mp4Link
+                        mp4Link,
+                        url,
+                        Qualities.Unknown.value,
+                        ExtractorLinkType.VIDEO
                     )
                 )
             }
@@ -184,10 +208,13 @@ private abstract class DoodStreamBase : ExtractorApi() {
         val trueUrl = app.get(md5PassUrl, referer = newUrl, headers = mapOf("User-Agent" to "Mozilla/5.0")).text + "z"
         
         callback(
-            newExtractorLink(
+            createLink(
                 this.name,
                 "${this.name} - Video",
-                trueUrl
+                trueUrl,
+                newUrl,
+                Qualities.Unknown.value,
+                ExtractorLinkType.VIDEO
             )
         )
     }
@@ -218,10 +245,13 @@ private abstract class PackedJsExtractorBase(
                 val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
                 
                 callback(
-                    newExtractorLink(
+                    createLink(
                         this.name,
                         "${this.name} - Video", 
-                        finalUrl
+                        finalUrl,
+                        url,
+                        Qualities.Unknown.value,
+                        ExtractorLinkType.VIDEO
                     )
                 )
             }
