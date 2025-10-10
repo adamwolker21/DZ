@@ -85,24 +85,26 @@ private abstract class StreamHGBase(override var name: String, override var main
                 continue
             }
 
-            Log.d(name, "Found packed JavaScript, starting final extraction logic.")
+            Log.d(name, "Found packed JavaScript, starting robust extraction.")
             
             try {
-                // الخطوة 1: Regex نهائي ومحصّن. يبحث عن القاموس الذي يتبع النمط "رقم,رقم,'القاموس'"
-                val dictionaryRegex = Regex(""",\d+,\d+,'((?:[^']|\\'){100,})'\.split\('\|'\)""")
+                // الخطوة 1: Regex نهائي ومبسط. يبحث عن أطول نص بين علامتي اقتباس يليه مباشرة ".split('|')"
+                // هذا يتجاهل كل التغييرات الطفيفة في بنية استدعاء الدالة
+                val dictionaryRegex = Regex("'((?:[^']|\\\\'){100,})'\\.split\\('\\|'\\)")
                 val dictionaryMatch = dictionaryRegex.find(packedJs)
 
                 if (dictionaryMatch == null) {
-                    Log.e(name, "Regex failed: Could not find the dictionary pattern (...,number,number,'dictionary'...)")
+                    Log.e(name, "Robust Regex failed: Could not find the long dictionary string ending with .split('|')")
                     continue
                 }
                 
                 // القاموس هو المجموعة الأولى التي تم التقاطها
                 val dictionary = dictionaryMatch.groupValues[1]
-                Log.d(name, "Successfully extracted dictionary using final pattern (length: ${dictionary.length}).")
+                Log.d(name, "Successfully extracted dictionary with robust regex (length: ${dictionary.length}).")
 
                 // الخطوة 2: البحث عن أجزاء الرابط داخل القاموس المستخرج
-                val partsRegex = Regex("""stream\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|master\|m3u8""")
+                // تم تحديث النمط ليشمل "hls4" لزيادة الدقة
+                val partsRegex = Regex("""hls4\|stream\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|master\|m3u8""")
                 val partsMatch = partsRegex.find(dictionary)
 
                 if (partsMatch != null) {
@@ -110,7 +112,7 @@ private abstract class StreamHGBase(override var name: String, override var main
                     Log.d(name, "Found URL parts in dictionary: $p1, $p2, $p3, $p4, $p5")
 
                     // الخطوة 3: إعادة بناء الرابط النهائي
-                    val reconstructedPath = "/stream/$p1-$p2/$p3/$p4/$p5/master.m3u8"
+                    val reconstructedPath = "/stream/$p1/$p2/$p3/$p4/master.m3u8" // Corrected path structure
                     val finalUrl = "https://$host$reconstructedPath"
                     Log.d(name, "✅ SUCCESS: Reconstructed final m3u8 link: $finalUrl")
                     
@@ -123,11 +125,11 @@ private abstract class StreamHGBase(override var name: String, override var main
                     )
                     return 
                 } else {
-                    Log.e(name, "❌ Regex failed: Could not find URL parts sequence in the extracted dictionary.")
+                    Log.e(name, "❌ Regex failed: Could not find URL parts sequence (hls4|stream|...) in the extracted dictionary.")
                 }
 
             } catch (e: Exception) {
-                Log.e(name, "An unexpected error occurred during manual extraction: ${e.message}")
+                Log.e(name, "An unexpected error occurred during robust extraction: ${e.message}")
             }
         }
         
