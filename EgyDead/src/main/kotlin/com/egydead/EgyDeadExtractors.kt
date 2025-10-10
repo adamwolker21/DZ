@@ -62,31 +62,31 @@ class StreamHGMasterExtractor : ExtractorApi() {
      * It finds the secret dictionary and extracts the hls2 link from it.
      */
     private fun extractWithMasterKey(packedJs: String): String? {
-        // Stage 1: The Regex to find the secret dictionary.
-        // This is a robust regex that looks for the function structure and extracts the longest string,
-        // which is always the dictionary. It's resilient to small changes.
-        val dictRegex = Regex("""eval\(function\(p,a,c,k,e,d\)\{.*?\}\((.*?),['"]((?:\\.|[^"'\\])*)['"]\.split\('\|'\)\)\)""")
-        val match = dictRegex.find(packedJs)
+        // Stage 1: The new, robust Regex to find the dictionary.
+        // It simply finds the longest string literal in the script followed by .split('|').
+        // This is much more resilient than trying to match the entire eval function structure.
+        val dictRegex = Regex("""['"]((?:\\.|[^"'\\]){200,})['"]\.split\(['']\|['']\)""")
+        val dictionaryMatch = dictRegex.find(packedJs)
 
-        if (match == null || match.groupValues.size < 3) {
-            Log.e(name, "Master Key Stage 1 FAILED: Could not find the structure of the packed function.")
+        if (dictionaryMatch == null) {
+            Log.e(name, "Master Key FAILED: Could not find the secret dictionary using the robust regex.")
             return null
         }
         
-        // The dictionary is the second captured group (the long string of words).
-        val dictionary = match.groupValues[2]
-        Log.d(name, "Master Key Stage 1 SUCCESS: Dictionary extracted.")
+        val dictionary = dictionaryMatch.groupValues[1]
+        Log.d(name, "Master Key SUCCESS: Dictionary extracted (length: ${dictionary.length}).")
 
         // Stage 2: Search within the dictionary for the real prize (the hls2 link).
+        // This regex looks for a complete, direct HTTPS link ending in .m3u8, which is our hls2 link.
         val hls2Regex = Regex("""(https://[a-zA-Z0-9.-]+\.com/[^|]*?master\.m3u8[^|]*)""")
         val hls2Match = hls2Regex.find(dictionary)
 
         return if (hls2Match != null) {
             val hls2Link = hls2Match.groupValues[1]
-            Log.d(name, "Master Key Stage 2 SUCCESS: Found hls2 link: $hls2Link")
+            Log.d(name, "Master Key SUCCESS: Found hls2 link in dictionary: $hls2Link")
             hls2Link
         } else {
-            Log.e(name, "Master Key Stage 2 FAILED: Found dictionary, but no hls2 link inside it.")
+            Log.e(name, "Master Key FAILED: Found dictionary, but no hls2 link inside it.")
             null
         }
     }
@@ -112,7 +112,7 @@ class StreamHGMasterExtractor : ExtractorApi() {
                     source = this.name,
                     name = this.name,
                     url = finalUrl,
-                    referer = url,
+                    referer = url, // Pass the crucial referer
                     quality = Qualities.Unknown.value
                 )
             )
