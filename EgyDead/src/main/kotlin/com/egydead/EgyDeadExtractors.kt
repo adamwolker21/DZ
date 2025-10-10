@@ -6,7 +6,8 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.getAndUnpack
-// Import ExtractorLinkType to use it directly
+// We are going back to using the helper function
+import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
@@ -89,7 +90,7 @@ private abstract class StreamHGBase(override var name: String, override var main
             Log.d(name, "Found packed JavaScript, starting final robust extraction.")
             
             try {
-                // الخطوة 1: Regex نهائي ومبسط. يبحث عن أطول نص بين علامتي اقتباس يليه مباشرة ".split('|')"
+                // الخطوة 1: Regex نهائي ومبسط.
                 val dictionaryRegex = Regex("'((?:[^']|\\\\'){100,})'\\.split\\('\\|'\\)")
                 val dictionaryMatch = dictionaryRegex.find(packedJs)
 
@@ -98,11 +99,10 @@ private abstract class StreamHGBase(override var name: String, override var main
                     continue
                 }
                 
-                // القاموس هو المجموعة الأولى التي تم التقاطها
                 val dictionary = dictionaryMatch.groupValues[1]
                 Log.d(name, "Successfully extracted dictionary with robust regex (length: ${dictionary.length}).")
 
-                // الخطوة 2: البحث عن أجزاء الرابط الأساسية داخل القاموس المستخرج
+                // الخطوة 2: البحث عن أجزاء الرابط الأساسية.
                 val partsRegex = Regex("""stream\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|master\|m3u8""")
                 val partsMatch = partsRegex.find(dictionary)
 
@@ -110,21 +110,21 @@ private abstract class StreamHGBase(override var name: String, override var main
                     val (p1, p2, p3, p4) = partsMatch.destructured
                     Log.d(name, "Found URL parts in dictionary: $p1, $p2, $p3, $p4")
 
-                    // الخطوة 3: إعادة بناء الرابط النهائي بالشكل الصحيح
+                    // الخطوة 3: إعادة بناء الرابط النهائي.
                     val reconstructedPath = "/stream/$p1/$p2/$p3/$p4/master.m3u8"
                     val finalUrl = "https://$host$reconstructedPath"
                     Log.d(name, "✅ SUCCESS: Reconstructed final m3u8 link: $finalUrl")
                     
-                    // **THE FINAL FIX IS HERE**
-                    // We call the ExtractorLink constructor directly to include the referer
+                    // **THE FINAL CORRECT SOLUTION**
+                    // We use the recommended `newExtractorLink` function and pass all parameters correctly.
                     callback(
-                        ExtractorLink(
+                        newExtractorLink(
                             source = this.name,
                             name = "${this.name} - HLS",
                             url = finalUrl,
-                            referer = finalPageUrl, // This is the crucial part
+                            type = ExtractorLinkType.M3U8,
                             quality = Qualities.Unknown.value,
-                            type = ExtractorLinkType.M3U8
+                            referer = finalPageUrl // The crucial part that fixes everything
                         )
                     )
                     return 
@@ -162,13 +162,13 @@ private class Forafile : ExtractorApi() {
             val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
             if (mp4Link != null) {
                 callback(
-                    ExtractorLink(
+                    newExtractorLink(
                         this.name,
                         "${this.name} - MP4",
                         mp4Link,
-                        url,
+                        ExtractorLinkType.VIDEO,
                         Qualities.Unknown.value,
-                        ExtractorLinkType.VIDEO
+                        referer = url
                     )
                 )
             }
@@ -190,13 +190,13 @@ private abstract class DoodStreamBase : ExtractorApi() {
         val trueUrl = app.get(md5PassUrl, referer = newUrl, headers = mapOf("User-Agent" to "Mozilla/5.0")).text + "z"
         
         callback(
-            ExtractorLink(
+            newExtractorLink(
                 this.name,
                 "${this.name} - Video",
                 trueUrl,
-                newUrl,
+                ExtractorLinkType.VIDEO,
                 Qualities.Unknown.value,
-                ExtractorLinkType.VIDEO
+                referer = newUrl
             )
         )
     }
@@ -227,13 +227,13 @@ private abstract class PackedJsExtractorBase(
                 val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
                 
                 callback(
-                    ExtractorLink(
+                    newExtractorLink(
                         this.name,
                         "${this.name} - Video", 
                         finalUrl,
-                        url,
+                        ExtractorLinkType.VIDEO,
                         Qualities.Unknown.value,
-                        ExtractorLinkType.VIDEO
+                        referer = url
                     )
                 )
             }
