@@ -11,9 +11,9 @@ import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import android.util.Log
 
-// The extractor list is now clean and focused.
+// قائمة المستخرجات الآن نظيفة وتحتوي فقط على الحل النهائي
 val extractorList = listOf(
-    StreamHGExtractor()
+    StreamHGFinalExtractor()
 )
 
 private val BROWSER_HEADERS = mapOf(
@@ -24,8 +24,7 @@ private val BROWSER_HEADERS = mapOf(
 
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
-// This is our final helper function. It's the only way to pass the referer
-// while also being able to build the project, by suppressing the deprecation error.
+// الدالة المساعدة النهائية التي تتجاوز قيود البناء
 @Suppress("DEPRECATION")
 private fun createLink(
     source: String,
@@ -53,14 +52,13 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
     }
 }
 
-// The final, most robust extractor compatible with your project environment.
-class StreamHGExtractor : ExtractorApi() {
+// الحل النهائي: مستخرج واحد، طريقة واحدة مضمونة، بناءً على اكتشافك
+class StreamHGFinalExtractor : ExtractorApi() {
     override var name = "StreamHG"
     override var mainUrl = "kravaxxa.com"
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val currentHost = java.net.URI(url).host ?: mainUrl
         val doc = safeGetAsDocument(url, referer) ?: return
         Log.d(name, "Page loaded successfully from $url")
 
@@ -69,56 +67,37 @@ class StreamHGExtractor : ExtractorApi() {
             Log.e(name, "No packed 'eval' JavaScript found.")
             return
         }
-        Log.d(name, "Found packed JS. Starting extraction...")
+        Log.d(name, "Found packed JS. Attempting final extraction based on hls2 discovery...")
         
-        var m3u8Link: String? = null
-
-        // --- ATTEMPT 1: Classic Unpacker ---
         try {
+            // الخطوة 1: فك تشفير السكريبت باستخدام الطريقة المضمونة
             val unpacked = getAndUnpack(packedJs)
-            val hls4Link = Regex("""["']hls4["']\s*:\s*["']([^"']+\.m3u8[^"']*)""").find(unpacked)?.groupValues?.get(1)
-            if (hls4Link != null) {
-                m3u8Link = "https://$currentHost$hls4Link".takeIf { hls4Link.startsWith('/') } ?: hls4Link
-                Log.d(name, "Success with Classic Unpacker.")
+            Log.d(name, "Successfully unpacked the script.")
+
+            // الخطوة 2: استهداف "الجائزة الحقيقية" (hls2) باستخدام تعبير نمطي بسيط ومباشر
+            val hls2Regex = Regex(""""hls2"\s*:\s*"([^"]+)"""")
+            val match = hls2Regex.find(unpacked)
+
+            if (match != null) {
+                // الرابط المستهدف هو الرابط الكامل والمباشر، لا يحتاج إلى بناء
+                val finalUrl = match.groupValues[1]
+                Log.d(name, "✅ SUCCESS! Found the direct hls2 link: $finalUrl")
+
+                // الخطوة 3: إنشاء الرابط النهائي باستخدام الدالة المساعدة التي تحل مشاكل البناء
+                callback(
+                    createLink(
+                        source = this.name,
+                        name = this.name, // يمكننا إضافة الجودة هنا لاحقًا إذا أردنا
+                        url = finalUrl,
+                        referer = url, // نمرر الـ referer كإجراء احترازي
+                        quality = Qualities.Unknown.value
+                    )
+                )
+            } else {
+                Log.e(name, "❌ Extraction failed: Could not find the 'hls2' link in the unpacked script.")
             }
         } catch (e: Exception) {
-            Log.w(name, "Classic Unpacker failed. Trying next method.")
-        }
-
-        // --- ATTEMPT 2: Smart Dictionary Regex (if previous failed) ---
-        if (m3u8Link == null) {
-            try {
-                val dictionaryRegex = Regex("'((?:[^']|\\\\'){100,})'\\.split\\('\\|'\\)")
-                val dictionaryMatch = dictionaryRegex.find(packedJs)
-                if (dictionaryMatch != null) {
-                    val dictionary = dictionaryMatch.groupValues[1]
-                    val partsRegex = Regex("""stream\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|master\|m3u8""")
-                    val partsMatch = partsRegex.find(dictionary)
-                    if (partsMatch != null) {
-                        val (p1, p2, p3, p4) = partsMatch.destructured
-                        m3u8Link = "https://$currentHost/stream/$p1/$p2/$p3/$p4/master.m3u8"
-                        Log.d(name, "Success with Smart Dictionary Regex.")
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(name, "Smart Dictionary Regex failed.")
-            }
-        }
-        
-        // If we found a link with any method, create the link using our special helper.
-        if (m3u8Link != null) {
-            Log.d(name, "✅ Link found: $m3u8Link. Creating final link.")
-            callback(
-                createLink(
-                    source = this.name,
-                    name = this.name,
-                    url = m3u8Link,
-                    referer = url, // Pass the crucial referer
-                    quality = Qualities.Unknown.value
-                )
-            )
-        } else {
-            Log.e(name, "❌ ALL EXTRACTION METHODS FAILED for $url")
+            Log.e(name, "❌ An error occurred during the unpacking process: ${e.message}")
         }
     }
-}
+                                  }
