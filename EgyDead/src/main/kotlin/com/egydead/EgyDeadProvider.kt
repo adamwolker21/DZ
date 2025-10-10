@@ -1,153 +1,210 @@
 package com.egydead
 
-import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.utils.ExtractorApi
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.SubtitleFile
-import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.getAndUnpack
-import com.lagradost.cloudstream3.base64Decode
-import com.lagradost.cloudstream3.base64Encode
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
 import android.util.Log
+import java.util.concurrent.atomic.AtomicBoolean // Import required for the fix
 
-// The extractor list now points to our final, robust extractor.
-val extractorList = listOf(
-    StreamHGResolver()
-)
+class EgyDeadProvider : MainAPI() {
+    override var mainUrl = "https://tv6.egydead.live"
+    override var name = "EgyDead"
+    override val hasMainPage = true
+    override var lang = "ar"
+    override val supportedTypes = setOf(
+        TvType.Movie,
+        TvType.TvSeries,
+    )
 
-private val BROWSER_HEADERS = mapOf(
-    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-    "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
-    "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-)
+    override val mainPage = mainPageOf(
+        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a-%d8%a7%d9%88%d9%86%d9%84%d8%a7%d9%8a%d9%86/" to "أفلام أجنبي",
+        "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "أفلام آسيوية",
+        "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
+    )
 
-private val cloudflareKiller by lazy { CloudflareKiller() }
+    private val cloudflareKiller by lazy { CloudflareKiller() }
 
-private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
-    return try {
-        app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false).document
-    } catch (e: Exception) {
-        Log.e("safeGetAsDocument", "Request failed for $url. Error: ${e.message}")
-        null
-    }
-}
-
-// Data class to hold our secret message for the resolver
-private data class ResolverData(val url: String, val referer: String)
-
-// This is the final, architecturally correct extractor using the built-in resolver system.
-class StreamHGResolver : ExtractorApi() {
-    override var name = "StreamHG"
-    override var mainUrl = "kravaxxa.com"
-    override val requiresReferer = true
-
-    // This function will be called by the app when it sees our "resolver://" link.
-    // It's the designated place to add the final headers and referer.
-    @Suppress("DEPRECATION")
-    override suspend fun load(url: String): ExtractorLink? {
-        Log.d(name, "LOAD FUNCTION TRIGGERED")
-        // The url is our secret message: "resolver://BASE64_ENCODED_DATA"
-        val decodedData = base64Decode(url.removePrefix("resolver://"))
-        Log.d(name, "Decoded resolver data: $decodedData")
-        
-        // Split the secret message to get the real URL and referer
-        val (realUrl, referer) = decodedData.split("|||")
-        Log.d(name, "Real URL: $realUrl")
-        Log.d(name, "Referer: $referer")
-
-        // Now, we create the final ExtractorLink with all the necessary info.
-        // This is the correct and safe place to do this.
-        return ExtractorLink(
-            source = this.name,
-            name = this.name,
-            url = realUrl,
-            referer = referer,
-            quality = Qualities.Unknown.value,
-            isM3u8 = true,
-            headers = BROWSER_HEADERS
-        )
-    }
-
-    // This function's only job is to find the m3u8 link and create a "secret message" (resolver link) for the load() function.
-    override suspend fun getUrl(
-        url: String,
-        referer: String?,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ) {
-        val currentHost = java.net.URI(url).host ?: mainUrl
-        val doc = safeGetAsDocument(url, referer) ?: return
-        Log.d(name, "Page loaded successfully from $url")
-
-        val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
-        if (packedJs == null) {
-            Log.e(name, "No packed 'eval' JavaScript found on the page.")
-            return
-        }
-        Log.d(name, "Found packed JS. Starting extraction to create resolver link...")
-        
-        var m3u8Link: String? = null
-
-        // --- ATTEMPT 1: Classic Unpacker ---
+    private suspend fun getWatchPage(url: String): Document? {
         try {
-            val unpacked = getAndUnpack(packedJs)
-            val hls4Link = Regex("""["']hls4["']\s*:\s*["']([^"']+\.m3u8[^"']*)""").find(unpacked)?.groupValues?.get(1)
-            if (hls4Link != null) {
-                m3u8Link = "https://$currentHost$hls4Link".takeIf { hls4Link.startsWith('/') } ?: hls4Link
-                Log.d(name, "Success with Classic Unpacker. Link found: $m3u8Link")
-            }
-        } catch (e: Exception) {
-            Log.w(name, "Classic Unpacker failed. Trying next method. Error: ${e.message}")
-        }
-
-        // --- ATTEMPT 2: Smart Dictionary Regex (if previous failed) ---
-        if (m3u8Link == null) {
-            try {
-                val dictionaryRegex = Regex("'((?:[^']|\\\\'){100,})'\\.split\\('\\|'\\)")
-                val dictionaryMatch = dictionaryRegex.find(packedJs)
-                if (dictionaryMatch != null) {
-                    val dictionary = dictionaryMatch.groupValues[1]
-                    val partsRegex = Regex("""stream\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|master\|m3u8""")
-                    val partsMatch = partsRegex.find(dictionary)
-                    if (partsMatch != null) {
-                        val (p1, p2, p3, p4) = partsMatch.destructured
-                        m3u8Link = "https://$currentHost/stream/$p1/$p2/$p3/$p4/master.m3u8"
-                        Log.d(name, "Success with Smart Dictionary Regex. Link found: $m3u8Link")
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(name, "Smart Dictionary Regex failed. Error: ${e.message}")
-            }
-        }
-        
-        // If we found a link, create and send the resolver link
-        if (m3u8Link != null) {
-            // Create the secret message: "REAL_URL|||REFERER_URL"
-            val resolverData = "$m3u8Link|||$url"
-            // Encode it in Base64 to make it URL-safe
-            val encodedData = base64Encode(resolverData)
-            Log.d(name, "Encoded resolver data: $encodedData")
-            
-            // This is the link we will pass to the app. It doesn't cause build errors.
-            val resolverUrl = "resolver://$encodedData"
-            Log.d(name, "✅ Link found. Creating and sending resolver link: $resolverUrl")
-            
-            @Suppress("DEPRECATION")
-            callback(
-                ExtractorLink(
-                    source = this.name,
-                    name = this.name,
-                    url = resolverUrl, // We send the secret message, not the real URL
-                    referer = url,
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = true
+            val initialResponse = app.get(url, interceptor = cloudflareKiller)
+            val document = initialResponse.document
+            if (document.selectFirst("div.watchNow form") != null) {
+                val cookies = initialResponse.cookies
+                val headers = mapOf(
+                    "Content-Type" to "application/x-www-form-urlencoded",
+                    "Referer" to url,
+                    "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
+                    "Origin" to mainUrl,
+                    "sec-fetch-dest" to "document",
+                    "sec-fetch-mode" to "navigate",
+                    "sec-fetch-site" to "same-origin",
+                    "sec-fetch-user" to "?1"
                 )
-            )
-        } else {
-            Log.e(name, "❌ ALL EXTRACTION METHODS FAILED for $url")
+                val data = mapOf("View" to "1")
+                return app.post(url, headers = headers, data = data, cookies = cookies, interceptor = cloudflareKiller).document
+            }
+            return document
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return null
         }
     }
+
+    override suspend fun getMainPage(
+        page: Int,
+        request: MainPageRequest
+    ): HomePageResponse {
+        val url = if (page == 1) {
+            "$mainUrl${request.data}"
+        } else {
+            "$mainUrl${request.data}page/$page/"
+        }
+
+        val document = app.get(url, interceptor = cloudflareKiller).document
+        val home = document.select("li.movieItem").mapNotNull {
+            it.toSearchResult()
+        }
+        return newHomePageResponse(request.name, home)
+    }
+
+    private fun Element.toSearchResult(): SearchResponse? {
+        val linkTag = this.selectFirst("a") ?: return null
+        val href = linkTag.attr("href")
+        val title = this.selectFirst("h1.BottomTitle")?.text() ?: return null
+        val posterUrl = this.selectFirst("img")?.attr("src")
+
+        val cleanedTitle = title.replace("مشاهدة", "").trim()
+            .replace(Regex("^(فيلم|مسلسل)"), "").trim()
+
+        val isSeries = title.contains("مسلسل") || title.contains("الموسم")
+
+        return if (isSeries) {
+            newTvSeriesSearchResponse(cleanedTitle, href, TvType.TvSeries) {
+                this.posterUrl = posterUrl
+            }
+        } else {
+            newMovieSearchResponse(cleanedTitle, href, TvType.Movie) {
+                this.posterUrl = posterUrl
+            }
+        }
+    }
+
+    override suspend fun search(query: String): List<SearchResponse> {
+        val searchUrl = "$mainUrl/?s=$query"
+        val document = app.get(searchUrl, interceptor = cloudflareKiller).document
+        return document.select("li.movieItem").mapNotNull {
+            it.toSearchResult()
+        }
+    }
+
+    override suspend fun load(url: String): LoadResponse? {
+        val document = app.get(url, interceptor = cloudflareKiller).document
+        val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
+        
+        val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
+        val plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
+        val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
+        val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
+        val duration = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()?.filter { it.isDigit() }?.toIntOrNull()
+
+        val categoryText = document.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: ""
+        val isSeries = categoryText.contains("مسلسلات") || pageTitle.contains("مسلسل") || pageTitle.contains("الموسم") || document.select("div.EpsList").isNotEmpty()
+
+        if (isSeries) {
+            val episodesDoc = getWatchPage(url) ?: document
+
+            val episodes = episodesDoc.select("div.EpsList li a").mapNotNull { epElement ->
+                val href = epElement.attr("href")
+                val titleAttr = epElement.attr("title")
+                val epNum = titleAttr.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
+                if (epNum == null) return@mapNotNull null
+                newEpisode(href) {
+                    this.name = epElement.text().trim()
+                    this.episode = epNum
+                }
+            }.distinctBy { it.episode }.toMutableList()
+            
+            val seriesTitle = pageTitle
+                .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
+                .trim()
+            
+            val currentEpNum = pageTitle.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
+            if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
+                 episodes.add(newEpisode(url) {
+                    this.name = pageTitle.substringAfter(seriesTitle).trim().ifBlank { "حلقة $currentEpNum" }
+                    this.episode = currentEpNum
+                })
+            }
+            
+            return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
+                this.posterUrl = posterUrl
+                this.plot = plot
+                this.year = year
+                this.tags = tags
+            }
+        } else {
+             val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
+
+            return newMovieLoadResponse(movieTitle, url, TvType.Movie, url) {
+                this.posterUrl = posterUrl
+                this.plot = plot
+                this.year = year
+                this.tags = tags
+                this.duration = duration
+            }
+        }
+    }
+    
+    // =================================================================================
+    // START of v2 FIX
+    // =================================================================================
+    override suspend fun loadLinks(
+        data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        Log.d("EgyDead", "Loading links for URL: $data")
+        val watchPageDoc = getWatchPage(data)
+        
+        if(watchPageDoc == null) {
+            Log.e("EgyDead", "Failed to get watch page document.")
+            return false
+        }
+        
+        Log.d("EgyDead", "Document title: ${watchPageDoc.title()}")
+
+        val servers = watchPageDoc.select("div.mob-servers li")
+        
+        Log.d("EgyDead", "Found ${servers.size} potential server elements.")
+        servers.forEachIndexed { index, server ->
+            Log.d("EgyDead", "Server data-link $index: ${server.attr("data-link")}")
+        }
+
+        // A thread-safe boolean to track if any links were found.
+        // This is necessary because apmap runs tasks in parallel.
+        val linksFound = AtomicBoolean(false)
+
+        servers.apmap { serverLi ->
+            val link = serverLi.attr("data-link")
+            if (link.isNotBlank()) {
+                // We create a new callback that wraps the original one.
+                val newCallback = { extractorLink: ExtractorLink ->
+                    // When a link is found, we set our flag to true.
+                    linksFound.set(true)
+                    // Then we call the original callback to pass the link to the UI.
+                    callback(extractorLink)
+                }
+                // We pass the new wrapped callback to the extractor.
+                loadExtractor(link, data, subtitleCallback, newCallback)
+            }
+        }
+
+        // The function now returns the value of our flag. It will be true
+        // only if at least one extractor successfully called the callback.
+        return linksFound.get()
+    }
+    // =================================================================================
+    // END of v2 FIX
+    // =================================================================================
 }
