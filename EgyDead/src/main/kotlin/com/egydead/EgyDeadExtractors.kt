@@ -17,7 +17,7 @@ val extractorList = listOf(
 
 private val BROWSER_HEADERS = mapOf(
     "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-    "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
+    "Accept-Language" to "en-US,en;q=0.9,ar=q=0.8",
     "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
 )
 
@@ -58,52 +58,60 @@ class StreamHGEngineeredExtractor : ExtractorApi() {
     override val requiresReferer = true
 
     /**
-     * This is our "Engine". It deconstructs the packed script, finds the necessary
-     * components (server, token, etc.), and builds the correct hls2 link.
+     * This is our "Engine". It perfectly simulates the packed script's logic
+     * to deobfuscate it and then extracts the true hls2 link.
      */
-    private fun buildLinkWithEngine(packedJs: String, videoId: String): String? {
-        // Stage 1: The Master Key to extract the dictionary.
-        val dictRegex = Regex("""['"]((?:\\.|[^"'\\]){200,})['"]\.split\(['']\|['']\)""")
-        val dictionaryMatch = dictRegex.find(packedJs)
-        if (dictionaryMatch == null) {
-            Log.e(name, "Engine FAILED: Could not extract the dictionary.")
+    private fun deobfuscateAndExtract(packedJs: String): String? {
+        // Stage 1: The Master Regex to deconstruct the packed function.
+        // It captures the template (p), radix (a), count (c), and dictionary (k).
+        val masterRegex = Regex("""eval\(function\(p,a,c,k,e,d\)\{.*?return p\}\('(.*?)',(\d+),(\d+),'(.*?)'\.split\('\|'\)\)\)""")
+        val match = masterRegex.find(packedJs)
+
+        if (match == null || match.groupValues.size < 5) {
+            Log.e(name, "Engine FAILED: Could not deconstruct the packed function structure.")
             return null
         }
-        val dictionary = dictionaryMatch.groupValues[1]
-        Log.d(name, "Engine Stage 1 SUCCESS: Dictionary extracted.")
 
-        // Stage 2: Gather the components from the dictionary.
-        val server = Regex("""([a-z0-9]+?\.premilkyway\.com)""").find(dictionary)?.groupValues?.get(1)
-        val staticId = Regex("""\b(\d{5})\b""").find(dictionary)?.groupValues?.get(1) // Looks for a 5-digit number
-        val token = Regex("""(\?t=[^|]+)""").find(dictionary)?.groupValues?.get(1)
+        var template = match.groupValues[1]
+        val radix = match.groupValues[2].toIntOrNull() ?: 36
+        val count = match.groupValues[3].toIntOrNull() ?: 0
+        val dictionary = match.groupValues[4].split("|")
 
-        if (server == null || staticId == null || token == null) {
-            Log.e(name, "Engine FAILED: Could not find all required components in the dictionary.")
-            Log.d(name, "Server: $server, StaticID: $staticId, Token: $token")
+        if (count != dictionary.size) {
+            Log.e(name, "Engine FAILED: Dictionary count mismatch.")
             return null
         }
-        Log.d(name, "Engine Stage 2 SUCCESS: All components found.")
-        Log.d(name, "--> Server: $server")
-        Log.d(name, "--> Static ID: $staticId")
-        Log.d(name, "--> Token: $token")
-        Log.d(name, "--> Video ID: $videoId")
+        Log.d(name, "Engine Stage 1 SUCCESS: Deconstructed packed script.")
 
+        // Stage 2: The "Fill-in-the-blanks" machine.
+        // This loop perfectly simulates the logic of the original eval function.
+        for (i in (count - 1) downTo 0) {
+            val keyword = dictionary[i]
+            if (keyword.isNotBlank()) {
+                val placeholder = i.toString(radix)
+                // Using regex for whole-word replacement (\b = word boundary)
+                template = template.replace(Regex("\\b$placeholder\\b"), keyword)
+            }
+        }
+        Log.d(name, "Engine Stage 2 SUCCESS: Deobfuscation complete.")
+        // Log.d(name, "Deobfuscated Script: $template") // Uncomment for deep debugging
 
-        // Stage 3: Build the final, correct URL using the components.
-        val finalUrl = "https://$server/hls2/01/$staticId/${videoId}_,l,n,h,.urlset/master.m3u8$token"
-        Log.d(name, "Engine Stage 3 SUCCESS: Final URL built.")
-        
-        return finalUrl
+        // Stage 3: Pluck the fruit.
+        // Now that the script is clean, we just need to find our prize.
+        val hls2Regex = Regex(""""hls2"\s*:\s*"([^"]+)"""")
+        val hls2Match = hls2Regex.find(template)
+
+        return if (hls2Match != null) {
+            val finalUrl = hls2Match.groupValues[1]
+            Log.d(name, "Engine Stage 3 SUCCESS: Found hls2 link: $finalUrl")
+            finalUrl
+        } else {
+            Log.e(name, "Engine Stage 3 FAILED: Could not find hls2 link in the deobfuscated script.")
+            null
+        }
     }
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        // The videoId is the key to building the correct link.
-        val videoId = url.substringAfterLast("/")
-        if (videoId.isBlank()) {
-            Log.e(name, "Could not extract videoId from URL: $url")
-            return
-        }
-
         val doc = safeGetAsDocument(url, referer) ?: return
         Log.d(name, "Page loaded successfully from $url")
 
@@ -112,13 +120,13 @@ class StreamHGEngineeredExtractor : ExtractorApi() {
             Log.e(name, "No packed 'eval' JavaScript found.")
             return
         }
-        Log.d(name, "Found packed JS. Executing the Engine...")
-        
+        Log.d(name, "Found packed JS. Executing the Final Engine...")
+
         // Call our custom-built engine to get the link.
-        val finalUrl = buildLinkWithEngine(packedJs, videoId)
-        
+        val finalUrl = deobfuscateAndExtract(packedJs)
+
         if (finalUrl != null) {
-            Log.d(name, "✅ EXTRACTION & BUILD SUCCESSFUL! Final link: $finalUrl")
+            Log.d(name, "✅ EXTRACTION & DEOBFUSCATION SUCCESSFUL! Final link: $finalUrl")
             callback(
                 createLink(
                     source = this.name,
@@ -129,7 +137,7 @@ class StreamHGEngineeredExtractor : ExtractorApi() {
                 )
             )
         } else {
-            Log.e(name, "❌ FAILED: The Engine could not build the link.")
+            Log.e(name, "❌ FAILED: The Final Engine could not find the link.")
         }
     }
-}
+                              }
