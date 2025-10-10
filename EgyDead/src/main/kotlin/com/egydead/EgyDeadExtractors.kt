@@ -11,18 +11,13 @@ import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import android.util.Log
 
-// قائمة المستخرجات المستخدمة من قبل المزود
+// The extractor list is now clean and focused.
 val extractorList = listOf(
-    StreamHG(), Davioad(), Haxloppd(), Kravaxxa(), Cavanhabg(), Dumbalag(),
-    Forafile(),
-    DoodStream(), DsvPlay(),
-    Mixdrop(), Mdfx9dc8n(), Mxdrop(),
-    Bigwarp(), BigwarpPro(),
-    EarnVids(),
-    VidGuard()
+    StreamHG(),
+    Kravaxxa() // We can add other StreamHG mirrors here if needed
 )
 
-// ترويسات متصفح كاملة للمحاكاة
+// BROWSER_HEADERS and CloudflareKiller remain the same.
 private val BROWSER_HEADERS = mapOf(
     "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
     "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
@@ -31,8 +26,7 @@ private val BROWSER_HEADERS = mapOf(
 
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
-// البديل الثاني: دالة مساعدة خاصة بنا لتجاوز قيود البناء
-// نقوم بعزل التحذير "deprecated" في هذا المكان فقط
+// Our clean helper function to create links and handle the "deprecated" issue.
 @Suppress("DEPRECATION")
 private fun createLink(
     source: String,
@@ -52,8 +46,7 @@ private fun createLink(
     )
 }
 
-
-// دالة آمنة لجلب الصفحة كـ Document
+// safeGetAsDocument remains the same.
 private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
     return try {
         app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false).document
@@ -63,215 +56,87 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
     }
 }
 
-// دالة آمنة لجلب الصفحة كنص
-private suspend fun safeGetAsText(url: String, referer: String? = null): String? {
-     return try {
-        app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false).text
-    } catch (e: Exception) {
-        Log.e("SafeGetAsText", "Request failed for $url. Error: ${e.message}")
-        null
-    }
-}
-
+// This is the new, robust, multi-layered extractor.
 private abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
 
-    private val potentialHosts = listOf(
-        "kravaxxa.com"
-    )
-
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val videoId = url.substringAfterLast("/")
-        if (videoId.isBlank()) {
-            Log.e(name, "Video ID is blank for URL: $url")
+        val doc = safeGetAsDocument(url, referer) ?: return
+        Log.d(name, "Page loaded successfully from $url")
+
+        val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
+        if (packedJs == null) {
+            Log.e(name, "No packed 'eval' JavaScript found on the page.")
             return
         }
+        Log.d(name, "Found packed JS. Starting multi-layered extraction...")
 
-        Log.d(name, "Starting extraction for video ID: $videoId")
-
-        for (host in potentialHosts) {
-            val finalPageUrl = "https://$host/e/$videoId"
-            Log.d(name, "Trying host: $host with URL: $finalPageUrl")
-
-            val doc = safeGetAsDocument(finalPageUrl, referer = url)
-            if (doc == null) {
-                Log.e(name, "Failed to get document from: $finalPageUrl")
-                continue
+        // --- ATTEMPT 1: Classic Unpacker (getAndUnpack) ---
+        try {
+            Log.d(name, "Attempt 1: Classic Unpacker (getAndUnpack)...")
+            val unpacked = getAndUnpack(packedJs)
+            val m3u8Link = Regex("""(https?://[^'"]+\.m3u8[^'"]*)""").find(unpacked)?.value
+            if (m3u8Link != null) {
+                Log.d(name, "✅ SUCCESS with Classic Unpacker. Link: $m3u8Link")
+                callback(createLink(this.name, "${this.name} - Unpacked", m3u8Link, url, Qualities.Unknown.value))
+                return
             }
+            Log.w(name, "Classic Unpacker ran but found no .m3u8 link.")
+        } catch (e: Exception) {
+            Log.e(name, "Attempt 1 FAILED: Classic Unpacker crashed. Error: ${e.message}")
+        }
 
-            Log.d(name, "Successfully retrieved document from: $host")
-
-            val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
-            if (packedJs == null) {
-                Log.e(name, "No packed 'eval' JavaScript found on: $host")
-                continue
-            }
-
-            Log.d(name, "Found packed JavaScript, starting final robust extraction.")
-            
-            try {
-                // Step 1: Final, simple regex.
-                val dictionaryRegex = Regex("'((?:[^']|\\\\'){100,})'\\.split\\('\\|'\\)")
-                val dictionaryMatch = dictionaryRegex.find(packedJs)
-
-                if (dictionaryMatch == null) {
-                    Log.e(name, "Robust Regex failed: Could not find the long dictionary string ending with .split('|')")
-                    continue
-                }
-                
+        // --- ATTEMPT 2: Smart Dictionary Regex ---
+        try {
+            Log.d(name, "Attempt 2: Smart Dictionary Regex...")
+            val dictionaryRegex = Regex("'((?:[^']|\\\\'){100,})'\\.split\\('\\|'\\)")
+            val dictionaryMatch = dictionaryRegex.find(packedJs)
+            if (dictionaryMatch != null) {
                 val dictionary = dictionaryMatch.groupValues[1]
                 Log.d(name, "Successfully extracted dictionary (length: ${dictionary.length}).")
-
-                // Step 2: Search for the core URL parts.
                 val partsRegex = Regex("""stream\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|master\|m3u8""")
                 val partsMatch = partsRegex.find(dictionary)
-
                 if (partsMatch != null) {
                     val (p1, p2, p3, p4) = partsMatch.destructured
-                    Log.d(name, "Found URL parts in dictionary: $p1, $p2, $p3, $p4")
-
-                    // Step 3: Reconstruct the final URL.
                     val reconstructedPath = "/stream/$p1/$p2/$p3/$p4/master.m3u8"
-                    val finalUrl = "https://$host$reconstructedPath"
-                    Log.d(name, "✅ SUCCESS: Reconstructed final m3u8 link: $finalUrl")
-                    
-                    // Call our new, clean helper function
-                    callback(
-                        createLink(
-                            source = this.name,
-                            name = "${this.name} - HLS",
-                            url = finalUrl,
-                            referer = finalPageUrl, // The crucial part that fixes everything
-                            quality = Qualities.Unknown.value
-                        )
-                    )
-                    return 
-                } else {
-                    Log.e(name, "❌ Regex failed: Could not find URL parts sequence in the dictionary.")
+                    val finalUrl = "https://$mainUrl$reconstructedPath"
+                    Log.d(name, "✅ SUCCESS with Smart Dictionary Regex. Link: $finalUrl")
+                    callback(createLink(this.name, "${this.name} - Regex", finalUrl, url, Qualities.Unknown.value))
+                    return
                 }
-
-            } catch (e: Exception) {
-                Log.e(name, "An unexpected error occurred during extraction: ${e.message}")
+                Log.w(name, "Smart Dictionary Regex extracted dictionary but couldn't find link parts.")
+            } else {
+                Log.w(name, "Smart Dictionary Regex couldn't find the dictionary.")
             }
+        } catch (e: Exception) {
+            Log.e(name, "Attempt 2 FAILED: Smart Dictionary Regex crashed. Error: ${e.message}")
         }
-        
-        Log.e(name, "❌ FAILED: No working hosts or links found for video: $videoId")
+
+        // --- ATTEMPT 3: QuickJS Engine Execution ---
+        try {
+            Log.d(name, "Attempt 3: Executing with QuickJS Engine...")
+            // We ask QuickJS to run the script and then give us the value of "links.hls4"
+            val jsToRun = "$packedJs\nlinks.hls4;"
+            val result = app.quickJs.evaluate(jsToRun) as? String
+            if (result != null && result.contains(".m3u8")) {
+                val finalUrl = when {
+                    result.startsWith("//") -> "https:$result"
+                    result.startsWith("/") -> "https://$mainUrl$result"
+                    else -> result
+                }
+                Log.d(name, "✅ SUCCESS with QuickJS Engine. Link: $finalUrl")
+                callback(createLink(this.name, "${this.name} - QuickJS", finalUrl, url, Qualities.Unknown.value))
+                return
+            }
+            Log.w(name, "QuickJS Engine executed but result was not a valid link. Result: $result")
+        } catch (e: Exception) {
+            Log.e(name, "Attempt 3 FAILED: QuickJS Engine crashed. Error: ${e.message}")
+        }
+
+        Log.e(name, "❌ ALL EXTRACTION METHODS FAILED for $url")
     }
 }
 
-
+// Define the specific servers using the new robust base class.
 private class StreamHG : StreamHGBase("StreamHG", "hglink.to")
-private class Davioad : StreamHGBase("StreamHG (Davioad)", "davioad.com")
-private class Haxloppd : StreamHGBase("StreamHG (Haxloppd)", "haxloppd.com")
 private class Kravaxxa : StreamHGBase("StreamHG (Kravaxxa)", "kravaxxa.com")
-private class Cavanhabg : StreamHGBase("StreamHG (Cavanhabg)", "cavanhabg.com")
-private class Dumbalag : StreamHGBase("StreamHG (Dumbalag)", "dumbalag.com")
-
-private class Forafile : ExtractorApi() {
-    override var name = "Forafile"
-    override var mainUrl = "forafile.com"
-    override val requiresReferer = true
-
-    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val document = safeGetAsDocument(url, referer)
-        val packedJs = document?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
-        if (packedJs != null) {
-            val unpacked = getAndUnpack(packedJs)
-            val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
-            if (mp4Link != null) {
-                callback(
-                    createLink(
-                        this.name,
-                        "${this.name} - MP4",
-                        mp4Link,
-                        url,
-                        Qualities.Unknown.value,
-                        ExtractorLinkType.VIDEO
-                    )
-                )
-            }
-        }
-    }
-}
-
-private abstract class DoodStreamBase : ExtractorApi() {
-    override var name = "DoodStream"
-    override val requiresReferer = true
-    
-    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val newUrl = if (url.contains("/e/")) url else url.replace("/d/", "/e/")
-        val responseText = safeGetAsText(newUrl, referer) ?: return
-        val doodToken = responseText.substringAfter("'/pass_md5/").substringBefore("',")
-        if (doodToken.isBlank()) return
-
-        val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
-        val trueUrl = app.get(md5PassUrl, referer = newUrl, headers = mapOf("User-Agent" to "Mozilla/5.0")).text + "z"
-        
-        callback(
-            createLink(
-                this.name,
-                "${this.name} - Video",
-                trueUrl,
-                newUrl,
-                Qualities.Unknown.value,
-                ExtractorLinkType.VIDEO
-            )
-        )
-    }
-}
-
-private class DoodStream : DoodStreamBase() { 
-    override var mainUrl = "doodstream.com" 
-}
-
-private class DsvPlay : DoodStreamBase() { 
-    override var mainUrl = "dsvplay.com" 
-}
-
-private abstract class PackedJsExtractorBase(
-    override var name: String,
-    override var mainUrl: String,
-    private val regex: Regex
-) : ExtractorApi() {
-    override val requiresReferer = true
-    
-    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val doc = safeGetAsDocument(url, referer)
-        val script = doc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d)))")?.data()
-        if (script != null) {
-            val unpacked = getAndUnpack(script)
-            val videoUrl = regex.find(unpacked)?.groupValues?.get(1)
-            if (videoUrl != null && videoUrl.isNotBlank()) {
-                val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
-                
-                callback(
-                    createLink(
-                        this.name,
-                        "${this.name} - Video", 
-                        finalUrl,
-                        url,
-                        Qualities.Unknown.value,
-                        ExtractorLinkType.VIDEO
-                    )
-                )
-            }
-        }
-    }
-}
-
-private class Mixdrop : PackedJsExtractorBase("Mixdrop", "mixdrop.ag", """MDCore\.wurl="([^"]+)""".toRegex())
-private class Mdfx9dc8n : PackedJsExtractorBase("Mdfx9dc8n", "mdfx9dc8n.net", """MDCore\.wurl="([^"]+)""".toRegex())
-private class Mxdrop : PackedJsExtractorBase("Mxdrop", "mxdrop.to", """MDCore\.wurl="([^"]+)""".toRegex())
-private class Bigwarp : PackedJsExtractorBase("Bigwarp", "bigwarp.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
-private class BigwarpPro : PackedJsExtractorBase("Bigwarp Pro", "bigwarp.pro", """\s*file\s*:\s*"([^"]+)""".toRegex())
-
-private open class PlaceholderExtractor(override var name: String, override var mainUrl: String) : ExtractorApi() {
-    override val requiresReferer = true
-    
-    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        Log.e(name, "Extractor not yet implemented for $url")
-    }
-}
-
-private class EarnVids : PlaceholderExtractor("EarnVids", "dingtezuni.com")
-private class VidGuard : PlaceholderExtractor("VidGuard", "listeamed.net")
