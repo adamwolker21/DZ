@@ -5,15 +5,16 @@ import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.getAndUnpack
+// We no longer need getAndUnpack, as we are building our own.
+// import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import android.util.Log
 
-// قائمة المستخرجات الآن نظيفة وتحتوي فقط على الحل النهائي
+// The extractor list now contains our final, self-sufficient extractor.
 val extractorList = listOf(
-    StreamHGFinalExtractor()
+    StreamHGCustomExtractor()
 )
 
 private val BROWSER_HEADERS = mapOf(
@@ -24,7 +25,7 @@ private val BROWSER_HEADERS = mapOf(
 
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
-// الدالة المساعدة النهائية التي تتجاوز قيود البناء
+// This helper function is our final solution to the build issues.
 @Suppress("DEPRECATION")
 private fun createLink(
     source: String,
@@ -52,11 +53,45 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
     }
 }
 
-// الحل النهائي: مستخرج واحد، طريقة واحدة مضمونة، بناءً على اكتشافك
-class StreamHGFinalExtractor : ExtractorApi() {
+// The final extractor, containing its own custom-built unpacking logic.
+class StreamHGCustomExtractor : ExtractorApi() {
     override var name = "StreamHG"
     override var mainUrl = "kravaxxa.com"
     override val requiresReferer = true
+
+    /**
+     * This is our custom-built "key". It bypasses the faulty getAndUnpack function.
+     * It extracts the secret dictionary from the packed JS and finds the hls2 link inside it.
+     */
+    private fun customUnpackAndFindLink(packedJs: String): String? {
+        // Step 1: A powerful and flexible Regex to find the dictionary.
+        // It handles both single (') and double (") quotes.
+        val dictionaryRegex = Regex("""['"]((?:\\.|[^"'\\]){100,})['"]\.split\(['']\|['']\)""")
+        val dictionaryMatch = dictionaryRegex.find(packedJs)
+
+        if (dictionaryMatch == null) {
+            Log.e(name, "Custom Unpacker: Could not find the secret dictionary.")
+            return null
+        }
+        
+        // The dictionary is the long string of words.
+        val dictionary = dictionaryMatch.groupValues[1]
+        Log.d(name, "Custom Unpacker: Successfully extracted the dictionary.")
+
+        // Step 2: Search within the dictionary for the direct hls2 link.
+        // We look for a full, direct HTTPS link ending in .m3u8.
+        val hls2Regex = Regex("""(https://[a-zA-Z0-9.-]+\.com/[^|]*?master\.m3u8[^|]*)""")
+        val hls2Match = hls2Regex.find(dictionary)
+
+        return if (hls2Match != null) {
+            val hls2Link = hls2Match.groupValues[1]
+            Log.d(name, "Custom Unpacker: Found hls2 link in dictionary: $hls2Link")
+            hls2Link
+        } else {
+            Log.e(name, "Custom Unpacker: Found dictionary, but no hls2 link inside it.")
+            null
+        }
+    }
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val doc = safeGetAsDocument(url, referer) ?: return
@@ -67,37 +102,24 @@ class StreamHGFinalExtractor : ExtractorApi() {
             Log.e(name, "No packed 'eval' JavaScript found.")
             return
         }
-        Log.d(name, "Found packed JS. Attempting final extraction based on hls2 discovery...")
+        Log.d(name, "Found packed JS. Executing our custom unpacker...")
         
-        try {
-            // الخطوة 1: فك تشفير السكريبت باستخدام الطريقة المضمونة
-            val unpacked = getAndUnpack(packedJs)
-            Log.d(name, "Successfully unpacked the script.")
-
-            // الخطوة 2: استهداف "الجائزة الحقيقية" (hls2) باستخدام تعبير نمطي بسيط ومباشر
-            val hls2Regex = Regex(""""hls2"\s*:\s*"([^"]+)"""")
-            val match = hls2Regex.find(unpacked)
-
-            if (match != null) {
-                // الرابط المستهدف هو الرابط الكامل والمباشر، لا يحتاج إلى بناء
-                val finalUrl = match.groupValues[1]
-                Log.d(name, "✅ SUCCESS! Found the direct hls2 link: $finalUrl")
-
-                // الخطوة 3: إنشاء الرابط النهائي باستخدام الدالة المساعدة التي تحل مشاكل البناء
-                callback(
-                    createLink(
-                        source = this.name,
-                        name = this.name, // يمكننا إضافة الجودة هنا لاحقًا إذا أردنا
-                        url = finalUrl,
-                        referer = url, // نمرر الـ referer كإجراء احترازي
-                        quality = Qualities.Unknown.value
-                    )
+        // Call our custom-built function to get the link.
+        val finalUrl = customUnpackAndFindLink(packedJs)
+        
+        if (finalUrl != null) {
+            Log.d(name, "✅ SUCCESS! Final link extracted: $finalUrl")
+            callback(
+                createLink(
+                    source = this.name,
+                    name = this.name,
+                    url = finalUrl,
+                    referer = url, // Pass the crucial referer
+                    quality = Qualities.Unknown.value
                 )
-            } else {
-                Log.e(name, "❌ Extraction failed: Could not find the 'hls2' link in the unpacked script.")
-            }
-        } catch (e: Exception) {
-            Log.e(name, "❌ An error occurred during the unpacking process: ${e.message}")
+            )
+        } else {
+            Log.e(name, "❌ FAILED: Our custom unpacker could not find the link.")
         }
     }
-                                  }
+}
