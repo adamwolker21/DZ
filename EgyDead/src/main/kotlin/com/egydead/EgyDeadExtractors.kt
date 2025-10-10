@@ -5,16 +5,14 @@ import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.Qualities
-// We no longer need getAndUnpack, as we are building our own.
-// import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import android.util.Log
 
-// The extractor list now contains our final, self-sufficient extractor.
+// The extractor list now contains our experimental external API extractor.
 val extractorList = listOf(
-    StreamHGCustomExtractor()
+    StreamHGExternalExtractor()
 )
 
 private val BROWSER_HEADERS = mapOf(
@@ -53,45 +51,11 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
     }
 }
 
-// The final extractor, containing its own custom-built unpacking logic.
-class StreamHGCustomExtractor : ExtractorApi() {
-    override var name = "StreamHG"
+// Experimental extractor that uses an external service (de4js.kshift.me) to deobfuscate.
+class StreamHGExternalExtractor : ExtractorApi() {
+    override var name = "StreamHG (External)"
     override var mainUrl = "kravaxxa.com"
     override val requiresReferer = true
-
-    /**
-     * This is our custom-built "key". It bypasses the faulty getAndUnpack function.
-     * It extracts the secret dictionary from the packed JS and finds the hls2 link inside it.
-     */
-    private fun customUnpackAndFindLink(packedJs: String): String? {
-        // Step 1: A powerful and flexible Regex to find the dictionary.
-        // It handles both single (') and double (") quotes.
-        val dictionaryRegex = Regex("""['"]((?:\\.|[^"'\\]){100,})['"]\.split\(['']\|['']\)""")
-        val dictionaryMatch = dictionaryRegex.find(packedJs)
-
-        if (dictionaryMatch == null) {
-            Log.e(name, "Custom Unpacker: Could not find the secret dictionary.")
-            return null
-        }
-        
-        // The dictionary is the long string of words.
-        val dictionary = dictionaryMatch.groupValues[1]
-        Log.d(name, "Custom Unpacker: Successfully extracted the dictionary.")
-
-        // Step 2: Search within the dictionary for the direct hls2 link.
-        // We look for a full, direct HTTPS link ending in .m3u8.
-        val hls2Regex = Regex("""(https://[a-zA-Z0-9.-]+\.com/[^|]*?master\.m3u8[^|]*)""")
-        val hls2Match = hls2Regex.find(dictionary)
-
-        return if (hls2Match != null) {
-            val hls2Link = hls2Match.groupValues[1]
-            Log.d(name, "Custom Unpacker: Found hls2 link in dictionary: $hls2Link")
-            hls2Link
-        } else {
-            Log.e(name, "Custom Unpacker: Found dictionary, but no hls2 link inside it.")
-            null
-        }
-    }
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val doc = safeGetAsDocument(url, referer) ?: return
@@ -102,24 +66,50 @@ class StreamHGCustomExtractor : ExtractorApi() {
             Log.e(name, "No packed 'eval' JavaScript found.")
             return
         }
-        Log.d(name, "Found packed JS. Executing our custom unpacker...")
-        
-        // Call our custom-built function to get the link.
-        val finalUrl = customUnpackAndFindLink(packedJs)
-        
-        if (finalUrl != null) {
-            Log.d(name, "✅ SUCCESS! Final link extracted: $finalUrl")
-            callback(
-                createLink(
-                    source = this.name,
-                    name = this.name,
-                    url = finalUrl,
-                    referer = url, // Pass the crucial referer
-                    quality = Qualities.Unknown.value
+        Log.d(name, "Found packed JS. Sending to external deobfuscator (de4js.kshift.me)...")
+
+        try {
+            // Step 1: Send the packed script to the external deobfuscation service.
+            val responseDoc = app.post(
+                "https://de4js.kshift.me/",
+                data = mapOf("input_code" to packedJs, "autodecode" to "1"),
+                headers = mapOf(
+                    "Content-Type" to "application/x-www-form-urlencoded",
+                    "User-Agent" to "CloudStream-Extractor-Client" // Identify our client
                 )
-            )
-        } else {
-            Log.e(name, "❌ FAILED: Our custom unpacker could not find the link.")
+            ).document
+            Log.d(name, "Received response from external deobfuscator.")
+
+            // Step 2: Extract the deobfuscated code from the result page.
+            val deobfuscatedResult = responseDoc.selectFirst("textarea#result_code")?.text()
+
+            if (deobfuscatedResult.isNullOrBlank()) {
+                Log.e(name, "External deobfuscator did not return a valid result.")
+                return
+            }
+            Log.d(name, "Successfully extracted deobfuscated code. Searching for hls2 link...")
+
+            // Step 3: Search for the hls2 link within the deobfuscated code.
+            val hls2Regex = Regex(""""hls2"\s*:\s*"([^"]+)"""")
+            val match = hls2Regex.find(deobfuscatedResult)
+
+            if (match != null) {
+                val finalUrl = match.groupValues[1]
+                Log.d(name, "✅ SUCCESS! Found the direct hls2 link via external service: $finalUrl")
+                callback(
+                    createLink(
+                        source = this.name,
+                        name = this.name,
+                        url = finalUrl,
+                        referer = url,
+                        quality = Qualities.Unknown.value
+                    )
+                )
+            } else {
+                Log.e(name, "❌ Extraction failed: Could not find the 'hls2' link in the deobfuscated result.")
+            }
+        } catch (e: Exception) {
+            Log.e(name, "❌ An error occurred during the external deobfuscation process: ${e.message}")
         }
     }
-}
+                                  }
