@@ -85,22 +85,21 @@ private abstract class StreamHGBase(override var name: String, override var main
                 continue
             }
 
-            Log.d(name, "Found packed JavaScript, starting advanced manual extraction.")
+            Log.d(name, "Found packed JavaScript, starting final extraction logic.")
             
             try {
-                // الخطوة 1: Regex جديد لتحليل بنية دالة eval واستخراج القاموس (k)
-                // يبحث عن النمط الكامل لاستدعاء الدالة لضمان الدقة
-                val evalArgsRegex = Regex("""\}\s*\((?:'|")((?:[^'"]|\\['"])*)(?:'|"),\d+,\d+,(?:'|")((?:[^'"]|\\['"])*)(?:'|")\.split\('\|'\)""")
-                
-                val evalMatch = evalArgsRegex.find(packedJs)
-                if (evalMatch == null) {
-                    Log.e(name, "Regex failed: Could not parse eval() arguments structure.")
+                // الخطوة 1: Regex نهائي ومحصّن. يبحث عن القاموس الذي يتبع النمط "رقم,رقم,'القاموس'"
+                val dictionaryRegex = Regex(""",\d+,\d+,'((?:[^']|\\'){100,})'\.split\('\|'\)""")
+                val dictionaryMatch = dictionaryRegex.find(packedJs)
+
+                if (dictionaryMatch == null) {
+                    Log.e(name, "Regex failed: Could not find the dictionary pattern (...,number,number,'dictionary'...)")
                     continue
                 }
-
-                // القاموس هو المجموعة الثانية التي تم التقاطها
-                val dictionary = evalMatch.groupValues[2]
-                Log.d(name, "Successfully extracted dictionary via structure parsing (length: ${dictionary.length}).")
+                
+                // القاموس هو المجموعة الأولى التي تم التقاطها
+                val dictionary = dictionaryMatch.groupValues[1]
+                Log.d(name, "Successfully extracted dictionary using final pattern (length: ${dictionary.length}).")
 
                 // الخطوة 2: البحث عن أجزاء الرابط داخل القاموس المستخرج
                 val partsRegex = Regex("""stream\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|master\|m3u8""")
