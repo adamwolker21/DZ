@@ -86,24 +86,32 @@ private abstract class StreamHGBase(override var name: String, override var main
                 continue
             }
 
-            Log.d(name, "Found packed JavaScript on: $host, length: ${packedJs.length}")
+            Log.d(name, "Found packed JavaScript, starting manual extraction.")
             
             try {
-                // الخطوة 2: فك تشفير السكريبت
-                val unpacked = getAndUnpack(packedJs)
-                Log.d(name, "Unpacked JS (first 500 chars): ${unpacked.take(500)}")
+                // الخطوة 2: استخراج "قاموس" الكلمات من السكريبت المعبأ
+                val dictionaryRegex = Regex("""'((?:[^']|\\'){1000,})'\.split\('\|'\)""")
+                val dictionaryMatch = dictionaryRegex.find(packedJs)
+                if (dictionaryMatch == null) {
+                    Log.e(name, "Regex failed: Could not find dictionary string in packed JS.")
+                    continue
+                }
                 
-                // الخطوة 3: استخدام Regex جديد ومحسن لاستخراج رابط hls4
-                val hls4Regex = Regex("""hls4"\s*:\s*"([^"]+)""")
-                val match = hls4Regex.find(unpacked)
+                val dictionary = dictionaryMatch.groupValues[1]
+                Log.d(name, "Successfully extracted dictionary string (length: ${dictionary.length}).")
 
-                if (match != null) {
-                    val extractedPath = match.groupValues[1]
-                    Log.d(name, "Regex matched! Extracted path: $extractedPath")
+                // الخطوة 3: البحث عن أجزاء الرابط داخل القاموس
+                val partsRegex = Regex("""stream\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|master\|m3u8""")
+                val partsMatch = partsRegex.find(dictionary)
 
-                    // الخطوة 4: بناء الرابط الكامل
-                    val finalUrl = "https://$host$extractedPath"
-                    Log.d(name, "✅ SUCCESS: Constructed final m3u8 link: $finalUrl")
+                if (partsMatch != null) {
+                    val (p1, p2, p3, p4, p5) = partsMatch.destructured
+                    Log.d(name, "Found URL parts: $p1, $p2, $p3, $p4, $p5")
+
+                    // الخطوة 4: إعادة بناء الرابط
+                    val reconstructedPath = "/stream/$p1-$p2/$p3/$p4/$p5/master.m3u8"
+                    val finalUrl = "https://$host$reconstructedPath"
+                    Log.d(name, "✅ SUCCESS: Reconstructed final m3u8 link: $finalUrl")
                     
                     callback(
                         newExtractorLink(
@@ -112,13 +120,13 @@ private abstract class StreamHGBase(override var name: String, override var main
                             finalUrl
                         )
                     )
-                    return // تم العثور على الرابط، قم بإنهاء الدالة
+                    return 
                 } else {
-                    Log.e(name, "❌ Regex failed: Could not find 'hls4' link in unpacked JavaScript.")
+                    Log.e(name, "❌ Regex failed: Could not find URL parts sequence in dictionary.")
                 }
 
             } catch (e: Exception) {
-                Log.e(name, "Error during unpacking or extraction: ${e.message}")
+                Log.e(name, "An unexpected error occurred during manual extraction: ${e.message}")
             }
         }
         
