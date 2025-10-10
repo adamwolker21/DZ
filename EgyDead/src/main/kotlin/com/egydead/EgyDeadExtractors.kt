@@ -6,16 +6,14 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.getAndUnpack
-import com.lagradost.cloudstream3.base64Decode
-import com.lagradost.cloudstream3.base64Encode
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import android.util.Log
 
-// The extractor list now points to our final, robust extractor.
+// The extractor list is now clean and focused.
 val extractorList = listOf(
-    StreamHGResolver()
+    StreamHGExtractor()
 )
 
 private val BROWSER_HEADERS = mapOf(
@@ -26,68 +24,52 @@ private val BROWSER_HEADERS = mapOf(
 
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
+// This is our final helper function. It's the only way to pass the referer
+// while also being able to build the project, by suppressing the deprecation error.
+@Suppress("DEPRECATION")
+private fun createLink(
+    source: String,
+    name: String,
+    url: String,
+    referer: String,
+    quality: Int
+): ExtractorLink {
+    return ExtractorLink(
+        source = source,
+        name = name,
+        url = url,
+        referer = referer,
+        quality = quality,
+        type = ExtractorLinkType.M3U8
+    )
+}
+
 private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
     return try {
         app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false).document
     } catch (e: Exception) {
-        Log.e("safeGetAsDocument", "Request failed for $url. Error: ${e.message}")
+        Log.e("SafeGetAsDocument", "Request failed for $url. Error: ${e.message}")
         null
     }
 }
 
-// Data class to hold our secret message for the resolver
-private data class ResolverData(val url: String, val referer: String)
-
-// This is the final, architecturally correct extractor using the built-in resolver system.
-class StreamHGResolver : ExtractorApi() {
+// The final, most robust extractor compatible with your project environment.
+class StreamHGExtractor : ExtractorApi() {
     override var name = "StreamHG"
     override var mainUrl = "kravaxxa.com"
     override val requiresReferer = true
 
-    // This function will be called by the app when it sees our "resolver://" link.
-    // It's the designated place to add the final headers and referer.
-    @Suppress("DEPRECATION")
-    override suspend fun load(url: String): ExtractorLink? {
-        Log.d(name, "LOAD FUNCTION TRIGGERED")
-        // The url is our secret message: "resolver://BASE64_ENCODED_DATA"
-        val decodedData = base64Decode(url.removePrefix("resolver://"))
-        Log.d(name, "Decoded resolver data: $decodedData")
-        
-        // Split the secret message to get the real URL and referer
-        val (realUrl, referer) = decodedData.split("|||")
-        Log.d(name, "Real URL: $realUrl")
-        Log.d(name, "Referer: $referer")
-
-        // Now, we create the final ExtractorLink with all the necessary info.
-        // This is the correct and safe place to do this.
-        return ExtractorLink(
-            source = this.name,
-            name = this.name,
-            url = realUrl,
-            referer = referer,
-            quality = Qualities.Unknown.value,
-            isM3u8 = true,
-            headers = BROWSER_HEADERS
-        )
-    }
-
-    // This function's only job is to find the m3u8 link and create a "secret message" (resolver link) for the load() function.
-    override suspend fun getUrl(
-        url: String,
-        referer: String?,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ) {
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val currentHost = java.net.URI(url).host ?: mainUrl
         val doc = safeGetAsDocument(url, referer) ?: return
         Log.d(name, "Page loaded successfully from $url")
 
         val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs == null) {
-            Log.e(name, "No packed 'eval' JavaScript found on the page.")
+            Log.e(name, "No packed 'eval' JavaScript found.")
             return
         }
-        Log.d(name, "Found packed JS. Starting extraction to create resolver link...")
+        Log.d(name, "Found packed JS. Starting extraction...")
         
         var m3u8Link: String? = null
 
@@ -97,10 +79,10 @@ class StreamHGResolver : ExtractorApi() {
             val hls4Link = Regex("""["']hls4["']\s*:\s*["']([^"']+\.m3u8[^"']*)""").find(unpacked)?.groupValues?.get(1)
             if (hls4Link != null) {
                 m3u8Link = "https://$currentHost$hls4Link".takeIf { hls4Link.startsWith('/') } ?: hls4Link
-                Log.d(name, "Success with Classic Unpacker. Link found: $m3u8Link")
+                Log.d(name, "Success with Classic Unpacker.")
             }
         } catch (e: Exception) {
-            Log.w(name, "Classic Unpacker failed. Trying next method. Error: ${e.message}")
+            Log.w(name, "Classic Unpacker failed. Trying next method.")
         }
 
         // --- ATTEMPT 2: Smart Dictionary Regex (if previous failed) ---
@@ -115,35 +97,24 @@ class StreamHGResolver : ExtractorApi() {
                     if (partsMatch != null) {
                         val (p1, p2, p3, p4) = partsMatch.destructured
                         m3u8Link = "https://$currentHost/stream/$p1/$p2/$p3/$p4/master.m3u8"
-                        Log.d(name, "Success with Smart Dictionary Regex. Link found: $m3u8Link")
+                        Log.d(name, "Success with Smart Dictionary Regex.")
                     }
                 }
             } catch (e: Exception) {
-                Log.w(name, "Smart Dictionary Regex failed. Error: ${e.message}")
+                Log.w(name, "Smart Dictionary Regex failed.")
             }
         }
         
-        // If we found a link, create and send the resolver link
+        // If we found a link with any method, create the link using our special helper.
         if (m3u8Link != null) {
-            // Create the secret message: "REAL_URL|||REFERER_URL"
-            val resolverData = "$m3u8Link|||$url"
-            // Encode it in Base64 to make it URL-safe
-            val encodedData = base64Encode(resolverData)
-            Log.d(name, "Encoded resolver data: $encodedData")
-            
-            // This is the link we will pass to the app. It doesn't cause build errors.
-            val resolverUrl = "resolver://$encodedData"
-            Log.d(name, "✅ Link found. Creating and sending resolver link: $resolverUrl")
-            
-            @Suppress("DEPRECATION")
+            Log.d(name, "✅ Link found: $m3u8Link. Creating final link.")
             callback(
-                ExtractorLink(
+                createLink(
                     source = this.name,
                     name = this.name,
-                    url = resolverUrl, // We send the secret message, not the real URL
-                    referer = url,
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = true
+                    url = m3u8Link,
+                    referer = url, // Pass the crucial referer
+                    quality = Qualities.Unknown.value
                 )
             )
         } else {
