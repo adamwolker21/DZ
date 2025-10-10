@@ -10,9 +10,9 @@ import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import android.util.Log
 
-// The extractor list now contains our experimental external API extractor.
+// The extractor list now contains our final, self-sufficient extractor.
 val extractorList = listOf(
-    StreamHGExternalExtractor()
+    StreamHGMasterExtractor()
 )
 
 private val BROWSER_HEADERS = mapOf(
@@ -51,11 +51,45 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
     }
 }
 
-// Experimental extractor that uses an external service (de4js.kshift.me) to deobfuscate.
-class StreamHGExternalExtractor : ExtractorApi() {
-    override var name = "StreamHG (External)"
+// The final extractor, containing its own "Master Key" unpacking logic.
+class StreamHGMasterExtractor : ExtractorApi() {
+    override var name = "StreamHG"
     override var mainUrl = "kravaxxa.com"
     override val requiresReferer = true
+
+    /**
+     * This is our "Master Key". A custom-built function to bypass the site's tricks.
+     * It finds the secret dictionary and extracts the hls2 link from it.
+     */
+    private fun extractWithMasterKey(packedJs: String): String? {
+        // Stage 1: The Regex to find the secret dictionary.
+        // This is a robust regex that looks for the function structure and extracts the longest string,
+        // which is always the dictionary. It's resilient to small changes.
+        val dictRegex = Regex("""eval\(function\(p,a,c,k,e,d\)\{.*?\}\((.*?),['"]((?:\\.|[^"'\\])*)['"]\.split\('\|'\)\)\)""")
+        val match = dictRegex.find(packedJs)
+
+        if (match == null || match.groupValues.size < 3) {
+            Log.e(name, "Master Key Stage 1 FAILED: Could not find the structure of the packed function.")
+            return null
+        }
+        
+        // The dictionary is the second captured group (the long string of words).
+        val dictionary = match.groupValues[2]
+        Log.d(name, "Master Key Stage 1 SUCCESS: Dictionary extracted.")
+
+        // Stage 2: Search within the dictionary for the real prize (the hls2 link).
+        val hls2Regex = Regex("""(https://[a-zA-Z0-9.-]+\.com/[^|]*?master\.m3u8[^|]*)""")
+        val hls2Match = hls2Regex.find(dictionary)
+
+        return if (hls2Match != null) {
+            val hls2Link = hls2Match.groupValues[1]
+            Log.d(name, "Master Key Stage 2 SUCCESS: Found hls2 link: $hls2Link")
+            hls2Link
+        } else {
+            Log.e(name, "Master Key Stage 2 FAILED: Found dictionary, but no hls2 link inside it.")
+            null
+        }
+    }
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val doc = safeGetAsDocument(url, referer) ?: return
@@ -66,50 +100,24 @@ class StreamHGExternalExtractor : ExtractorApi() {
             Log.e(name, "No packed 'eval' JavaScript found.")
             return
         }
-        Log.d(name, "Found packed JS. Sending to external deobfuscator (de4js.kshift.me)...")
-
-        try {
-            // Step 1: Send the packed script to the external deobfuscation service.
-            val responseDoc = app.post(
-                "https://de4js.kshift.me/",
-                data = mapOf("input_code" to packedJs, "autodecode" to "1"),
-                headers = mapOf(
-                    "Content-Type" to "application/x-www-form-urlencoded",
-                    "User-Agent" to "CloudStream-Extractor-Client" // Identify our client
+        Log.d(name, "Found packed JS. Executing the Master Key...")
+        
+        // Call our custom-built function to get the link.
+        val finalUrl = extractWithMasterKey(packedJs)
+        
+        if (finalUrl != null) {
+            Log.d(name, "✅ EXTRACTION SUCCESSFUL! Final link: $finalUrl")
+            callback(
+                createLink(
+                    source = this.name,
+                    name = this.name,
+                    url = finalUrl,
+                    referer = url,
+                    quality = Qualities.Unknown.value
                 )
-            ).document
-            Log.d(name, "Received response from external deobfuscator.")
-
-            // Step 2: Extract the deobfuscated code from the result page.
-            val deobfuscatedResult = responseDoc.selectFirst("textarea#result_code")?.text()
-
-            if (deobfuscatedResult.isNullOrBlank()) {
-                Log.e(name, "External deobfuscator did not return a valid result.")
-                return
-            }
-            Log.d(name, "Successfully extracted deobfuscated code. Searching for hls2 link...")
-
-            // Step 3: Search for the hls2 link within the deobfuscated code.
-            val hls2Regex = Regex(""""hls2"\s*:\s*"([^"]+)"""")
-            val match = hls2Regex.find(deobfuscatedResult)
-
-            if (match != null) {
-                val finalUrl = match.groupValues[1]
-                Log.d(name, "✅ SUCCESS! Found the direct hls2 link via external service: $finalUrl")
-                callback(
-                    createLink(
-                        source = this.name,
-                        name = this.name,
-                        url = finalUrl,
-                        referer = url,
-                        quality = Qualities.Unknown.value
-                    )
-                )
-            } else {
-                Log.e(name, "❌ Extraction failed: Could not find the 'hls2' link in the deobfuscated result.")
-            }
-        } catch (e: Exception) {
-            Log.e(name, "❌ An error occurred during the external deobfuscation process: ${e.message}")
+            )
+        } else {
+            Log.e(name, "❌ FAILED: The Master Key could not find the link.")
         }
     }
-                                  }
+}
