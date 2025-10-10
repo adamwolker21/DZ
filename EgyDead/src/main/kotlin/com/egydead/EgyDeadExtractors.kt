@@ -10,9 +10,9 @@ import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import android.util.Log
 
-// The extractor list now contains our final, self-sufficient extractor.
+// The extractor list now contains our final, engineered solution.
 val extractorList = listOf(
-    StreamHGMasterExtractor()
+    StreamHGEngineeredExtractor()
 )
 
 private val BROWSER_HEADERS = mapOf(
@@ -51,47 +51,59 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
     }
 }
 
-// The final extractor, containing its own "Master Key" unpacking logic.
-class StreamHGMasterExtractor : ExtractorApi() {
+// The final extractor, containing its own "Engine" to build the correct link.
+class StreamHGEngineeredExtractor : ExtractorApi() {
     override var name = "StreamHG"
     override var mainUrl = "kravaxxa.com"
     override val requiresReferer = true
 
     /**
-     * This is our "Master Key". A custom-built function to bypass the site's tricks.
-     * It finds the secret dictionary and extracts the hls2 link from it.
+     * This is our "Engine". It deconstructs the packed script, finds the necessary
+     * components (server, token, etc.), and builds the correct hls2 link.
      */
-    private fun extractWithMasterKey(packedJs: String): String? {
-        // Stage 1: The new, robust Regex to find the dictionary.
-        // It simply finds the longest string literal in the script followed by .split('|').
-        // This is much more resilient than trying to match the entire eval function structure.
+    private fun buildLinkWithEngine(packedJs: String, videoId: String): String? {
+        // Stage 1: The Master Key to extract the dictionary.
         val dictRegex = Regex("""['"]((?:\\.|[^"'\\]){200,})['"]\.split\(['']\|['']\)""")
         val dictionaryMatch = dictRegex.find(packedJs)
-
         if (dictionaryMatch == null) {
-            Log.e(name, "Master Key FAILED: Could not find the secret dictionary using the robust regex.")
+            Log.e(name, "Engine FAILED: Could not extract the dictionary.")
             return null
         }
-        
         val dictionary = dictionaryMatch.groupValues[1]
-        Log.d(name, "Master Key SUCCESS: Dictionary extracted (length: ${dictionary.length}).")
+        Log.d(name, "Engine Stage 1 SUCCESS: Dictionary extracted.")
 
-        // Stage 2: Search within the dictionary for the real prize (the hls2 link).
-        // This regex looks for a complete, direct HTTPS link ending in .m3u8, which is our hls2 link.
-        val hls2Regex = Regex("""(https://[a-zA-Z0-9.-]+\.com/[^|]*?master\.m3u8[^|]*)""")
-        val hls2Match = hls2Regex.find(dictionary)
+        // Stage 2: Gather the components from the dictionary.
+        val server = Regex("""([a-z0-9]+?\.premilkyway\.com)""").find(dictionary)?.groupValues?.get(1)
+        val staticId = Regex("""\b(\d{5})\b""").find(dictionary)?.groupValues?.get(1) // Looks for a 5-digit number
+        val token = Regex("""(\?t=[^|]+)""").find(dictionary)?.groupValues?.get(1)
 
-        return if (hls2Match != null) {
-            val hls2Link = hls2Match.groupValues[1]
-            Log.d(name, "Master Key SUCCESS: Found hls2 link in dictionary: $hls2Link")
-            hls2Link
-        } else {
-            Log.e(name, "Master Key FAILED: Found dictionary, but no hls2 link inside it.")
-            null
+        if (server == null || staticId == null || token == null) {
+            Log.e(name, "Engine FAILED: Could not find all required components in the dictionary.")
+            Log.d(name, "Server: $server, StaticID: $staticId, Token: $token")
+            return null
         }
+        Log.d(name, "Engine Stage 2 SUCCESS: All components found.")
+        Log.d(name, "--> Server: $server")
+        Log.d(name, "--> Static ID: $staticId")
+        Log.d(name, "--> Token: $token")
+        Log.d(name, "--> Video ID: $videoId")
+
+
+        // Stage 3: Build the final, correct URL using the components.
+        val finalUrl = "https://$server/hls2/01/$staticId/${videoId}_,l,n,h,.urlset/master.m3u8$token"
+        Log.d(name, "Engine Stage 3 SUCCESS: Final URL built.")
+        
+        return finalUrl
     }
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        // The videoId is the key to building the correct link.
+        val videoId = url.substringAfterLast("/")
+        if (videoId.isBlank()) {
+            Log.e(name, "Could not extract videoId from URL: $url")
+            return
+        }
+
         val doc = safeGetAsDocument(url, referer) ?: return
         Log.d(name, "Page loaded successfully from $url")
 
@@ -100,13 +112,13 @@ class StreamHGMasterExtractor : ExtractorApi() {
             Log.e(name, "No packed 'eval' JavaScript found.")
             return
         }
-        Log.d(name, "Found packed JS. Executing the Master Key...")
+        Log.d(name, "Found packed JS. Executing the Engine...")
         
-        // Call our custom-built function to get the link.
-        val finalUrl = extractWithMasterKey(packedJs)
+        // Call our custom-built engine to get the link.
+        val finalUrl = buildLinkWithEngine(packedJs, videoId)
         
         if (finalUrl != null) {
-            Log.d(name, "✅ EXTRACTION SUCCESSFUL! Final link: $finalUrl")
+            Log.d(name, "✅ EXTRACTION & BUILD SUCCESSFUL! Final link: $finalUrl")
             callback(
                 createLink(
                     source = this.name,
@@ -117,7 +129,7 @@ class StreamHGMasterExtractor : ExtractorApi() {
                 )
             )
         } else {
-            Log.e(name, "❌ FAILED: The Master Key could not find the link.")
+            Log.e(name, "❌ FAILED: The Engine could not build the link.")
         }
     }
 }
