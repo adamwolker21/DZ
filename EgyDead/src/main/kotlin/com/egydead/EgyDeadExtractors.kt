@@ -53,8 +53,8 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
     }
 }
 
-// Fixed the visibility from private to internal to solve the build error.
-internal class StreamHGMultiMethod : ExtractorApi() {
+// Fixed the visibility from internal to public to solve the final build error.
+class StreamHGMultiMethod : ExtractorApi() {
     override var name = "StreamHG"
     override var mainUrl = "kravaxxa.com"
     override val requiresReferer = true
@@ -112,14 +112,12 @@ internal class StreamHGMultiMethod : ExtractorApi() {
         // --- ATTEMPT 3: Experimental External Deobfuscator (de4js.kshift.me) ---
         try {
             Log.d(name, "Attempt 3: External Deobfuscator (de4js.kshift.me)...")
-            // Send a POST request to the external site with the packed code
             val responseDoc = app.post(
                 "https://de4js.kshift.me/",
                 data = mapOf("input_code" to packedJs, "autodecode" to "1"),
                 headers = mapOf("Content-Type" to "application/x-www-form-urlencoded")
             ).document
             
-            // Extract the result from the textarea
             val deobfuscatedResult = responseDoc.selectFirst("textarea#result_code")?.text()
             
             if (!deobfuscatedResult.isNullOrBlank()) {
