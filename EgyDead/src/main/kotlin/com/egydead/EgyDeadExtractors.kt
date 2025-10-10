@@ -6,9 +6,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.getAndUnpack
-// We are going back to using the helper function
 import com.lagradost.cloudstream3.utils.newExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import android.util.Log
@@ -73,6 +71,7 @@ private abstract class StreamHGBase(override var name: String, override var main
             val finalPageUrl = "https://$host/e/$videoId"
             Log.d(name, "Trying host: $host with URL: $finalPageUrl")
 
+            // This is the critical step: we use the referer here to get the page
             val doc = safeGetAsDocument(finalPageUrl, referer = url)
             if (doc == null) {
                 Log.e(name, "Failed to get document from: $finalPageUrl")
@@ -90,7 +89,7 @@ private abstract class StreamHGBase(override var name: String, override var main
             Log.d(name, "Found packed JavaScript, starting final robust extraction.")
             
             try {
-                // الخطوة 1: Regex نهائي ومبسط.
+                // Step 1: Final, simple regex.
                 val dictionaryRegex = Regex("'((?:[^']|\\\\'){100,})'\\.split\\('\\|'\\)")
                 val dictionaryMatch = dictionaryRegex.find(packedJs)
 
@@ -100,9 +99,9 @@ private abstract class StreamHGBase(override var name: String, override var main
                 }
                 
                 val dictionary = dictionaryMatch.groupValues[1]
-                Log.d(name, "Successfully extracted dictionary with robust regex (length: ${dictionary.length}).")
+                Log.d(name, "Successfully extracted dictionary (length: ${dictionary.length}).")
 
-                // الخطوة 2: البحث عن أجزاء الرابط الأساسية.
+                // Step 2: Search for the core URL parts.
                 val partsRegex = Regex("""stream\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|master\|m3u8""")
                 val partsMatch = partsRegex.find(dictionary)
 
@@ -110,30 +109,28 @@ private abstract class StreamHGBase(override var name: String, override var main
                     val (p1, p2, p3, p4) = partsMatch.destructured
                     Log.d(name, "Found URL parts in dictionary: $p1, $p2, $p3, $p4")
 
-                    // الخطوة 3: إعادة بناء الرابط النهائي.
+                    // Step 3: Reconstruct the final URL.
                     val reconstructedPath = "/stream/$p1/$p2/$p3/$p4/master.m3u8"
                     val finalUrl = "https://$host$reconstructedPath"
                     Log.d(name, "✅ SUCCESS: Reconstructed final m3u8 link: $finalUrl")
                     
-                    // **THE FINAL CORRECT SOLUTION**
-                    // We use the recommended `newExtractorLink` function and pass all parameters correctly.
+                    // **THE FINAL BUILD FIX**
+                    // We call the simplest version of newExtractorLink that your project accepts.
+                    // (source, name, url) - No quality, no referer.
                     callback(
                         newExtractorLink(
-                            source = this.name,
-                            name = "${this.name} - HLS",
-                            url = finalUrl,
-                            type = ExtractorLinkType.M3U8,
-                            quality = Qualities.Unknown.value,
-                            referer = finalPageUrl // The crucial part that fixes everything
+                            this.name,
+                            "${this.name} - HLS",
+                            finalUrl
                         )
                     )
                     return 
                 } else {
-                    Log.e(name, "❌ Regex failed: Could not find URL parts sequence (stream|...|master|m3u8) in the extracted dictionary.")
+                    Log.e(name, "❌ Regex failed: Could not find URL parts sequence in the dictionary.")
                 }
 
             } catch (e: Exception) {
-                Log.e(name, "An unexpected error occurred during robust extraction: ${e.message}")
+                Log.e(name, "An unexpected error occurred during extraction: ${e.message}")
             }
         }
         
@@ -165,10 +162,7 @@ private class Forafile : ExtractorApi() {
                     newExtractorLink(
                         this.name,
                         "${this.name} - MP4",
-                        mp4Link,
-                        ExtractorLinkType.VIDEO,
-                        Qualities.Unknown.value,
-                        referer = url
+                        mp4Link
                     )
                 )
             }
@@ -193,10 +187,7 @@ private abstract class DoodStreamBase : ExtractorApi() {
             newExtractorLink(
                 this.name,
                 "${this.name} - Video",
-                trueUrl,
-                ExtractorLinkType.VIDEO,
-                Qualities.Unknown.value,
-                referer = newUrl
+                trueUrl
             )
         )
     }
@@ -230,10 +221,7 @@ private abstract class PackedJsExtractorBase(
                     newExtractorLink(
                         this.name,
                         "${this.name} - Video", 
-                        finalUrl,
-                        ExtractorLinkType.VIDEO,
-                        Qualities.Unknown.value,
-                        referer = url
+                        finalUrl
                     )
                 )
             }
