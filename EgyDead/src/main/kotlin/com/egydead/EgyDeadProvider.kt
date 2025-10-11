@@ -6,10 +6,10 @@ import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import android.util.Log
-import java.util.concurrent.atomic.AtomicBoolean 
+import java.util.concurrent.ConcurrentLinkedQueue
 
 class EgyDeadProvider : MainAPI() {
-    // This part of the code is reverted to the previously working version
+    // This part of the code is from the last known working version
     // to ensure posters, episode lists, and general functionality are restored.
     override var mainUrl = "https://tv6.egydead.live"
     override var name = "EgyDead"
@@ -160,9 +160,8 @@ class EgyDeadProvider : MainAPI() {
     }
     
     // =================================================================================
-    // START of v38 FINAL FIX
-    // This is the simplest, most robust, and most compatible way to wait for links.
-    // It returns to the logic of your original working code but ensures it waits.
+    // START of v39 THE RENDEZVOUS POINT FIX
+    // This function now waits for ALL extractors to finish their work before returning.
     // =================================================================================
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
@@ -173,30 +172,29 @@ class EgyDeadProvider : MainAPI() {
 
         if (servers.isEmpty()) return false
 
-        // This is a thread-safe way to track if any extractor has successfully found a link.
-        val hasFoundLink = AtomicBoolean(false)
+        // A thread-safe list to collect all links from all parallel tasks.
+        val foundLinks = ConcurrentLinkedQueue<ExtractorLink>()
 
-        // apmap is the correct, built-in way to run tasks in parallel.
+        // apmap will run all tasks in parallel and wait for all of them to complete.
         servers.apmap { serverLi ->
             val link = serverLi.attr("data-link")
             if (link.isNotBlank()) {
-                // We pass the callback directly. If the extractor finds a link,
-                // it will call this callback.
+                // Each extractor gets a callback that adds its result to our shared list.
                 loadExtractor(link, data, subtitleCallback) { foundLink ->
-                    // When the callback is invoked, we update our flag.
-                    hasFoundLink.set(true)
-                    // And then pass the link up to the app.
-                    callback(foundLink)
+                    foundLinks.add(foundLink)
                 }
             }
         }
 
-        // The function will now wait for apmap to finish all its parallel tasks.
-        // After they are all done, it will return true if our flag was ever set,
-        // and false otherwise. This is the "patient manager".
-        return hasFoundLink.get()
+        // After apmap has waited for everyone to return to the "rendezvous point",
+        // we check if anyone brought back a link.
+        if (foundLinks.isEmpty()) return false
+
+        // We submit all found links to the app at once.
+        foundLinks.forEach(callback)
+        return true
     }
     // =================================================================================
-    // END of v38 FINAL FIX
+    // END of v39 THE RENDEZVOUS POINT FIX
     // =================================================================================
 }
