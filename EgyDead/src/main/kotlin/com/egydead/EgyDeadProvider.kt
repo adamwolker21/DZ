@@ -3,15 +3,40 @@ package com.egydead
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.network.CloudflareKiller
+import org.json.JSONObject
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import android.util.Log
-import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.coroutines.resume
-import kotlinx.coroutines.suspendCancellableCoroutine
 
+// =================================================================================
+// START of v45 - The Final Direct Action Fix
+// This version uses the last known stable provider base and merges the
+// successful extractor logic directly into loadLinks, bypassing all callbacks.
+// =================================================================================
+
+// --- Helper variables and functions moved here for the merged logic ---
+private val BROWSER_HEADERS = mapOf(
+    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
+    "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36",
+)
+
+// This separate cloudflareKiller instance is for our manual extraction logic.
+private val extractorCloudflareKiller by lazy { CloudflareKiller() }
+
+private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
+    return try {
+        app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = extractorCloudflareKiller, verify = false).document
+    } catch (e: Exception) {
+        Log.e("safeGetAsDocument", "FAILED for $url: ${e.message}")
+        null
+    }
+}
+
+
+// --- Main Provider Class ---
 class EgyDeadProvider : MainAPI() {
-    // This is the known working base of the provider.
+    // Using the stable base provider code.
     override var mainUrl = "https://tv6.egydead.live"
     override var name = "EgyDead"
     override val hasMainPage = true
@@ -27,22 +52,23 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
-    private val cloudflareKiller by lazy { CloudflareKiller() }
+    // This is the provider's own cloudflareKiller, separate from the extractor's one.
+    private val providerCloudflareKiller by lazy { CloudflareKiller() }
 
     private suspend fun getWatchPage(url: String): Document? {
         try {
-            val initialResponse = app.get(url, interceptor = cloudflareKiller)
+            // Using the original, more complex getWatchPage logic that works.
+            val initialResponse = app.get(url, interceptor = providerCloudflareKiller)
             val document = initialResponse.document
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
-                val headers = mapOf(
-                    "Content-Type" to "application/x-www-form-urlencoded",
-                    "Referer" to url,
+                val postHeaders = mapOf(
+                    "Content-Type" to "application/x-www-form-urlencoded", "Referer" to url,
                     "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
                     "Origin" to mainUrl
                 )
                 val data = mapOf("View" to "1")
-                return app.post(url, headers = headers, data = data, cookies = cookies, interceptor = cloudflareKiller).document
+                return app.post(url, headers = postHeaders, data = data, cookies = cookies, interceptor = providerCloudflareKiller).document
             }
             return document
         } catch (e: Exception) {
@@ -51,14 +77,14 @@ class EgyDeadProvider : MainAPI() {
         }
     }
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse { /* ... */
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page == 1) "$mainUrl${request.data}" else "$mainUrl${request.data}page/$page/"
-        val document = app.get(url, interceptor = cloudflareKiller).document
+        val document = app.get(url, interceptor = providerCloudflareKiller).document
         val home = document.select("li.movieItem").mapNotNull { it.toSearchResult() }
         return newHomePageResponse(request.name, home)
     }
 
-    private fun Element.toSearchResult(): SearchResponse? { /* ... */
+    private fun Element.toSearchResult(): SearchResponse? {
         val href = this.selectFirst("a")?.attr("href") ?: return null
         val title = this.selectFirst("h1.BottomTitle")?.text() ?: return null
         val posterUrl = this.selectFirst("img")?.attr("src")
@@ -68,13 +94,13 @@ class EgyDeadProvider : MainAPI() {
         else newMovieSearchResponse(cleanedTitle, href, TvType.Movie) { this.posterUrl = posterUrl }
     }
 
-    override suspend fun search(query: String): List<SearchResponse> { /* ... */
-        val document = app.get("$mainUrl/?s=$query", interceptor = cloudflareKiller).document
+    override suspend fun search(query: String): List<SearchResponse> {
+        val document = app.get("$mainUrl/?s=$query", interceptor = providerCloudflareKiller).document
         return document.select("li.movieItem").mapNotNull { it.toSearchResult() }
     }
 
-    override suspend fun load(url: String): LoadResponse? { /* ... */
-        val document = app.get(url, interceptor = cloudflareKiller).document
+    override suspend fun load(url: String): LoadResponse? {
+        val document = app.get(url, interceptor = providerCloudflareKiller).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
         val plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
@@ -96,10 +122,9 @@ class EgyDeadProvider : MainAPI() {
             }
         }
     }
-    
+
     // =================================================================================
-    // START of v44 THE FINAL PROFESSIONAL FIX (suspendCancellableCoroutine)
-    // This is the only guaranteed way to be both FAST (parallel) and PATIENT (wait for result).
+    // THE FINAL FIX: `loadLinks` now contains all logic directly and sequentially.
     // =================================================================================
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
@@ -107,53 +132,62 @@ class EgyDeadProvider : MainAPI() {
     ): Boolean {
         val watchPageDoc = getWatchPage(data) ?: return false
         val servers = watchPageDoc.select("div.mob-servers li")
-
         if (servers.isEmpty()) return false
 
-        // This creates the "waiting room". The function will pause here.
-        return suspendCancellableCoroutine { continuation ->
-            // A thread-safe flag to ensure we only "ring the bell" once.
-            val hasResumed = AtomicBoolean(false)
-            // A counter to track how many servers are left.
-            var remainingServers = servers.size
+        // A simple, sequential loop that waits for each server.
+        for (server in servers) {
+            val link = server.attr("data-link")
+            if (link.isBlank()) continue
+            
+            Log.d("EgyDeadProvider", "Processing server link: $link")
 
-            // We launch all tasks in parallel.
-            servers.apmap { serverLi ->
-                val link = serverLi.attr("data-link")
-                if (link.isNotBlank()) {
-                    // We call the extractor. It will do its work in the background.
-                    loadExtractor(link, data, subtitleCallback) { foundLink ->
-                        // This is the "bell". The first extractor to find a link gets to ring it.
-                        // It tries to set the flag from false to true.
-                        if (hasResumed.compareAndSet(false, true)) {
-                            // If successful, it means it's the first one.
-                            // We wake up the waiting function and tell it we succeeded.
-                            if (continuation.isActive) {
-                                continuation.resume(true)
+            // The "Manager" now does the work himself, bypassing `loadExtractor`.
+            try {
+                // --- StreamHG Logic ---
+                if (link.contains("hglink.to")) {
+                    val potentialHosts = listOf("kravaxxa.com", "cavanhabg.com", "dumbalag.com")
+                    val videoId = link.substringAfterLast("/")
+                    if (videoId.isBlank()) continue
+
+                    for (host in potentialHosts) {
+                        try {
+                            val finalPageUrl = "https://$host/e/$videoId"
+                            val doc = safeGetAsDocument(finalPageUrl, referer = data) ?: continue
+
+                            val packedJs = doc.select("script")
+                                .map { it.data() }
+                                .filter { it.contains("eval(function(p,a,c,k,e,d)") }
+                                .maxByOrNull { it.length } ?: continue
+                            
+                            val unpacked = getAndUnpack(packedJs)
+                            val jsonObjectString = unpacked.substringAfter("var links = ").substringBefore(";").trim()
+                            val jsonObject = JSONObject(jsonObjectString)
+                            val m3u8Link = jsonObject.getString("hls2")
+
+                            if (m3u8Link.isNotBlank() && m3u8Link.startsWith("http")) {
+                                callback(
+                                    newExtractorLink("StreamHG", "StreamHG", m3u8Link, type = ExtractorLinkType.M3U8) {
+                                        this.referer = finalPageUrl
+                                        this.quality = Qualities.Unknown.value
+                                    }
+                                )
+                                break // Found link on this host, move to the next server
                             }
-                        }
-                        // Even after the bell is rung, we still pass the link up.
-                        callback(foundLink)
-                    }
-                }
-
-                // This is the countdown logic.
-                // We use 'synchronized' to make sure the counter is thread-safe.
-                synchronized(this) {
-                    remainingServers--
-                    // If this is the last server to finish, AND the bell was never rung,
-                    // it means everyone failed.
-                    if (remainingServers == 0 && !hasResumed.get()) {
-                        // We wake up the waiting function and tell it we failed.
-                        if (continuation.isActive) {
-                            continuation.resume(false)
+                        } catch (e: Exception) {
+                            Log.e("EgyDeadProvider", "StreamHG failed on host '$host': ${e.message}")
                         }
                     }
                 }
+                // --- DoodStream Logic and other built-in extractors ---
+                else {
+                    // For all other servers, we can still use the built-in `loadExtractor`
+                    // as they are simpler and don't suffer from the same timing issues.
+                    loadExtractor(link, data, subtitleCallback, callback)
+                }
+            } catch (e: Exception) {
+                Log.e("EgyDeadProvider", "Failed to process server $link: ${e.message}")
             }
         }
+        return true
     }
-    // =================================================================================
-    // END of v44 THE FINAL PROFESSIONAL FIX
-    // =================================================================================
 }
