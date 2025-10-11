@@ -82,12 +82,13 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
                 val unpacked = getAndUnpack(packedJs)
                 Log.d("StreamHG_Final", "Successfully unpacked JS.")
                 
-                // =================== v24 FIX: Robust String Manipulation ===================
-                // Instead of a fragile regex, we use direct string search which is more reliable.
-                val m3u8Link = unpacked.substringAfter("""hls2":"_URL_""").substringBefore("""_URL_"""")
+                // =================== v25 FIX: Correct String Manipulation ===================
+                // This is the corrected version of the string search. It looks for the literal
+                // text `"hls2":"` and then extracts everything until the next `"`.
+                val m3u8Link = unpacked.substringAfter("\"hls2\":\"").substringBefore("\"")
 
                 if (m3u8Link.isNotBlank() && m3u8Link.startsWith("http")) {
-                    Log.d("StreamHG_Final", "SUCCESS: Found 'hls2' link using robust string manipulation: $m3u8Link")
+                    Log.d("StreamHG_Final", "SUCCESS: Found 'hls2' link with CORRECT string manipulation: $m3u8Link")
                     Log.d("StreamHG_Final", "Submitting link using the correct newExtractorLink syntax.")
                     
                     callback(
@@ -104,7 +105,7 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
                     Log.d("StreamHG_Final", "Successfully submitted the link via callback.")
                     return 
                 } else {
-                    Log.e("StreamHG_Final", "Robust string manipulation FAILED to find a valid 'hls2' link.")
+                    Log.e("StreamHG_Final", "Corrected string manipulation FAILED to find a valid 'hls2' link. Check unpacked JS content.")
                 }
 
             } catch (e: Exception) {
