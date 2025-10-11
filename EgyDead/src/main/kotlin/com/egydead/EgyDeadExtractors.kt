@@ -45,7 +45,6 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
 abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
 
-    // The full list of potential hosts.
     private val potentialHosts = listOf(
         "kravaxxa.com",
         "cavanhabg.com",
@@ -57,12 +56,6 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val videoId = url.substringAfterLast("/")
         if (videoId.isBlank()) return
-        
-        // =================== v35 THE FINAL GUARANTEED DELIVERY ===================
-        // Instead of calling the callback immediately and returning, we collect all found links
-        // into a list. This prevents any timing issues (race conditions) where the function
-        // might exit before the callback has been fully processed by the app's UI thread.
-        val extractorLinks = mutableListOf<ExtractorLink>()
 
         for (host in potentialHosts) {
             val finalPageUrl = "https://$host/e/$videoId"
@@ -78,12 +71,14 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
             try {
                 val unpacked = getAndUnpack(packedJs)
                 
+                // The final, guaranteed fix: Extract the JSON object and parse it.
+                // The .trim() is crucial to remove leading whitespace.
                 val jsonObjectString = unpacked.substringAfter("var links = ").substringBefore(";").trim()
                 val jsonObject = JSONObject(jsonObjectString)
                 val m3u8Link = jsonObject.getString("hls2")
 
                 if (m3u8Link.isNotBlank() && m3u8Link.startsWith("http")) {
-                    extractorLinks.add(
+                    callback(
                         newExtractorLink(
                             source = this.name,
                             name = this.name,
@@ -94,18 +89,13 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
                             this.quality = Qualities.Unknown.value
                         }
                     )
-                    // We found a working link on this host, so we can stop searching.
-                    break 
+                    // Once we find a working link, we can stop searching other hosts.
+                    return 
                 }
             } catch (e: Exception) {
-                // Continue to the next host if something fails
+                Log.e("StreamHG", "Failed on host '$host': ${e.message}")
             }
         }
-
-        // After the loop has finished, we submit all the links we found.
-        // This is the most robust way to ensure the links are delivered to the app.
-        extractorLinks.forEach(callback)
-        // ====================================================================
     }
 }
 
