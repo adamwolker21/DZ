@@ -6,10 +6,7 @@ import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import android.util.Log
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlin.coroutines.resume
-import kotlinx.coroutines.suspendCancellableCoroutine
+import java.util.concurrent.atomic.AtomicBoolean 
 
 class EgyDeadProvider : MainAPI() {
     // This part of the code is reverted to the previously working version
@@ -163,10 +160,9 @@ class EgyDeadProvider : MainAPI() {
     }
     
     // =================================================================================
-    // START of v37 SURGICAL FIX
-    // This is the only function that has been changed from your working code.
-    // This new implementation waits patiently for all extractors to finish their work
-    // before it reports back, solving the race condition permanently.
+    // START of v38 FINAL FIX
+    // This is the simplest, most robust, and most compatible way to wait for links.
+    // It returns to the logic of your original working code but ensures it waits.
     // =================================================================================
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
@@ -177,52 +173,30 @@ class EgyDeadProvider : MainAPI() {
 
         if (servers.isEmpty()) return false
 
-        var linksFound = false
-        val mutex = Mutex()
+        // This is a thread-safe way to track if any extractor has successfully found a link.
+        val hasFoundLink = AtomicBoolean(false)
 
-        // We use suspendCancellableCoroutine to manually control when this function returns.
-        // It will "suspend" (pause) until we explicitly tell it to "resume".
-        return suspendCancellableCoroutine { continuation ->
-            // This ensures the function doesn't end prematurely if there are no servers.
-            if (servers.isEmpty()) {
-                continuation.resume(false)
-                return@suspendCancellableCoroutine
-            }
-
-            var remainingServers = servers.size
-
-            servers.forEach { serverLi ->
-                // We run each extractor in its own coroutine to do the work in parallel.
-                ioSafe {
-                    val link = serverLi.attr("data-link")
-                    if (link.isNotBlank()) {
-                        // We create a new callback to intercept the result.
-                        val newCallback = { extractorLink: ExtractorLink ->
-                            // Use a mutex to safely update our flag from multiple threads.
-                            mutex.withLock {
-                                linksFound = true
-                            }
-                            // Pass the link up to the main app.
-                            callback(extractorLink)
-                        }
-                        // Call the extractor with our interceptor callback.
-                        loadExtractor(link, data, subtitleCallback, newCallback)
-                    }
-
-                    // This logic tracks when all servers have been processed.
-                    mutex.withLock {
-                        remainingServers--
-                        // If this is the last server and the coroutine is still active,
-                        // we can finally resume and return the result.
-                        if (remainingServers == 0 && continuation.isActive) {
-                            continuation.resume(linksFound)
-                        }
-                    }
+        // apmap is the correct, built-in way to run tasks in parallel.
+        servers.apmap { serverLi ->
+            val link = serverLi.attr("data-link")
+            if (link.isNotBlank()) {
+                // We pass the callback directly. If the extractor finds a link,
+                // it will call this callback.
+                loadExtractor(link, data, subtitleCallback) { foundLink ->
+                    // When the callback is invoked, we update our flag.
+                    hasFoundLink.set(true)
+                    // And then pass the link up to the app.
+                    callback(foundLink)
                 }
             }
         }
+
+        // The function will now wait for apmap to finish all its parallel tasks.
+        // After they are all done, it will return true if our flag was ever set,
+        // and false otherwise. This is the "patient manager".
+        return hasFoundLink.get()
     }
     // =================================================================================
-    // END of v37 SURGICAL FIX
+    // END of v38 FINAL FIX
     // =================================================================================
 }
