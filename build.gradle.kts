@@ -54,16 +54,30 @@ subprojects {
         }
 
 
-        tasks.withType<KotlinJvmCompile> {
-            compilerOptions {
-                jvmTarget.set(JvmTarget.JVM_1_8)
-                freeCompilerArgs.addAll(
-                    "-Xno-call-assertions",
-                    "-Xno-param-assertions",
-                    "-Xno-receiver-assertions"
-                )
-            }
+        kotlin {
+    jvmToolchain(8)
+    
+    // إضافة هذا للإعدادات العامة
+    sourceSets.all {
+        languageSettings {
+            optIn("kotlin.RequiresOptIn")
+            languageVersion = KotlinVersion.KOTLIN_1_8
         }
+    }
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    kotlinOptions {
+        jvmTarget = "1.8"
+        allWarningsAsErrors = false // هذا السطر مهم
+        freeCompilerArgs = freeCompilerArgs + listOf(
+            "-Xno-deprecation-warnings",
+            "-Xno-call-assertions",
+            "-Xno-param-assertions",
+            "-Xno-receiver-assertions"
+        )
+    }
+}
     }
 
     dependencies {
