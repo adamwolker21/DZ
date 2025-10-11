@@ -7,22 +7,16 @@ import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.network.CloudflareKiller
-import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import org.json.JSONObject
 import org.jsoup.nodes.Document
 import android.util.Log
 
-// The complete list of extractors, all fixed to work with the modern API.
-// These are needed here so the Provider can open the links it finds.
+// The extractor list now only contains StreamHG for this focused test.
 val extractorList = listOf(
-    StreamHG(), Davioad(), Haxloppd(), Kravaxxa(), Cavanhabg(), Dumbalag(),
-    Forafile(),
-    DoodStream(), DsvPlay(),
-    Mixdrop(), Mdfx9dc8n(), Mxdrop(),
-    Bigwarp(), BigwarpPro(),
+    StreamHG()
 )
 
-// Using a mobile User-Agent as it's less likely to be blocked.
+// Using a mobile User-Agent.
 private val BROWSER_HEADERS = mapOf(
     "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
     "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
@@ -45,16 +39,13 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
 abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
 
-    // The full list of potential hosts.
+    // Focusing only on kravaxxa.com
     private val potentialHosts = listOf(
-        "kravaxxa.com",
-        "cavanhabg.com",
-        "dumbalag.com",
-        "davioad.com",
-        "haxloppd.com"
+        "kravaxxa.com"
     )
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        Log.d("Extraction_Test", "================== getUrl CALLED v32 (Forensic Test) ==================")
         val videoId = url.substringAfterLast("/")
         if (videoId.isBlank()) return
 
@@ -62,7 +53,7 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
             val finalPageUrl = "https://$host/e/$videoId"
             val doc = safeGetAsDocument(finalPageUrl, referer = url) ?: continue
 
-            // Find all 'eval' scripts and pick the longest one to avoid the anti-bot trap script.
+            // Find all 'eval' scripts and pick the longest one.
             val packedJs = doc.select("script")
                 .map { it.data() }
                 .filter { it.contains("eval(function(p,a,c,k,e,d)") }
@@ -72,118 +63,59 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
 
             try {
                 val unpacked = getAndUnpack(packedJs)
-                
-                // Flexible regex to find the hls2 link.
-                val m3u8Link = Regex("""["']hls2["']\s*:\s*["'](.*?)["']""").find(unpacked)?.groupValues?.get(1)
+                Log.d("Extraction_Test", "Successfully unpacked JS. Now testing all extraction methods...")
 
-                if (m3u8Link != null && m3u8Link.startsWith("http")) {
-                    Log.d("StreamHG", "SUCCESS: Found 'hls2' link: $m3u8Link")
-                    
-                    callback(
-                        newExtractorLink(
-                            source = this.name,
-                            name = this.name,
-                            url = m3u8Link,
-                            type = ExtractorLinkType.M3U8
-                        ) {
-                            this.referer = finalPageUrl
-                            this.quality = Qualities.Unknown.value
-                        }
-                    )
-                    return 
+                // =================== v32 FORENSIC TEST ===================
+
+                // --- Method 1: Simple String Manipulation ---
+                try {
+                    val simpleStringResult = unpacked.substringAfter("\"hls2\":\"").substringBefore("\"")
+                    if (simpleStringResult.isNotBlank() && simpleStringResult.startsWith("http")) {
+                        Log.d("Extraction_Test", "Method 1 (Simple String) SUCCESS: ${simpleStringResult.take(100)}...")
+                    } else {
+                        Log.e("Extraction_Test", "Method 1 (Simple String) FAILED: Result was not a valid link -> '$simpleStringResult'")
+                    }
+                } catch (e: Exception) {
+                    Log.e("Extraction_Test", "Method 1 (Simple String) CRASHED: ${e.message}")
                 }
+
+                // --- Method 2: Flexible Regex ---
+                try {
+                    val regex = Regex("""["']hls2["']\s*:\s*["'](.*?)["']""")
+                    val regexResult = regex.find(unpacked)?.groupValues?.get(1)
+                    if (regexResult != null && regexResult.startsWith("http")) {
+                        Log.d("Extraction_Test", "Method 2 (Regex) SUCCESS: ${regexResult.take(100)}...")
+                    } else {
+                        Log.e("Extraction_Test", "Method 2 (Regex) FAILED: Regex did not find a valid link. Found: '$regexResult'")
+                    }
+                } catch (e: Exception) {
+                    Log.e("Extraction_Test", "Method 2 (Regex) CRASHED: ${e.message}")
+                }
+
+                // --- Method 3: JSON Parsing ---
+                try {
+                    // Extract the JSON part from the "var links = {...};" script
+                    val jsonObjectString = unpacked.substringAfter("var links = ").substringBefore(";")
+                    if (jsonObjectString.isNotBlank()) {
+                        val jsonObject = JSONObject(jsonObjectString)
+                        val jsonResult = jsonObject.getString("hls2")
+                        Log.d("Extraction_Test", "Method 3 (JSON Parsing) SUCCESS: ${jsonResult.take(100)}...")
+                    } else {
+                        Log.e("Extraction_Test", "Method 3 (JSON Parsing) FAILED: Could not extract the JSON object string from the script.")
+                    }
+                } catch (e: Exception) {
+                    Log.e("Extraction_Test", "Method 3 (JSON Parsing) CRASHED: ${e.message}")
+                }
+                
+                // This version does not call the callback, it only logs the results.
+                // ==========================================================
+
             } catch (e: Exception) {
-                Log.e("StreamHG", "An error occurred during unpacking or link extraction: ${e.message}")
+                Log.e("Extraction_Test", "An error occurred during unpacking: ${e.message}")
             }
         }
+        Log.d("Extraction_Test", "================== getUrl FINISHED (Forensic run complete) ==================")
     }
 }
 
-// Defining the classes for each domain.
 class StreamHG : StreamHGBase("StreamHG", "hglink.to")
-class Davioad : StreamHGBase("StreamHG (Davioad)", "davioad.com")
-class Haxloppd : StreamHGBase("StreamHG (Haxloppd)", "haxloppd.com")
-class Kravaxxa : StreamHGBase("StreamHG (Kravaxxa)", "kravaxxa.com")
-class Cavanhabg : StreamHGBase("StreamHG (Cavanhabg)", "cavanhabg.com")
-class Dumbalag : StreamHGBase("StreamHG (Dumbalag)", "dumbalag.com" )
-
-
-// --- Forafile Handler (Fixed) ---
-class Forafile : ExtractorApi() {
-    override var name = "Forafile"
-    override var mainUrl = "forafile.com"
-    override val requiresReferer = true
-
-    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val document = safeGetAsDocument(url, referer)
-        val packedJs = document?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
-        if (packedJs != null) {
-            val unpacked = getAndUnpack(packedJs)
-            val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
-            if (mp4Link != null) {
-                callback(
-                    // v31 FIX: Removed the 'type' parameter as it caused a build error for non-M3U8 links.
-                    newExtractorLink(this.name, this.name, mp4Link) {
-                        this.referer = url
-                    }
-                )
-            }
-        }
-    }
-}
-
-// --- DoodStream Handlers (Fixed) ---
-abstract class DoodStreamBase : ExtractorApi() {
-    override val requiresReferer = true
-    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val newUrl = if (url.contains("/e/")) url else url.replace("/d/", "/e/")
-        val responseText = try { app.get(newUrl, referer = referer, headers = BROWSER_HEADERS).text } catch (e: Exception) { null } ?: return
-
-        val doodToken = responseText.substringAfter("'/pass_md5/").substringBefore("',")
-        if (doodToken.isBlank()) return
-        
-        val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
-        val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z"
-        callback(
-            newExtractorLink(this.name, this.name, trueUrl, type = ExtractorLinkType.M3U8) {
-                this.referer = newUrl
-            }
-        )
-    }
-}
-class DoodStream : DoodStreamBase() { override var name = "DoodStream"; override var mainUrl = "doodstream.com" }
-class DsvPlay : DoodStreamBase() { override var name = "DsvPlay"; override var mainUrl = "dsvplay.com" }
-
-
-// --- Packed JS Extractor Base (Fixed) ---
-abstract class PackedJsExtractorBase(
-    override var name: String,
-    override var mainUrl: String,
-    private val regex: Regex
-) : ExtractorApi() {
-    override val requiresReferer = true
-    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val doc = safeGetAsDocument(url, referer)
-        val script = doc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d)))")?.data()
-        if (script != null) {
-            val unpacked = getAndUnpack(script)
-            val videoUrl = regex.find(unpacked)?.groupValues?.get(1)
-            if (videoUrl != null && videoUrl.isNotBlank()) {
-                val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
-                callback(
-                    // Also removed explicit 'type' here for safety.
-                    newExtractorLink(this.name, this.name, finalUrl) {
-                        this.referer = url
-                    }
-                )
-            }
-        }
-    }
-}
-
-class Mixdrop : PackedJsExtractorBase("Mixdrop", "mixdrop.ag", """MDCore\.wurl="([^"]+)""".toRegex())
-class Mdfx9dc8n : PackedJsExtractorBase("Mdfx9dc8n", "mdfx9dc8n.net", """MDCore\.wurl="([^"]+)""".toRegex())
-class Mxdrop : PackedJsExtractorBase("Mxdrop", "mxdrop.to", """MDCore\.wurl="([^"]+)""".toRegex())
-
-class Bigwarp : PackedJsExtractorBase("Bigwarp", "bigwarp.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
-class BigwarpPro : PackedJsExtractorBase("Bigwarp Pro", "bigwarp.pro", """\s*file\s*:\s*"([^"]+)""".toRegex())
