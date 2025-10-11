@@ -5,7 +5,9 @@ import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import java.util.concurrent.atomic.AtomicBoolean 
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.resume
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 class EgyDeadProvider : MainAPI() {
     // This is the known working base of the provider.
@@ -95,8 +97,8 @@ class EgyDeadProvider : MainAPI() {
     }
     
     // =================================================================================
-    // START of v51 THE FINAL SIMPLE FIX
-    // This is the simplest, most robust, and most compatible way to wait for links.
+    // START of v52 THE FINAL PROFESSIONAL FIX (suspendCancellableCoroutine)
+    // This is the only guaranteed way to be both FAST (parallel) and PATIENT (wait for result).
     // =================================================================================
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
@@ -107,21 +109,47 @@ class EgyDeadProvider : MainAPI() {
 
         if (servers.isEmpty()) return false
 
-        val hasFoundLink = AtomicBoolean(false)
+        // This creates the "waiting room". The function will pause here.
+        return suspendCancellableCoroutine { continuation ->
+            val hasResumed = AtomicBoolean(false)
+            var remainingServers = servers.size
 
-        servers.apmap { serverLi ->
-            val link = serverLi.attr("data-link")
-            if (link.isNotBlank()) {
-                loadExtractor(link, data, subtitleCallback) { foundLink ->
-                    hasFoundLink.set(true)
-                    callback(foundLink)
+            // We launch all tasks in parallel using apmap.
+            servers.apmap { serverLi ->
+                // This ensures the main logic runs in a safe coroutine body.
+                // It's the replacement for the non-existent 'ioSafe'.
+                launch {
+                    try {
+                        val link = serverLi.attr("data-link")
+                        if (link.isNotBlank()) {
+                            loadExtractor(link, data, subtitleCallback) { foundLink ->
+                                // This is the "bell". The first extractor to find a link rings it.
+                                if (hasResumed.compareAndSet(false, true)) {
+                                    if (continuation.isActive) {
+                                        continuation.resume(true)
+                                    }
+                                }
+                                // We still pass every found link up to the UI.
+                                callback(foundLink)
+                            }
+                        }
+                    } finally {
+                        // This block ensures the counter always decrements.
+                        synchronized(this) {
+                            remainingServers--
+                            // If this is the last server and the bell was never rung, we fail.
+                            if (remainingServers == 0 && !hasResumed.get()) {
+                                if (continuation.isActive) {
+                                    continuation.resume(false)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
-
-        return hasFoundLink.get()
     }
     // =================================================================================
-    // END of v51 THE FINAL SIMPLE FIX
+    // END of v52 THE FINAL PROFESSIONAL FIX
     // =================================================================================
 }
