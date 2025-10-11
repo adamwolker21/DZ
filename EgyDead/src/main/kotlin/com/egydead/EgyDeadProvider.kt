@@ -1,22 +1,21 @@
 package com.egydead
 
+// Imports from Provider
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.network.CloudflareKiller
-import org.json.JSONObject
-import org.jsoup.Jsoup
-import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import android.util.Log
 import java.util.concurrent.atomic.AtomicBoolean
 
-// --- Helper variables and functions for the merged logic ---
-private val BROWSER_HEADERS = mapOf(
-    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-    "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
-    "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36",
-)
-private val extractorCloudflareKiller by lazy { CloudflareKiller() }
+// Imports from Extractors
+import android.util.Log
+import com.lagradost.cloudstream3.utils.ExtractorApi
+import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.getAndUnpack
+import org.json.JSONObject
+import org.jsoup.nodes.Document
+
 
 class EgyDeadProvider : MainAPI() {
     // This is the known working base of the provider.
@@ -35,11 +34,11 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
-    private val providerCloudflareKiller by lazy { CloudflareKiller() }
+    private val cloudflareKiller by lazy { CloudflareKiller() }
 
     private suspend fun getWatchPage(url: String): Document? {
         try {
-            val initialResponse = app.get(url, interceptor = providerCloudflareKiller)
+            val initialResponse = app.get(url, interceptor = cloudflareKiller)
             val document = initialResponse.document
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
@@ -50,7 +49,7 @@ class EgyDeadProvider : MainAPI() {
                     "Origin" to mainUrl
                 )
                 val data = mapOf("View" to "1")
-                return app.post(url, headers = headers, data = data, cookies = cookies, interceptor = providerCloudflareKiller).document
+                return app.post(url, headers = headers, data = data, cookies = cookies, interceptor = cloudflareKiller).document
             }
             return document
         } catch (e: Exception) {
@@ -61,7 +60,7 @@ class EgyDeadProvider : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page == 1) "$mainUrl${request.data}" else "$mainUrl${request.data}page/$page/"
-        val document = app.get(url, interceptor = providerCloudflareKiller).document
+        val document = app.get(url, interceptor = cloudflareKiller).document
         val home = document.select("li.movieItem").mapNotNull { it.toSearchResult() }
         return newHomePageResponse(request.name, home)
     }
@@ -77,12 +76,12 @@ class EgyDeadProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val document = app.get("$mainUrl/?s=$query", interceptor = providerCloudflareKiller).document
+        val document = app.get("$mainUrl/?s=$query", interceptor = cloudflareKiller).document
         return document.select("li.movieItem").mapNotNull { it.toSearchResult() }
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url, interceptor = providerCloudflareKiller).document
+        val document = app.get(url, interceptor = cloudflareKiller).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
         val plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
@@ -108,11 +107,6 @@ class EgyDeadProvider : MainAPI() {
         }
     }
 
-    // =================================================================================
-    // START of v54 - The Final Surgical Fix
-    // This function now uses the simple and effective waiting mechanism you fixed,
-    // but crucially, it bypasses `loadExtractor` for StreamHG and does the work directly.
-    // =================================================================================
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
@@ -128,53 +122,185 @@ class EgyDeadProvider : MainAPI() {
             try {
                 val link = serverLi.attr("data-link")
                 if (link.isNotBlank()) {
-                    
-                    // --- THE SURGICAL FIX ---
-                    // Instead of calling the problematic `loadExtractor` for StreamHG,
-                    // we do the work directly here.
-                    if (link.contains("hglink.to")) {
-                        Log.d("EgyDeadProvider", "Manually processing StreamHG link: $link")
-                        val potentialHosts = listOf("kravaxxa.com", "cavanhabg.com", "dumbalag.com")
-                        val videoId = link.substringAfterLast("/")
-                        if (videoId.isNotBlank()) {
-                            for (host in potentialHosts) {
-                                try {
-                                    val finalPageUrl = "https://$host/e/$videoId"
-                                    val htmlText = app.get(finalPageUrl, referer = data, headers = BROWSER_HEADERS, interceptor = extractorCloudflareKiller, verify = false).text
-                                    val doc = Jsoup.parse(htmlText)
-                                    val packedJs = doc.select("script").map { it.data() }.filter { it.contains("eval(function(p,a,c,k,e,d)") }.maxByOrNull { it.length } ?: continue
-                                    val unpacked = getAndUnpack(packedJs)
-                                    val jsonObjectString = unpacked.substringAfter("var links = ").substringBefore(";").trim()
-                                    val jsonObject = JSONObject(jsonObjectString)
-                                    val m3u8Link = jsonObject.getString("hls2")
-
-                                    if (m3u8Link.isNotBlank() && m3u8Link.startsWith("http")) {
-                                        callback(
-                                            newExtractorLink("StreamHG", "StreamHG", m3u8Link, type = ExtractorLinkType.M3U8) {
-                                                this.referer = finalPageUrl
-                                            }
-                                        )
-                                        foundAUrl.set(true)
-                                        break // Found link, break from host loop
-                                    }
-                                } catch (e: Exception) {
-                                    // continue to next host
-                                }
-                            }
-                        }
-                    } else {
-                        // For all other servers, we continue to use the reliable `loadExtractor`.
-                        loadExtractor(link, data, subtitleCallback) { foundLink ->
-                            callback(foundLink)
-                            foundAUrl.set(true)
-                        }
+                    loadExtractor(link, data, subtitleCallback) { foundLink ->
+                        callback(foundLink)
+                        foundAUrl.set(true)
                     }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
-
         return foundAUrl.get()
     }
 }
+
+// =================================================================================
+// START OF EXTRACTORS
+// =================================================================================
+
+// The complete list of extractors, all fixed to work with the modern API.
+val extractorList = listOf(
+    StreamHG(), Davioad(), Haxloppd(), Kravaxxa(), Cavanhabg(), Dumbalag(),
+    Forafile(),
+    DoodStream(), DsvPlay(),
+    Mixdrop(), Mdfx9dc8n(), Mxdrop(),
+    Bigwarp(), BigwarpPro(),
+)
+
+// Using a mobile User-Agent.
+private val BROWSER_HEADERS = mapOf(
+    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "Accept-Language" to "en-US,en;q=0.9,ar=q=0.8",
+    "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36",
+)
+
+private val extractorCloudflareKiller by lazy { CloudflareKiller() }
+
+// Safe function to get page as Document.
+private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
+    return try {
+        app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = extractorCloudflareKiller, verify = false).document
+    } catch (e: Exception) {
+        Log.e("Extractor", "safeGetAsDocument FAILED for $url: ${e.message}")
+        null
+    }
+}
+
+// The classes must be public to be accessible in the public `extractorList`.
+abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
+    override val requiresReferer = true
+
+    // The full list of potential hosts.
+    private val potentialHosts = listOf(
+        "kravaxxa.com",
+        "cavanhabg.com",
+        "dumbalag.com",
+        "davioad.com",
+        "haxloppd.com"
+    )
+
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        val videoId = url.substringAfterLast("/")
+        if (videoId.isBlank()) return
+
+        for (host in potentialHosts) {
+            val finalPageUrl = "https://$host/e/$videoId"
+            val doc = safeGetAsDocument(finalPageUrl, referer = url) ?: continue
+
+            val packedJs = doc.select("script")
+                .map { it.data() }
+                .filter { it.contains("eval(function(p,a,c,k,e,d)") }
+                .maxByOrNull { it.length }
+
+            if (packedJs.isNullOrBlank()) continue
+
+            try {
+                val unpacked = getAndUnpack(packedJs)
+                
+                val jsonObjectString = unpacked.substringAfter("var links = ").substringBefore(";").trim()
+                val jsonObject = JSONObject(jsonObjectString)
+                val m3u8Link = jsonObject.getString("hls2")
+
+                if (m3u8Link.isNotBlank() && m3u8Link.startsWith("http")) {
+                    callback(
+                        newExtractorLink(
+                            source = this.name,
+                            name = this.name,
+                            url = m3u8Link,
+                            type = ExtractorLinkType.M3U8
+                        ) {
+                            this.referer = finalPageUrl
+                            this.quality = Qualities.Unknown.value
+                        }
+                    )
+                    return 
+                }
+            } catch (e: Exception) {
+                Log.e("StreamHG", "Failed on host '$host': ${e.message}")
+            }
+        }
+    }
+}
+
+// Defining the classes for each domain.
+class StreamHG : StreamHGBase("StreamHG", "hglink.to")
+class Davioad : StreamHGBase("StreamHG (Davioad)", "davioad.com")
+class Haxloppd : StreamHGBase("StreamHG (Haxloppd)", "haxloppd.com")
+class Kravaxxa : StreamHGBase("StreamHG (Kravaxxa)", "kravaxxa.com")
+class Cavanhabg : StreamHGBase("StreamHG (Cavanhabg)", "cavanhabg.com")
+class Dumbalag : StreamHGBase("StreamHG (Dumbalag)", "dumbalag.com" )
+
+class Forafile : ExtractorApi() {
+    override var name = "Forafile"
+    override var mainUrl = "forafile.com"
+    override val requiresReferer = true
+
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        val document = safeGetAsDocument(url, referer)
+        val packedJs = document?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
+        if (packedJs != null) {
+            val unpacked = getAndUnpack(packedJs)
+            val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
+            if (mp4Link != null) {
+                callback(
+                    newExtractorLink(this.name, this.name, mp4Link) {
+                        this.referer = url
+                    }
+                )
+            }
+        }
+    }
+}
+
+abstract class DoodStreamBase : ExtractorApi() {
+    override val requiresReferer = true
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        val newUrl = if (url.contains("/e/")) url else url.replace("/d/", "/e/")
+        val responseText = try { app.get(newUrl, referer = referer, headers = BROWSER_HEADERS).text } catch (e: Exception) { null } ?: return
+
+        val doodToken = responseText.substringAfter("'/pass_md5/").substringBefore("',")
+        if (doodToken.isBlank()) return
+        
+        val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
+        val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z"
+        callback(
+            newExtractorLink(this.name, this.name, trueUrl, type = ExtractorLinkType.M3U8) {
+                this.referer = newUrl
+            }
+        )
+    }
+}
+class DoodStream : DoodStreamBase() { override var name = "DoodStream"; override var mainUrl = "doodstream.com" }
+class DsvPlay : DoodStreamBase() { override var name = "DsvPlay"; override var mainUrl = "dsvplay.com" }
+
+abstract class PackedJsExtractorBase(
+    override var name: String,
+    override var mainUrl: String,
+    private val regex: Regex
+) : ExtractorApi() {
+    override val requiresReferer = true
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        val doc = safeGetAsDocument(url, referer)
+        val script = doc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d)))")?.data()
+        if (script != null) {
+            val unpacked = getAndUnpack(script)
+            val videoUrl = regex.find(unpacked)?.groupValues?.get(1)
+            if (videoUrl != null && videoUrl.isNotBlank()) {
+                val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
+                callback(
+                    newExtractorLink(this.name, this.name, finalUrl) {
+                        this.referer = url
+                    }
+                )
+            }
+        }
+    }
+}
+
+class Mixdrop : PackedJsExtractorBase("Mixdrop", "mixdrop.ag", """MDCore\.wurl="([^"]+)""".toRegex())
+class Mdfx9dc8n : PackedJsExtractorBase("Mdfx9dc8n", "mdfx9dc8n.net", """MDCore\.wurl="([^"]+)""".toRegex())
+class Mxdrop : PackedJsExtractorBase("Mxdrop", "mxdrop.to", """MDCore\.wurl="([^"]+)""".toRegex())
+
+class Bigwarp : PackedJsExtractorBase("Bigwarp", "bigwarp.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
+class BigwarpPro : PackedJsExtractorBase("Bigwarp Pro", "bigwarp.pro", """\s*file\s*:\s*"([^"]+)""".toRegex())
