@@ -3,6 +3,7 @@ package com.egydead
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.network.CloudflareKiller
@@ -28,7 +29,6 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
     }
 }
 
-@Suppress("DEPRECATION")
 class StreamHG : ExtractorApi() {
     override var name = "StreamHG"
     override var mainUrl = "hglink.to"
@@ -36,7 +36,6 @@ class StreamHG : ExtractorApi() {
 
     private val potentialHosts = listOf("kravaxxa.com")
 
-    @Suppress("DEPRECATION")
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val videoId = url.substringAfterLast("/")
         if (videoId.isBlank()) return
@@ -53,17 +52,65 @@ class StreamHG : ExtractorApi() {
                 val m3u8Link = Regex("""['"]hls2['"]\s*:\s*['"](.*?)['"]""").find(unpacked)?.groupValues?.get(1)
 
                 if (m3u8Link != null) {
-                    @Suppress("DEPRECATION")
+                    // ========== جميع الاحتمالات لـ newExtractorLink ==========
+                    
+                    // الاحتمال 1: 3 معاملات أساسية
+                    // callback(newExtractorLink(this.name, this.name, m3u8Link))
+                    
+                    // الاحتمال 2: 4 معاملات مع referer
+                    // callback(newExtractorLink(this.name, this.name, m3u8Link, finalPageUrl))
+                    
+                    // الاحتمال 3: 5 معاملات مع quality
+                    // callback(newExtractorLink(this.name, this.name, m3u8Link, finalPageUrl, Qualities.Unknown.value))
+                    
+                    // الاحتمال 4: 6 معاملات مع isM3u8
+                    // callback(newExtractorLink(this.name, this.name, m3u8Link, finalPageUrl, Qualities.Unknown.value, true))
+                    
+                    // الاحتمال 5: مع named parameters
                     callback(
-                        ExtractorLink(
+                        newExtractorLink(
                             source = this.name,
-                            name = this.name,
-                            url = m3u8Link,
-                            referer = finalPageUrl,
-                            quality = Qualities.Unknown.value,
-                            isM3u8 = true
+                            name = this.name, 
+                            url = m3u8Link
+                            // referer = finalPageUrl,
+                            // quality = Qualities.Unknown.value,
+                            // isM3u8 = true
                         )
                     )
+                    
+                    // الاحتمال 6: named parameters مع referer فقط
+                    // callback(
+                    //     newExtractorLink(
+                    //         source = this.name,
+                    //         name = this.name,
+                    //         url = m3u8Link,
+                    //         referer = finalPageUrl
+                    //     )
+                    // )
+                    
+                    // الاحتمال 7: named parameters مع referer و quality
+                    // callback(
+                    //     newExtractorLink(
+                    //         source = this.name,
+                    //         name = this.name,
+                    //         url = m3u8Link,
+                    //         referer = finalPageUrl,
+                    //         quality = Qualities.Unknown.value
+                    //     )
+                    // )
+                    
+                    // الاحتمال 8: جميع named parameters
+                    // callback(
+                    //     newExtractorLink(
+                    //         source = this.name,
+                    //         name = this.name,
+                    //         url = m3u8Link,
+                    //         referer = finalPageUrl,
+                    //         quality = Qualities.Unknown.value,
+                    //         isM3u8 = true
+                    //     )
+                    // )
+                    
                     return
                 }
             } catch (e: Exception) {
