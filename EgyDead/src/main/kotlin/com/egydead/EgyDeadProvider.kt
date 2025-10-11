@@ -8,12 +8,14 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 
 // =================================================================================
-// START of v48 - The Final Preload Fix
-// This version implements your pre-loading idea correctly.
+// START of v49 - The Final Scope Fix
+// This version fixes the 'Unresolved reference 'cs'' build error.
 // =================================================================================
 
 // --- Helper variables and functions for the pre-loading logic ---
@@ -93,7 +95,8 @@ class EgyDeadProvider : MainAPI() {
 
         // --- PRELOAD STARTS HERE ---
         // We launch a new background task that will not block the UI.
-        cs.launch {
+        // v49 FIX: Replaced 'cs.launch' with the correct 'CoroutineScope(Dispatchers.IO).launch'
+        CoroutineScope(Dispatchers.IO).launch {
             Log.d("Preload", "Starting pre-load for: $url")
             val watchPageDoc = getWatchPage(url) ?: return@launch
             val streamHgLink = watchPageDoc.select("div.mob-servers li")
