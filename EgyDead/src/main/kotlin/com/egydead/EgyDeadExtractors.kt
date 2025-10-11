@@ -13,6 +13,7 @@ import org.jsoup.nodes.Document
 import android.util.Log
 
 // The complete list of extractors, all fixed to work with the modern API.
+// These are needed here so the Provider can open the links it finds.
 val extractorList = listOf(
     StreamHG(), Davioad(), Haxloppd(), Kravaxxa(), Cavanhabg(), Dumbalag(),
     Forafile(),
@@ -55,9 +56,7 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val videoId = url.substringAfterLast("/")
-        if (videoId.isBlank()) {
-            return
-        }
+        if (videoId.isBlank()) return
 
         for (host in potentialHosts) {
             val finalPageUrl = "https://$host/e/$videoId"
@@ -74,10 +73,8 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
             try {
                 val unpacked = getAndUnpack(packedJs)
                 
-                // =================== v30 THE FINAL FIX ===================
-                // This flexible regex is designed to find the hls2 link regardless of spacing or formatting.
+                // Flexible regex to find the hls2 link.
                 val m3u8Link = Regex("""["']hls2["']\s*:\s*["'](.*?)["']""").find(unpacked)?.groupValues?.get(1)
-                // =========================================================
 
                 if (m3u8Link != null && m3u8Link.startsWith("http")) {
                     Log.d("StreamHG", "SUCCESS: Found 'hls2' link: $m3u8Link")
@@ -85,7 +82,7 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
                     callback(
                         newExtractorLink(
                             source = this.name,
-                            name = this.name, // The name of the server to be displayed.
+                            name = this.name,
                             url = m3u8Link,
                             type = ExtractorLinkType.M3U8
                         ) {
@@ -93,7 +90,6 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
                             this.quality = Qualities.Unknown.value
                         }
                     )
-                    // Once a working link is found, we stop and return.
                     return 
                 }
             } catch (e: Exception) {
@@ -126,7 +122,8 @@ class Forafile : ExtractorApi() {
             val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
             if (mp4Link != null) {
                 callback(
-                    newExtractorLink(this.name, this.name, mp4Link, type = ExtractorLinkType.MP4) {
+                    // v31 FIX: Removed the 'type' parameter as it caused a build error for non-M3U8 links.
+                    newExtractorLink(this.name, this.name, mp4Link) {
                         this.referer = url
                     }
                 )
@@ -146,7 +143,7 @@ abstract class DoodStreamBase : ExtractorApi() {
         if (doodToken.isBlank()) return
         
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
-        val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z" // The "z" is important
+        val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z"
         callback(
             newExtractorLink(this.name, this.name, trueUrl, type = ExtractorLinkType.M3U8) {
                 this.referer = newUrl
@@ -174,6 +171,7 @@ abstract class PackedJsExtractorBase(
             if (videoUrl != null && videoUrl.isNotBlank()) {
                 val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
                 callback(
+                    // Also removed explicit 'type' here for safety.
                     newExtractorLink(this.name, this.name, finalUrl) {
                         this.referer = url
                     }
