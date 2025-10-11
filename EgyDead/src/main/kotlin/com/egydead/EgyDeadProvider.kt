@@ -5,8 +5,9 @@ import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import android.util.Log
-import java.util.concurrent.atomic.AtomicBoolean // Import required for the fix
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.resume
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -27,28 +28,11 @@ class EgyDeadProvider : MainAPI() {
     private val cloudflareKiller by lazy { CloudflareKiller() }
 
     private suspend fun getWatchPage(url: String): Document? {
-        try {
-            val initialResponse = app.get(url, interceptor = cloudflareKiller)
-            val document = initialResponse.document
-            if (document.selectFirst("div.watchNow form") != null) {
-                val cookies = initialResponse.cookies
-                val headers = mapOf(
-                    "Content-Type" to "application/x-www-form-urlencoded",
-                    "Referer" to url,
-                    "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
-                    "Origin" to mainUrl,
-                    "sec-fetch-dest" to "document",
-                    "sec-fetch-mode" to "navigate",
-                    "sec-fetch-site" to "same-origin",
-                    "sec-fetch-user" to "?1"
-                )
-                val data = mapOf("View" to "1")
-                return app.post(url, headers = headers, data = data, cookies = cookies, interceptor = cloudflareKiller).document
-            }
-            return document
+        return try {
+            app.get(url, interceptor = cloudflareKiller).document
         } catch (e: Exception) {
             e.printStackTrace()
-            return null
+            null
         }
     }
 
@@ -73,7 +57,7 @@ class EgyDeadProvider : MainAPI() {
         val linkTag = this.selectFirst("a") ?: return null
         val href = linkTag.attr("href")
         val title = this.selectFirst("h1.BottomTitle")?.text() ?: return null
-        val posterUrl = this.selectFirst("img")?.attr("src")
+        val posterUrl = this.selectFirst("img")?.attr("data-src") ?: this.selectFirst("img")?.attr("src")
 
         val cleanedTitle = title.replace("مشاهدة", "").trim()
             .replace(Regex("^(فيلم|مسلسل)"), "").trim()
@@ -109,34 +93,22 @@ class EgyDeadProvider : MainAPI() {
         val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
         val duration = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()?.filter { it.isDigit() }?.toIntOrNull()
 
-        val categoryText = document.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: ""
-        val isSeries = categoryText.contains("مسلسلات") || pageTitle.contains("مسلسل") || pageTitle.contains("الموسم") || document.select("div.EpsList").isNotEmpty()
+        val isSeries = document.select("div.EpsList").isNotEmpty()
 
         if (isSeries) {
-            val episodesDoc = getWatchPage(url) ?: document
-
-            val episodes = episodesDoc.select("div.EpsList li a").mapNotNull { epElement ->
+            val episodes = document.select("div.EpsList li a").mapNotNull { epElement ->
                 val href = epElement.attr("href")
-                val titleAttr = epElement.attr("title")
-                val epNum = titleAttr.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
-                if (epNum == null) return@mapNotNull null
+                val epNum = epElement.text().filter { it.isDigit() }.toIntOrNull() ?: return@mapNotNull null
+                
                 newEpisode(href) {
                     this.name = epElement.text().trim()
                     this.episode = epNum
                 }
-            }.distinctBy { it.episode }.toMutableList()
+            }.distinctBy { it.episode }
             
             val seriesTitle = pageTitle
-                .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
+                .replace(Regex("""(مسلسل|الموسم|الحلقة \d+|مترجمة|الاخيرة)"""), "")
                 .trim()
-            
-            val currentEpNum = pageTitle.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
-            if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
-                 episodes.add(newEpisode(url) {
-                    this.name = pageTitle.substringAfter(seriesTitle).trim().ifBlank { "حلقة $currentEpNum" }
-                    this.episode = currentEpNum
-                })
-            }
             
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
                 this.posterUrl = posterUrl
@@ -157,54 +129,51 @@ class EgyDeadProvider : MainAPI() {
         }
     }
     
-    // =================================================================================
-    // START of v2 FIX
-    // =================================================================================
+    // =================== v36 THE FINAL FIX ===================
+    // The loadLinks function now correctly waits for the extractors to finish their job.
+    // It suspends its own execution and only resumes when at least one link has been found
+    // or when all extractors have been tried. This solves the "manager leaving early" problem.
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        Log.d("EgyDead", "Loading links for URL: $data")
-        val watchPageDoc = getWatchPage(data)
-        
-        if(watchPageDoc == null) {
-            Log.e("EgyDead", "Failed to get watch page document.")
-            return false
-        }
-        
-        Log.d("EgyDead", "Document title: ${watchPageDoc.title()}")
-
+        val watchPageDoc = getWatchPage(data) ?: return false
         val servers = watchPageDoc.select("div.mob-servers li")
-        
-        Log.d("EgyDead", "Found ${servers.size} potential server elements.")
-        servers.forEachIndexed { index, server ->
-            Log.d("EgyDead", "Server data-link $index: ${server.attr("data-link")}")
-        }
 
-        // A thread-safe boolean to track if any links were found.
-        // This is necessary because apmap runs tasks in parallel.
-        val linksFound = AtomicBoolean(false)
+        if (servers.isEmpty()) return false
 
-        servers.apmap { serverLi ->
-            val link = serverLi.attr("data-link")
-            if (link.isNotBlank()) {
-                // We create a new callback that wraps the original one.
-                val newCallback = { extractorLink: ExtractorLink ->
-                    // When a link is found, we set our flag to true.
-                    linksFound.set(true)
-                    // Then we call the original callback to pass the link to the UI.
-                    callback(extractorLink)
+        return suspendCancellableCoroutine { continuation ->
+            val hasFoundLink = AtomicBoolean(false)
+            var remainingServers = servers.size
+
+            servers.apmap { serverLi ->
+                val link = serverLi.attr("data-link")
+                if (link.isNotBlank()) {
+                    loadExtractor(link, data, subtitleCallback) { foundLink ->
+                        // This is the callback from the extractor.
+                        // We pass the link up to the app.
+                        callback(foundLink)
+                        // If this is the first link we've found, we can resume the coroutine
+                        // and declare the function a success.
+                        if (hasFoundLink.compareAndSet(false, true)) {
+                            if (continuation.isActive) {
+                                continuation.resume(true)
+                            }
+                        }
+                    }
                 }
-                // We pass the new wrapped callback to the extractor.
-                loadExtractor(link, data, subtitleCallback, newCallback)
+                // This logic ensures that if all servers are tried and none return a link,
+                // the function will eventually resume with 'false'.
+                synchronized(this) {
+                    remainingServers--
+                    if (remainingServers == 0 && !hasFoundLink.get()) {
+                        if (continuation.isActive) {
+                            continuation.resume(false)
+                        }
+                    }
+                }
             }
         }
-
-        // The function now returns the value of our flag. It will be true
-        // only if at least one extractor successfully called the callback.
-        return linksFound.get()
     }
-    // =================================================================================
-    // END of v2 FIX
-    // =================================================================================
+    // =========================================================
 }
