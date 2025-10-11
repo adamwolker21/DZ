@@ -53,13 +53,12 @@ subprojects {
         }
     }
 
-    // نقل إعدادات Kotlin خارج كتلة android
     tasks.withType<KotlinCompile>().configureEach {
         kotlinOptions {
             jvmTarget = "1.8"
             allWarningsAsErrors = false // هذا السطر مهم
             freeCompilerArgs = freeCompilerArgs + listOf(
-                "-Xno-deprecation-warnings",
+                // إزالة الflags غير المدعومة
                 "-Xno-call-assertions",
                 "-Xno-param-assertions",
                 "-Xno-receiver-assertions"
