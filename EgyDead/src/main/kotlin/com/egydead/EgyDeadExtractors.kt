@@ -73,10 +73,11 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
             try {
                 val unpacked = getAndUnpack(packedJs)
                 
-                // =================== v33 THE FINAL GUARANTEED FIX ===================
-                // This is the winning method from our forensic test (v32).
-                // It parses the unpacked script as a structured JSON object, which is 100% reliable.
-                val jsonObjectString = unpacked.substringAfter("var links = ").substringBefore(";")
+                // =================== v34 THE FINAL TRIM FIX ===================
+                // The JSON parser failed because the extracted string had a leading space.
+                // Adding .trim() removes any leading/trailing whitespace, ensuring the string
+                // starts with '{' as required by the JSON parser.
+                val jsonObjectString = unpacked.substringAfter("var links = ").substringBefore(";").trim()
                 val jsonObject = JSONObject(jsonObjectString)
                 val m3u8Link = jsonObject.getString("hls2")
                 // ====================================================================
