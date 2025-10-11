@@ -63,9 +63,12 @@ class StreamHGFinalEngine : ExtractorApi() {
      */
     private fun deobfuscate(p: String, a: Int, c: Int, k: List<String>): String {
         var template = p
+        // This loop perfectly simulates: while(c--)
         for (i in (c - 1) downTo 0) {
             if (i < k.size && k[i].isNotBlank()) {
+                // This simulates: c.toString(a)
                 val placeholder = i.toString(a)
+                // This simulates: p.replace(new RegExp('\\b' + ... + '\\b', 'g'), k[c])
                 template = template.replace(Regex("\\b$placeholder\\b"), k[i])
             }
         }
@@ -84,6 +87,7 @@ class StreamHGFinalEngine : ExtractorApi() {
         Log.d(name, "Found packed JS. Executing the user-designed Final Engine...")
 
         // Stage 1: Deconstruction using the user's proven regex.
+        // This is a direct translation of `evalRegex`.
         val masterRegex = Regex("""eval\(function\(p,a,c,k,e,d\)\{.*?\}\('(.*?)',(\d+),(\d+),'(.*?)'\.split\('\|'\)\)\)""")
         val match = masterRegex.find(packedJs)
 
@@ -93,16 +97,17 @@ class StreamHGFinalEngine : ExtractorApi() {
         }
         Log.d(name, "Engine Stage 1 SUCCESS: Deconstructed packed script into its core components.")
 
+        // This is a direct translation of: const [packedString, base, count, keyString] = [...]
         val (packedString, baseStr, countStr, keyString) = match.destructured
         val base = baseStr.toIntOrNull() ?: 36
         val count = countStr.toIntOrNull() ?: 0
         val keys = keyString.split("|")
 
-        // Stage 2: Re-construction using our deobfuscate function.
+        // Stage 2: Re-construction using our deobfuscate function (a translation of your function).
         val deobfuscatedJs = deobfuscate(packedString, base, count, keys)
         Log.d(name, "Engine Stage 2 SUCCESS: Deobfuscation complete.")
 
-        // Stage 3: Extraction of the final prize.
+        // Stage 3: Extraction of the final prize using the user's hls2 regex.
         val hls2Regex = Regex(""""hls2"\s*:\s*"([^"]+)"""")
         val urlMatch = hls2Regex.find(deobfuscatedJs)
 
