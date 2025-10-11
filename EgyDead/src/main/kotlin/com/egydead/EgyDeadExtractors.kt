@@ -17,7 +17,7 @@ val extractorList = listOf(
     StreamHG()
 )
 
-// Using a mobile User-Agent as it might be treated differently by the server.
+// Using a mobile User-Agent.
 private val BROWSER_HEADERS = mapOf(
     "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
     "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
@@ -46,7 +46,7 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
     )
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        Log.d("StreamHG_Final", "================== getUrl CALLED v28 ==================")
+        Log.d("StreamHG_Final", "================== getUrl CALLED v29 (Diagnostic) ==================")
         val videoId = url.substringAfterLast("/")
         if (videoId.isBlank()) {
             Log.e("StreamHG_Final", "Failed to extract video ID.")
@@ -60,15 +60,11 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
             val doc = safeGetAsDocument(finalPageUrl, referer = url) ?: continue
             Log.d("StreamHG_Final", "Successfully retrieved document.")
 
-            // =================== v28 THE SMART FIX ===================
-            // The server has two 'eval' scripts. One is a short anti-bot script (the trap),
-            // and the other is the long, real one with the video links (the treasure).
-            // Instead of finding the *first* script, we find *all* of them and pick the longest one.
+            // Find all 'eval' scripts and pick the longest one.
             val packedJs = doc.select("script")
                 .map { it.data() }
                 .filter { it.contains("eval(function(p,a,c,k,e,d)") }
-                .maxByOrNull { it.length } // ← Find the longest script
-            // =========================================================
+                .maxByOrNull { it.length }
 
             if (packedJs == null || packedJs.isBlank()) {
                 Log.e("StreamHG_Final", "Could not find any packed JS (eval) script.")
@@ -78,36 +74,26 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
 
             try {
                 val unpacked = getAndUnpack(packedJs)
-                Log.d("StreamHG_Final", "Successfully unpacked JS.")
-                
-                // Using the robust string manipulation to find the hls2 link.
-                val m3u8Link = unpacked.substringAfter("\"hls2\":\"").substringBefore("\"")
+                Log.d("StreamHG_Final", "Successfully unpacked JS. Now logging its full content...")
 
-                if (m3u8Link.isNotBlank() && m3u8Link.startsWith("http")) {
-                    Log.d("StreamHG_Final", "SUCCESS: Found 'hls2' link: $m3u8Link")
-                    
-                    callback(
-                        newExtractorLink(
-                            source = this.name,
-                            name = this.name,
-                            url = m3u8Link,
-                            type = ExtractorLinkType.M3U8
-                        ) {
-                            this.referer = finalPageUrl
-                            this.quality = Qualities.Unknown.value
-                        }
-                    )
-                    Log.d("StreamHG_Final", "Successfully submitted the link via callback.")
-                    return 
+                // =================== v29 DIAGNOSTIC CODE ===================
+                // Log the entire unpacked content in chunks to avoid truncation.
+                if (unpacked.isNotBlank()) {
+                    Log.d("Phase3_Full_Unpacked_JS", "================== START OF UNPACKED CONTENT ==================")
+                    unpacked.chunked(4000).forEachIndexed { index, chunk ->
+                        Log.d("Phase3_Full_Unpacked_JS", "Chunk ${index + 1}: $chunk")
+                    }
+                    Log.d("Phase3_Full_Unpacked_JS", "==================  END OF UNPACKED CONTENT  ==================")
                 } else {
-                    Log.e("StreamHG_Final", "String manipulation FAILED to find a valid 'hls2' link in the unpacked JS.")
+                    Log.e("StreamHG_Final", "Unpacking was successful, but the result is an empty string.")
                 }
+                // ==========================================================
 
             } catch (e: Exception) {
-                Log.e("StreamHG_Final", "An error occurred during unpacking or link extraction: ${e.message}")
+                Log.e("StreamHG_Final", "An error occurred during unpacking: ${e.message}")
             }
         }
-        Log.d("StreamHG_Final", "================== getUrl FINISHED (No link found) ==================")
+        Log.d("StreamHG_Final", "================== getUrl FINISHED (Diagnostic run complete) ==================")
     }
 }
 
