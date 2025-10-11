@@ -176,8 +176,8 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
             if (packedJs.isNullOrBlank()) continue
 
             try {
-                // THE FIX IS HERE: Added referer parameter to getAndUnpack call
-                val unpacked = getAndUnpack(packedJs, referer = finalPageUrl)
+                // FIX for v2: Removed 'referer' parameter from getAndUnpack call
+                val unpacked = getAndUnpack(packedJs)
                 
                 val jsonObjectString = unpacked.substringAfter("var links = ").substringBefore(";").trim()
                 val jsonObject = JSONObject(jsonObjectString)
@@ -214,7 +214,8 @@ class Forafile : ExtractorApi() {
         val document = safeGetAsDocument(url, referer)
         val packedJs = document?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
-            val unpacked = getAndUnpack(packedJs, referer = url)
+            // FIX for v2: Removed 'referer' parameter from getAndUnpack call
+            val unpacked = getAndUnpack(packedJs)
             val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
             mp4Link?.let { callback(newExtractorLink(this.name, this.name, it) { this.referer = url }) }
         }
@@ -244,7 +245,8 @@ abstract class PackedJsExtractorBase(
         val doc = safeGetAsDocument(url, referer)
         val script = doc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d)))")?.data()
         if (script != null) {
-            val unpacked = getAndUnpack(script, referer = url)
+            // FIX for v2: Removed 'referer' parameter from getAndUnpack call
+            val unpacked = getAndUnpack(script)
             val videoUrl = regex.find(unpacked)?.groupValues?.get(1)
             if (videoUrl != null && videoUrl.isNotBlank()) {
                 val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
