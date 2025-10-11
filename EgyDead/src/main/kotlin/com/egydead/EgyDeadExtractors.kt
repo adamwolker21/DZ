@@ -80,16 +80,25 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
 
             try {
                 val unpacked = getAndUnpack(packedJs)
-                Log.d("StreamHG_Final", "Successfully unpacked JS.")
+                Log.d("StreamHG_Final", "Successfully unpacked JS. Now logging its content...")
+
+                // =================== v26 DIAGNOSTIC CODE ===================
+                // Log the entire unpacked content in chunks to avoid truncation.
+                if (unpacked.length > 4000) {
+                    Log.d("Unpacked_JS_Content", "Content is long, logging in chunks:")
+                    unpacked.chunked(4000).forEachIndexed { index, chunk ->
+                        Log.d("Unpacked_JS_Content", "Chunk ${index + 1}: $chunk")
+                    }
+                } else {
+                    Log.d("Unpacked_JS_Content", unpacked)
+                }
+                Log.d("StreamHG_Final", "Finished logging unpacked content.")
+                // ==========================================================
                 
-                // =================== v25 FIX: Correct String Manipulation ===================
-                // This is the corrected version of the string search. It looks for the literal
-                // text `"hls2":"` and then extracts everything until the next `"`.
                 val m3u8Link = unpacked.substringAfter("\"hls2\":\"").substringBefore("\"")
 
                 if (m3u8Link.isNotBlank() && m3u8Link.startsWith("http")) {
-                    Log.d("StreamHG_Final", "SUCCESS: Found 'hls2' link with CORRECT string manipulation: $m3u8Link")
-                    Log.d("StreamHG_Final", "Submitting link using the correct newExtractorLink syntax.")
+                    Log.d("StreamHG_Final", "SUCCESS: Found 'hls2' link: $m3u8Link")
                     
                     callback(
                         newExtractorLink(
@@ -105,7 +114,7 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
                     Log.d("StreamHG_Final", "Successfully submitted the link via callback.")
                     return 
                 } else {
-                    Log.e("StreamHG_Final", "Corrected string manipulation FAILED to find a valid 'hls2' link. Check unpacked JS content.")
+                    Log.e("StreamHG_Final", "String manipulation FAILED to find a valid 'hls2' link.")
                 }
 
             } catch (e: Exception) {
