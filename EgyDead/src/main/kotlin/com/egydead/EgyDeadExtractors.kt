@@ -17,8 +17,7 @@ val extractorList = listOf(
     StreamHG()
 )
 
-// =================== v27 CHANGE: Mobile User-Agent ===================
-// Changed the User-Agent to mimic a mobile browser.
+// Using a mobile User-Agent as it might be treated differently by the server.
 private val BROWSER_HEADERS = mapOf(
     "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
     "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
@@ -29,28 +28,10 @@ private val cloudflareKiller by lazy { CloudflareKiller() }
 
 // Safe function to get page as Document.
 private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
-    Log.d("StreamHG_Forensics", "safeGetAsDocument: Attempting to GET URL: $url")
     return try {
-        val response = app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false)
-        Log.d("StreamHG_Forensics", "safeGetAsDocument: Successfully got response for URL: $url with status code: ${response.code}")
-        
-        // =================== v27 CHANGE: Log Phase 2 Content ===================
-        val htmlContent = response.text
-        Log.d("StreamHG_Forensics", "Now logging the full HTML content received (Phase 2)...")
-        if (htmlContent.length > 4000) {
-            Log.d("Phase2_HTML_Content", "Content is long, logging in chunks:")
-            htmlContent.chunked(4000).forEachIndexed { index, chunk ->
-                Log.d("Phase2_HTML_Content", "Chunk ${index + 1}: $chunk")
-            }
-        } else {
-            Log.d("Phase2_HTML_Content", htmlContent)
-        }
-        Log.d("StreamHG_Forensics", "Finished logging Phase 2 content.")
-        // =====================================================================
-
-        response.document
+        app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false).document
     } catch (e: Exception) {
-        Log.e("StreamHG_Forensics", "safeGetAsDocument: FAILED to GET URL: $url. Error: ${e.message}")
+        Log.e("StreamHG_Final", "safeGetAsDocument FAILED for $url: ${e.message}")
         null
     }
 }
@@ -65,54 +46,45 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
     )
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        Log.d("StreamHG_Forensics", "================== getUrl CALLED ==================")
-        Log.d("StreamHG_Forensics", "Initial URL: $url")
-
+        Log.d("StreamHG_Final", "================== getUrl CALLED v28 ==================")
         val videoId = url.substringAfterLast("/")
         if (videoId.isBlank()) {
-            Log.e("StreamHG_Forensics", "Failed to extract video ID from URL.")
+            Log.e("StreamHG_Final", "Failed to extract video ID.")
             return
         }
-        Log.d("StreamHG_Forensics", "Extracted Video ID: $videoId")
 
         for (host in potentialHosts) {
             val finalPageUrl = "https://$host/e/$videoId"
-            Log.d("StreamHG_Forensics", "Constructed final page URL: $finalPageUrl")
+            Log.d("StreamHG_Final", "Constructed final page URL: $finalPageUrl")
 
-            val doc = safeGetAsDocument(finalPageUrl, referer = url)
+            val doc = safeGetAsDocument(finalPageUrl, referer = url) ?: continue
+            Log.d("StreamHG_Final", "Successfully retrieved document.")
 
-            if (doc == null) {
-                Log.e("StreamHG_Forensics", "Failed to get document from $finalPageUrl. Document is null.")
-                continue
-            }
-            Log.d("StreamHG_Forensics", "Successfully retrieved document.")
+            // =================== v28 THE SMART FIX ===================
+            // The server has two 'eval' scripts. One is a short anti-bot script (the trap),
+            // and the other is the long, real one with the video links (the treasure).
+            // Instead of finding the *first* script, we find *all* of them and pick the longest one.
+            val packedJs = doc.select("script")
+                .map { it.data() }
+                .filter { it.contains("eval(function(p,a,c,k,e,d)") }
+                .maxByOrNull { it.length } // ← Find the longest script
+            // =========================================================
 
-            val packedJs = doc.select("script").find { it.data().contains("eval(function(p,a,c,k,e,d)") }?.data()
             if (packedJs == null || packedJs.isBlank()) {
-                Log.e("StreamHG_Forensics", "Could not find the packed JS (eval) script on the page.")
+                Log.e("StreamHG_Final", "Could not find any packed JS (eval) script.")
                 continue
             }
-            Log.d("StreamHG_Forensics", "Found packed JS script. Attempting to unpack (Phase 3)...")
+            Log.d("StreamHG_Final", "Found the longest packed JS script (length: ${packedJs.length}). Attempting to unpack...")
 
             try {
                 val unpacked = getAndUnpack(packedJs)
-                Log.d("StreamHG_Forensics", "Successfully unpacked JS. Now logging its content (Phase 3)...")
-
-                // Log the entire unpacked content in chunks to avoid truncation.
-                if (unpacked.length > 4000) {
-                    Log.d("Phase3_Unpacked_JS", "Content is long, logging in chunks:")
-                    unpacked.chunked(4000).forEachIndexed { index, chunk ->
-                        Log.d("Phase3_Unpacked_JS", "Chunk ${index + 1}: $chunk")
-                    }
-                } else {
-                    Log.d("Phase3_Unpacked_JS", unpacked)
-                }
-                Log.d("StreamHG_Forensics", "Finished logging Phase 3 content.")
+                Log.d("StreamHG_Final", "Successfully unpacked JS.")
                 
+                // Using the robust string manipulation to find the hls2 link.
                 val m3u8Link = unpacked.substringAfter("\"hls2\":\"").substringBefore("\"")
 
                 if (m3u8Link.isNotBlank() && m3u8Link.startsWith("http")) {
-                    Log.d("StreamHG_Forensics", "SUCCESS: Found 'hls2' link: $m3u8Link")
+                    Log.d("StreamHG_Final", "SUCCESS: Found 'hls2' link: $m3u8Link")
                     
                     callback(
                         newExtractorLink(
@@ -125,18 +97,17 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
                             this.quality = Qualities.Unknown.value
                         }
                     )
-                    Log.d("StreamHG_Forensics", "Successfully submitted the link via callback.")
+                    Log.d("StreamHG_Final", "Successfully submitted the link via callback.")
                     return 
                 } else {
-                    Log.e("StreamHG_Forensics", "String manipulation FAILED to find a valid 'hls2' link in Phase 3 content.")
+                    Log.e("StreamHG_Final", "String manipulation FAILED to find a valid 'hls2' link in the unpacked JS.")
                 }
 
             } catch (e: Exception) {
-                Log.e("StreamHG_Forensics", "An error occurred during unpacking or link extraction: ${e.message}")
+                Log.e("StreamHG_Final", "An error occurred during unpacking or link extraction: ${e.message}")
             }
         }
-
-        Log.d("StreamHG_Forensics", "================== getUrl FINISHED (No link found) ==================")
+        Log.d("StreamHG_Final", "================== getUrl FINISHED (No link found) ==================")
     }
 }
 
