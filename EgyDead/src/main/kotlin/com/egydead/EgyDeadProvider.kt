@@ -4,14 +4,15 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.json.JSONObject
+import org.jsoup.Jsoup // Import Jsoup directly for manual parsing
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import android.util.Log
 
 // =================================================================================
-// START of v45 - The Final Direct Action Fix
-// This version uses the last known stable provider base and merges the
-// successful extractor logic directly into loadLinks, bypassing all callbacks.
+// START of v46 - The Final Manual Fix
+// All logic is now inside the Provider, and we are manually parsing HTML
+// to bypass the `NoSuchMethodError`.
 // =================================================================================
 
 // --- Helper variables and functions moved here for the merged logic ---
@@ -23,16 +24,6 @@ private val BROWSER_HEADERS = mapOf(
 
 // This separate cloudflareKiller instance is for our manual extraction logic.
 private val extractorCloudflareKiller by lazy { CloudflareKiller() }
-
-private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
-    return try {
-        app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = extractorCloudflareKiller, verify = false).document
-    } catch (e: Exception) {
-        Log.e("safeGetAsDocument", "FAILED for $url: ${e.message}")
-        null
-    }
-}
-
 
 // --- Main Provider Class ---
 class EgyDeadProvider : MainAPI() {
@@ -52,12 +43,11 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
-    // This is the provider's own cloudflareKiller, separate from the extractor's one.
+    // This is the provider's own cloudflareKiller.
     private val providerCloudflareKiller by lazy { CloudflareKiller() }
 
     private suspend fun getWatchPage(url: String): Document? {
         try {
-            // Using the original, more complex getWatchPage logic that works.
             val initialResponse = app.get(url, interceptor = providerCloudflareKiller)
             val document = initialResponse.document
             if (document.selectFirst("div.watchNow form") != null) {
@@ -122,10 +112,7 @@ class EgyDeadProvider : MainAPI() {
             }
         }
     }
-
-    // =================================================================================
-    // THE FINAL FIX: `loadLinks` now contains all logic directly and sequentially.
-    // =================================================================================
+    
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
@@ -134,16 +121,13 @@ class EgyDeadProvider : MainAPI() {
         val servers = watchPageDoc.select("div.mob-servers li")
         if (servers.isEmpty()) return false
 
-        // A simple, sequential loop that waits for each server.
         for (server in servers) {
             val link = server.attr("data-link")
             if (link.isBlank()) continue
             
             Log.d("EgyDeadProvider", "Processing server link: $link")
 
-            // The "Manager" now does the work himself, bypassing `loadExtractor`.
             try {
-                // --- StreamHG Logic ---
                 if (link.contains("hglink.to")) {
                     val potentialHosts = listOf("kravaxxa.com", "cavanhabg.com", "dumbalag.com")
                     val videoId = link.substringAfterLast("/")
@@ -152,7 +136,13 @@ class EgyDeadProvider : MainAPI() {
                     for (host in potentialHosts) {
                         try {
                             val finalPageUrl = "https://$host/e/$videoId"
-                            val doc = safeGetAsDocument(finalPageUrl, referer = data) ?: continue
+                            
+                            // =================== v46 MANUAL PARSING FIX ===================
+                            // Step 1: Get the raw HTML text.
+                            val htmlText = app.get(finalPageUrl, referer = data, headers = BROWSER_HEADERS, interceptor = extractorCloudflareKiller, verify = false).text
+                            // Step 2: Manually parse the text into a Jsoup Document.
+                            val doc = Jsoup.parse(htmlText)
+                            // =============================================================
 
                             val packedJs = doc.select("script")
                                 .map { it.data() }
@@ -171,17 +161,14 @@ class EgyDeadProvider : MainAPI() {
                                         this.quality = Qualities.Unknown.value
                                     }
                                 )
-                                break // Found link on this host, move to the next server
+                                break 
                             }
                         } catch (e: Exception) {
                             Log.e("EgyDeadProvider", "StreamHG failed on host '$host': ${e.message}")
                         }
                     }
-                }
-                // --- DoodStream Logic and other built-in extractors ---
-                else {
-                    // For all other servers, we can still use the built-in `loadExtractor`
-                    // as they are simpler and don't suffer from the same timing issues.
+                } else {
+                    // For other servers, we can still use the built-in `loadExtractor`.
                     loadExtractor(link, data, subtitleCallback, callback)
                 }
             } catch (e: Exception) {
