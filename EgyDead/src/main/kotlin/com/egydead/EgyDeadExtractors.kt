@@ -11,7 +11,7 @@ import com.lagradost.cloudstream3.utils.Qualities
 import org.jsoup.nodes.Document
 import android.util.Log
 
-// سنقوم بتجربة عدة extractors مختلفة
+// جرب جميع extractors دفعة واحدة
 val extractorList = listOf(
     StreamHG1(),
     StreamHG2(),
@@ -62,9 +62,9 @@ private suspend fun extractM3u8Link(url: String, referer: String?): String? {
     return null
 }
 
-// ===== التجارب المختلفة لـ newExtractorLink =====
+// ===== جميع الاحتمالات لـ newExtractorLink =====
 
-// التجربة 1: 3 معاملات أساسية
+// الاحتمال 1: 3 معاملات أساسية
 class StreamHG1 : ExtractorApi() {
     override var name = "StreamHG1"
     override var mainUrl = "hglink.to"
@@ -76,7 +76,7 @@ class StreamHG1 : ExtractorApi() {
     }
 }
 
-// التجربة 2: 4 معاملات مع referer
+// الاحتمال 2: 4 معاملات مع referer
 class StreamHG2 : ExtractorApi() {
     override var name = "StreamHG2"
     override var mainUrl = "hglink.to"
@@ -88,7 +88,7 @@ class StreamHG2 : ExtractorApi() {
     }
 }
 
-// التجربة 3: 5 معاملات مع quality
+// الاحتمال 3: 5 معاملات مع quality
 class StreamHG3 : ExtractorApi() {
     override var name = "StreamHG3"
     override var mainUrl = "hglink.to"
@@ -100,7 +100,7 @@ class StreamHG3 : ExtractorApi() {
     }
 }
 
-// التجربة 4: 6 معاملات مع isM3u8
+// الاحتمال 4: 6 معاملات مع isM3u8
 class StreamHG4 : ExtractorApi() {
     override var name = "StreamHG4"
     override var mainUrl = "hglink.to"
@@ -112,7 +112,7 @@ class StreamHG4 : ExtractorApi() {
     }
 }
 
-// التجربة 5: named parameters (الأساسية)
+// الاحتمال 5: named parameters (الأساسية)
 class StreamHG5 : ExtractorApi() {
     override var name = "StreamHG5"
     override var mainUrl = "hglink.to"
@@ -130,7 +130,7 @@ class StreamHG5 : ExtractorApi() {
     }
 }
 
-// التجربة 6: named parameters مع referer
+// الاحتمال 6: named parameters مع referer
 class StreamHG6 : ExtractorApi() {
     override var name = "StreamHG6"
     override var mainUrl = "hglink.to"
@@ -149,7 +149,7 @@ class StreamHG6 : ExtractorApi() {
     }
 }
 
-// التجربة 7: named parameters مع referer و quality
+// الاحتمال 7: named parameters مع referer و quality
 class StreamHG7 : ExtractorApi() {
     override var name = "StreamHG7"
     override var mainUrl = "hglink.to"
@@ -169,7 +169,7 @@ class StreamHG7 : ExtractorApi() {
     }
 }
 
-// التجربة 8: named parameters مع referer و quality و isM3u8
+// الاحتمال 8: named parameters مع referer و quality و isM3u8
 class StreamHG8 : ExtractorApi() {
     override var name = "StreamHG8"
     override var mainUrl = "hglink.to"
