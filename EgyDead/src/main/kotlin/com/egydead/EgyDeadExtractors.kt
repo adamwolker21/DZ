@@ -1,22 +1,14 @@
 package com.egydead
 
-import com.lagradost.api.Log
-import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.extractors.Filesim
-import com.lagradost.cloudstream3.extractors.StreamSB
-import com.lagradost.cloudstream3.extractors.VidhideExtractor
 import com.lagradost.cloudstream3.utils.ExtractorApi
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.INFER_TYPE
-import com.lagradost.cloudstream3.utils.M3u8Helper
-import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.newExtractorLink
-import kotlin.text.Regex
-import com.google.gson.JsonObject
-import com.google.gson.JsonParser
-import com.lagradost.cloudstream3.base64Decode
+import com.lagradost.cloudstream3.SubtitleFile
+import com.lagradost.cloudstream3.utils.getAndUnpack
+import com.lagradost.cloudstream3.network.CloudflareKiller
+import com.lagradost.cloudstream3.utils.Qualities
+import org.jsoup.nodes.Document
+import android.util.Log
 
 // The extractor list now only contains StreamHG to focus on it.
 val extractorList = listOf(
@@ -34,8 +26,7 @@ private val cloudflareKiller by lazy { CloudflareKiller() }
 
 // Safe function to get page as Document.
 class StreamHG : StreamHGBase("StreamHG", "hglink.to") {
-    // ... الكود الحالي ...
-
+    @Suppress("DEPRECATION")
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         Log.d("StreamHG_Final", "================== getUrl CALLED ==================")
         Log.d("StreamHG_Final", "Initial URL: $url")
@@ -74,11 +65,11 @@ class StreamHG : StreamHGBase("StreamHG", "hglink.to") {
 
                 if (m3u8Link != null) {
                     Log.d("StreamHG_Final", "SUCCESS: Found 'hls2' link with flexible regex: $m3u8Link")
-                    Log.d("StreamHG_Final", "Submitting link using newExtractorLink.")
+                    Log.d("StreamHG_Final", "Submitting link using deprecated ExtractorLink constructor.")
                     
-                    // استخدام الدالة الجديدة بدلاً من المُنشئ المُهمل
+                    // استخدام المُنشئ القديم مع كتم التحذير على مستوى الدالة
                     callback(
-                        newExtractorLink(
+                        ExtractorLink(
                             source = this.name,
                             name = this.name,
                             url = m3u8Link,
