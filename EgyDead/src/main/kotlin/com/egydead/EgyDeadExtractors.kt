@@ -10,7 +10,7 @@ import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import android.util.Log
 
-// The final extractor list, containing the user-designed solution with a robust regex.
+// The final extractor list, containing a direct translation of the user's proven algorithm.
 val extractorList = listOf(
     StreamHGFinalEngine()
 )
@@ -80,15 +80,15 @@ class StreamHGFinalEngine : ExtractorApi() {
             Log.e(name, "No packed 'eval' JavaScript found.")
             return
         }
-        Log.d(name, "Found packed JS. Executing the user-designed Final Engine...")
+        Log.d(name, "Found packed JS. Executing the user's exact algorithm...")
 
-        // Stage 1: The NEW, more FLEXIBLE deconstruction regex.
-        // It focuses on the core pattern and is resilient to minor structural changes.
-        val masterRegex = Regex("""\('(.*?)',(\d+),(\d+),'(.*?)'\.split\('\|'\)\)""")
+        // Stage 1: Deconstruction using a literal, 1-to-1 translation of the user's proven regex.
+        // No more simplification, no more "flexible" versions. This is the real one.
+        val masterRegex = Regex("""eval\(function\(p,a,c,k,e,d\)\{.*?\}\s?\(\s?'(.*? P)',(\d+),(\d+),'(.*?)'\.split\('\|'\)\s?\)\s?\)""")
         val match = masterRegex.find(packedJs)
 
         if (match == null || match.groupValues.size < 5) {
-            Log.e(name, "Engine FAILED: Could not deconstruct the packed function structure with the flexible regex.")
+            Log.e(name, "Engine FAILED: Could not deconstruct the packed function with the user's exact regex.")
             return
         }
         Log.d(name, "Engine Stage 1 SUCCESS: Deconstructed packed script into its core components.")
