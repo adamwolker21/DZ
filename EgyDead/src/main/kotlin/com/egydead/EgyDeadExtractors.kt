@@ -10,12 +10,12 @@ import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import android.util.Log
 
-// قائمة المستخرجات تحتوي فقط على StreamHG للتركيز عليه
+// The extractor list now only contains StreamHG to focus on it.
 val extractorList = listOf(
     StreamHG()
 )
 
-// ترويسات متصفح كاملة للمحاكاة
+// Full browser headers for emulation.
 private val BROWSER_HEADERS = mapOf(
     "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
     "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
@@ -24,7 +24,7 @@ private val BROWSER_HEADERS = mapOf(
 
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
-// دالة آمنة لجلب الصفحة كـ Document
+// Safe function to get page as Document.
 private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
     Log.d("StreamHG_Final", "safeGetAsDocument: Attempting to GET URL: $url")
     return try {
@@ -41,7 +41,7 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
 abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
 
-    // التركيز فقط على kravaxxa.com
+    // Focusing only on kravaxxa.com
     private val potentialHosts = listOf(
         "kravaxxa.com"
     )
@@ -80,12 +80,13 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
                 val unpacked = getAndUnpack(packedJs)
                 Log.d("StreamHG_Final", "Successfully unpacked JS.")
                 
-                // =================== FINAL FIX: Targeting "hls2" link ===================
-                // New regex to specifically find the URL inside the "hls2" key.
-                val m3u8Link = Regex("""["']hls2["']:\s*["']([^"']+)""").find(unpacked)?.groupValues?.get(1)
+                // =================== v20 FIX: More flexible Regex ===================
+                // This new regex is more robust and ignores formatting issues like newlines or extra spaces.
+                // It looks for 'hls2', then a colon, then a quote, and captures everything until the next quote.
+                val m3u8Link = Regex("""['"]hls2['"]\s*:\s*['"](.*?)['"]""").find(unpacked)?.groupValues?.get(1)
 
                 if (m3u8Link != null) {
-                    Log.d("StreamHG_Final", "SUCCESS: Found 'hls2' link in unpacked JS: $m3u8Link")
+                    Log.d("StreamHG_Final", "SUCCESS: Found 'hls2' link with new regex: $m3u8Link")
                     Log.d("StreamHG_Final", "Calling M3u8Helper.generateM3u8...")
                     
                     M3u8Helper.generateM3u8(
@@ -100,7 +101,7 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
                     Log.d("StreamHG_Final", "Finished calling M3u8Helper.")
                     return 
                 } else {
-                    Log.e("StreamHG_Final", "Unpacked JS, but the new regex FAILED to find the 'hls2' link.")
+                    Log.e("StreamHG_Final", "Unpacked JS, but the FINAL regex FAILED to find the 'hls2' link.")
                 }
 
             } catch (e: Exception) {
