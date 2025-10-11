@@ -5,12 +5,9 @@ import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import android.util.Log
-import java.util.concurrent.ConcurrentLinkedQueue
 
 class EgyDeadProvider : MainAPI() {
-    // This part of the code is from the last known working version
-    // to ensure posters, episode lists, and general functionality are restored.
+    // This is the known working base of the provider.
     override var mainUrl = "https://tv6.egydead.live"
     override var name = "EgyDead"
     override val hasMainPage = true
@@ -160,8 +157,10 @@ class EgyDeadProvider : MainAPI() {
     }
     
     // =================================================================================
-    // START of v39 THE RENDEZVOUS POINT FIX
-    // This function now waits for ALL extractors to finish their work before returning.
+    // START of v40 THE STREAMPLAY METHOD
+    // This function now mimics the successful and simple logic of StreamPlay provider.
+    // It starts all extractors in parallel and immediately returns true,
+    // allowing the app to handle the incoming links as they arrive.
     // =================================================================================
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
@@ -170,31 +169,20 @@ class EgyDeadProvider : MainAPI() {
         val watchPageDoc = getWatchPage(data) ?: return false
         val servers = watchPageDoc.select("div.mob-servers li")
 
-        if (servers.isEmpty()) return false
-
-        // A thread-safe list to collect all links from all parallel tasks.
-        val foundLinks = ConcurrentLinkedQueue<ExtractorLink>()
-
-        // apmap will run all tasks in parallel and wait for all of them to complete.
+        // We use apmap to launch all extractor tasks in the background.
         servers.apmap { serverLi ->
             val link = serverLi.attr("data-link")
             if (link.isNotBlank()) {
-                // Each extractor gets a callback that adds its result to our shared list.
-                loadExtractor(link, data, subtitleCallback) { foundLink ->
-                    foundLinks.add(foundLink)
-                }
+                // The app will wait for this function to provide links via the callback.
+                loadExtractor(link, data, subtitleCallback, callback)
             }
         }
 
-        // After apmap has waited for everyone to return to the "rendezvous point",
-        // we check if anyone brought back a link.
-        if (foundLinks.isEmpty()) return false
-
-        // We submit all found links to the app at once.
-        foundLinks.forEach(callback)
+        // We immediately return true to tell the app that we have started the link loading process.
+        // The UI will show "Loading..." and populate links as the callbacks are invoked.
         return true
     }
     // =================================================================================
-    // END of v39 THE RENDEZVOUS POINT FIX
+    // END of v40 THE STREAMPLAY METHOD
     // =================================================================================
 }
