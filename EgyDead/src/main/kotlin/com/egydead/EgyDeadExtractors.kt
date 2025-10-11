@@ -86,6 +86,8 @@ class StreamHGFinalEngine : ExtractorApi() {
         }
         Log.d(name, "Found packed JS. Executing the user-designed Final Engine...")
 
+        Log.d(name, "RAW SCRIPT CONTENT: $packedJs")
+        
         // Stage 1: Deconstruction using the user's proven regex.
         // This is a direct translation of `evalRegex`.
         val masterRegex = Regex("""eval\(function\(p,a,c,k,e,d\)\{.*?\}\('(.*?)',(\d+),(\d+),'(.*?)'\.split\('\|'\)\)\)""")
