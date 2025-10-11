@@ -50,14 +50,14 @@ class EgyDeadProvider : MainAPI() {
         }
     }
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse { /* ... */
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page == 1) "$mainUrl${request.data}" else "$mainUrl${request.data}page/$page/"
         val document = app.get(url, interceptor = cloudflareKiller).document
         val home = document.select("li.movieItem").mapNotNull { it.toSearchResult() }
         return newHomePageResponse(request.name, home)
     }
 
-    private fun Element.toSearchResult(): SearchResponse? { /* ... */
+    private fun Element.toSearchResult(): SearchResponse? {
         val href = this.selectFirst("a")?.attr("href") ?: return null
         val title = this.selectFirst("h1.BottomTitle")?.text() ?: return null
         val posterUrl = this.selectFirst("img")?.attr("src")
@@ -67,12 +67,12 @@ class EgyDeadProvider : MainAPI() {
         else newMovieSearchResponse(cleanedTitle, href, TvType.Movie) { this.posterUrl = posterUrl }
     }
 
-    override suspend fun search(query: String): List<SearchResponse> { /* ... */
+    override suspend fun search(query: String): List<SearchResponse> {
         val document = app.get("$mainUrl/?s=$query", interceptor = cloudflareKiller).document
         return document.select("li.movieItem").mapNotNull { it.toSearchResult() }
     }
 
-    override suspend fun load(url: String): LoadResponse? { /* ... */
+    override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url, interceptor = cloudflareKiller).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
@@ -81,8 +81,11 @@ class EgyDeadProvider : MainAPI() {
 
         if (isSeries) {
             val episodes = document.select("div.EpsList li a").mapNotNull { ep ->
-                val epNum = ep.attr("title").substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull() ?: return@mapNotNull null
-                newEpisode(ep.attr("href")) { this.name = ep.text().trim(); this.episode = epNum }
+                val epNum = ep.attr("title").substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
+                newEpisode(ep.attr("href")) {
+                    this.name = ep.text().trim()
+                    this.episode = epNum
+                }
             }
             val seriesTitle = pageTitle.replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "").trim()
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
@@ -95,10 +98,12 @@ class EgyDeadProvider : MainAPI() {
             }
         }
     }
-    
+
     // =================================================================================
-    // START of v52 THE FINAL PROFESSIONAL FIX (suspendCancellableCoroutine)
-    // This is the only guaranteed way to be both FAST (parallel) and PATIENT (wait for result).
+    // START of THE FIX
+    // The previous implementation was overly complex and caused errors.
+    // `apmap` already runs its lambda in a suspendable context, so `launch` is not needed.
+    // We use AtomicBoolean to safely track if any link was found across parallel executions.
     // =================================================================================
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
@@ -109,47 +114,31 @@ class EgyDeadProvider : MainAPI() {
 
         if (servers.isEmpty()) return false
 
-        // This creates the "waiting room". The function will pause here.
-        return suspendCancellableCoroutine { continuation ->
-            val hasResumed = AtomicBoolean(false)
-            var remainingServers = servers.size
+        // A thread-safe boolean to track if we have successfully found any link.
+        val foundAUrl = AtomicBoolean(false)
 
-            // We launch all tasks in parallel using apmap.
-            servers.apmap { serverLi ->
-                // This ensures the main logic runs in a safe coroutine body.
-                // It's the replacement for the non-existent 'ioSafe'.
-                launch {
-                    try {
-                        val link = serverLi.attr("data-link")
-                        if (link.isNotBlank()) {
-                            loadExtractor(link, data, subtitleCallback) { foundLink ->
-                                // This is the "bell". The first extractor to find a link rings it.
-                                if (hasResumed.compareAndSet(false, true)) {
-                                    if (continuation.isActive) {
-                                        continuation.resume(true)
-                                    }
-                                }
-                                // We still pass every found link up to the UI.
-                                callback(foundLink)
-                            }
-                        }
-                    } finally {
-                        // This block ensures the counter always decrements.
-                        synchronized(this) {
-                            remainingServers--
-                            // If this is the last server and the bell was never rung, we fail.
-                            if (remainingServers == 0 && !hasResumed.get()) {
-                                if (continuation.isActive) {
-                                    continuation.resume(false)
-                                }
-                            }
-                        }
+        // `apmap` executes the code block for each server in parallel.
+        // The lambda passed to it is already a `suspend` function.
+        servers.apmap { serverLi: Element ->
+            try {
+                val link = serverLi.attr("data-link")
+                if (link.isNotBlank()) {
+                    // We can call `loadExtractor` directly because we are in a suspend context.
+                    loadExtractor(link, data, subtitleCallback) { foundLink ->
+                        callback(foundLink)
+                        // Set the flag to true. This is safe to do from multiple threads.
+                        foundAUrl.set(true)
                     }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
+
+        // Return true if any of the parallel executions found a URL, false otherwise.
+        return foundAUrl.get()
     }
     // =================================================================================
-    // END of v52 THE FINAL PROFESSIONAL FIX
+    // END of THE FIX
     // =================================================================================
 }
