@@ -3,7 +3,6 @@ package com.egydead
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.network.CloudflareKiller
@@ -29,6 +28,7 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
     }
 }
 
+@Suppress("DEPRECATION")
 class StreamHG : ExtractorApi() {
     override var name = "StreamHG"
     override var mainUrl = "hglink.to"
@@ -36,6 +36,7 @@ class StreamHG : ExtractorApi() {
 
     private val potentialHosts = listOf("kravaxxa.com")
 
+    @Suppress("DEPRECATION")
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val videoId = url.substringAfterLast("/")
         if (videoId.isBlank()) return
@@ -52,8 +53,9 @@ class StreamHG : ExtractorApi() {
                 val m3u8Link = Regex("""['"]hls2['"]\s*:\s*['"](.*?)['"]""").find(unpacked)?.groupValues?.get(1)
 
                 if (m3u8Link != null) {
+                    @Suppress("DEPRECATION")
                     callback(
-                        newExtractorLink(
+                        ExtractorLink(
                             source = this.name,
                             name = this.name,
                             url = m3u8Link,
