@@ -1,172 +1,119 @@
-package com.Coflix
+package com.egydead
 
-import com.lagradost.api.Log
-import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.extractors.Filesim
-import com.lagradost.cloudstream3.extractors.StreamSB
-import com.lagradost.cloudstream3.extractors.VidhideExtractor
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.INFER_TYPE
-import com.lagradost.cloudstream3.utils.M3u8Helper
+import com.lagradost.cloudstream3.utils.newExtractorLink  // ← هذا هو الاستيراد المفقود!
+import com.lagradost.cloudstream3.SubtitleFile
+import com.lagradost.cloudstream3.utils.getAndUnpack
+import com.lagradost.cloudstream3.network.CloudflareKiller
 import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.newExtractorLink
-import kotlin.text.Regex
-import com.google.gson.JsonObject
-import com.google.gson.JsonParser
-import com.lagradost.cloudstream3.base64Decode
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import org.jsoup.nodes.Document
+import android.util.Log
 
-open class darkibox : ExtractorApi() {
-    override var name = "Darkibox"
-    override var mainUrl = "https://darkibox.com"
-    override val requiresReferer = true
+// The extractor list now only contains StreamHG to focus on it.
+val extractorList = listOf(
+    StreamHG()
+)
 
-    override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
-            val response = app.get(url,referer=mainUrl).toString()
-            Regex("""sources:\s*\[\{src:\s*"(.*?)"""").find(response)?.groupValues?.get(1)?.let { link ->
-                return listOf(
-                    newExtractorLink(
-                        this.name,
-                        this.name,
-                        url = link,
-                        ExtractorLinkType.M3U8
-                    ) {
-                        this.referer = referer ?: ""
-                        this.quality = Qualities.P1080.value
-                    }
-                )
-            }
-        return null
+// Full browser headers for emulation.
+private val BROWSER_HEADERS = mapOf(
+    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
+    "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36", // ← صححت User-Agent هنا أيضاً
+)
+
+private val cloudflareKiller by lazy { CloudflareKiller() }
+
+// Safe function to get page as Document.
+private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
+    Log.d("StreamHG_Final", "safeGetAsDocument: Attempting to GET URL: $url")
+    return try {
+        val response = app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false)
+        Log.d("StreamHG_Final", "safeGetAsDocument: Successfully got response for URL: $url with status code: ${response.code}")
+        response.document
+    } catch (e: Exception) {
+        Log.e("StreamHG_Final", "safeGetAsDocument: FAILED to GET URL: $url. Error: ${e.message}")
+        null
     }
 }
 
-open class Videzz : ExtractorApi() {
-    override var name = "Videzz"
-    override var mainUrl = "https://videzz.net"
+// The classes must be public to be accessible in the public `extractorList`.
+abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
 
-    override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
-            val mp4 = app.get(url,referer=mainUrl).document.select("#vplayer > #player source").attr("src")
-            return listOf(
-                newExtractorLink(
-                    this.name,
-                    this.name,
-                    url = mp4,
-                    type = INFER_TYPE
-                ) {
-                    this.referer = referer ?: ""
-                    this.quality = Qualities.P1080.value
-                }
-            )
-    }
-}
+    // Focusing only on kravaxxa.com
+    private val potentialHosts = listOf(
+        "kravaxxa.com"
+    )
 
-class VidHideplus : VidhideExtractor() {
-    override var mainUrl = "https://vidhideplus.com"
-}
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        Log.d("StreamHG_Final", "================== getUrl CALLED ==================")
+        Log.d("StreamHG_Final", "Initial URL: $url")
 
-
-class waaw : StreamSB() {
-    override var mainUrl = "https://waaw.to"
-}
-
-class FileMoonSx : Filesim() {
-    override val mainUrl = "https://filemoon.sx"
-    override val name = "FileMoonSx"
-}
-
-open class Voe : ExtractorApi() {
-    override val name = "Voe"
-    override val mainUrl = "https://voe.sx"
-    override val requiresReferer = true
-    private val redirectRegex = Regex("""window.location.href\s*=\s*'([^']+)';""")
-
-    override suspend fun getUrl(
-        url: String,
-        referer: String?,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ) {
-        var res = app.get(url, referer = referer)
-        val redirectUrl = redirectRegex.find(res.document.data())?.groupValues?.get(1)
-        if (redirectUrl != null) {
-            res = app.get(redirectUrl, referer = referer)
-        }
-        val encodedString = res.document.selectFirst("script[type=application/json]")?.data()?.trim()?.substringAfter("[\"")?.substringBeforeLast("\"]")
-        if (encodedString == null) {
-            println("encoded string not found.")
+        val videoId = url.substringAfterLast("/")
+        if (videoId.isBlank()) {
+            Log.e("StreamHG_Final", "Failed to extract video ID from URL.")
             return
         }
-        val decryptedJson = decryptF7(encodedString)
-        val m3u8 = decryptedJson.get("source")?.asString
-        val mp4 = decryptedJson.get("direct_access_url")?.asString
+        Log.d("StreamHG_Final", "Extracted Video ID: $videoId")
 
-        if (m3u8 != null) {
-            M3u8Helper.generateM3u8(
-                name,
-                m3u8,
-                "$mainUrl/",
-                headers = mapOf("Origin" to "$mainUrl/")
-            ).forEach(callback)
-        }
-        if (mp4!=null)
-        {
-            callback.invoke(
-                newExtractorLink(
-                    source = "$name MP4",
-                    name = "$name MP4",
-                    url = mp4,
-                    INFER_TYPE
-                ) {
-                    this.referer = url
-                    this.quality = Qualities.Unknown.value
-                }
-            )
-        }
-    }
+        for (host in potentialHosts) {
+            val finalPageUrl = "https://$host/e/$videoId"
+            Log.d("StreamHG_Final", "Constructed final page URL: $finalPageUrl")
 
-    private fun decryptF7(p8: String): JsonObject {
-        return try {
-            val vF = rot13(p8)
-            val vF2 = replacePatterns(vF)
-            val vF3 = removeUnderscores(vF2)
-            val vF4 = base64Decode(vF3)
-            val vF5 = charShift(vF4, 3)
-            val vF6 = reverse(vF5)
-            val vAtob = base64Decode(vF6)
+            val doc = safeGetAsDocument(finalPageUrl, referer = url)
 
-            JsonParser.parseString(vAtob).asJsonObject
-        } catch (e: Exception) {
-            println("Decryption error: ${e.message}")
-            JsonObject()
-        }
-    }
-
-    private fun rot13(input: String): String {
-        return input.map { c ->
-            when (c) {
-                in 'A'..'Z' -> ((c - 'A' + 13) % 26 + 'A'.code).toChar()
-                in 'a'..'z' -> ((c - 'a' + 13) % 26 + 'a'.code).toChar()
-                else -> c
+            if (doc == null) {
+                Log.e("StreamHG_Final", "Failed to get document from $finalPageUrl. Document is null.")
+                continue
             }
-        }.joinToString("")
-    }
+            Log.d("StreamHG_Final", "Successfully retrieved document.")
 
-    private fun replacePatterns(input: String): String {
-        val patterns = listOf("@$", "^^", "~@", "%?", "*~", "!!", "#&")
-        return patterns.fold(input) { result, pattern ->
-            result.replace(Regex(Regex.escape(pattern)), "_")
+            val packedJs = doc.select("script").find { it.data().contains("eval(function(p,a,c,k,e,d)") }?.data() // ← استخدمت select بدلاً من selectFirst
+            if (packedJs == null || packedJs.isBlank()) {
+                Log.e("StreamHG_Final", "Could not find the packed JS (eval) script on the page.")
+                continue
+            }
+            Log.d("StreamHG_Final", "Found packed JS script.")
+
+            try {
+                val unpacked = getAndUnpack(packedJs)
+                Log.d("StreamHG_Final", "Successfully unpacked JS.")
+                
+                // Flexible regex to find the hls2 link.
+                val m3u8Link = Regex("""['"]hls2['"]\s*:\s*['"](.*?)['"]""").find(unpacked)?.groupValues?.get(1)
+
+                if (m3u8Link != null) {
+                    Log.d("StreamHG_Final", "SUCCESS: Found 'hls2' link with flexible regex: $m3u8Link")
+                    Log.d("StreamHG_Final", "Submitting link using the correct newExtractorLink syntax.")
+                    
+                    // =================== SOLUTION ===================
+                    callback(
+                        newExtractorLink(  // ← الآن هذه الدالة معروفة بسبب الاستيراد
+                            source = this.name,
+                            name = this.name,
+                            url = m3u8Link,
+                            type = ExtractorLinkType.M3U8
+                        ) {
+                            this.referer = finalPageUrl  // ← الآن هذه الخصائص معروفة
+                            this.quality = Qualities.Unknown.value
+                        }
+                    )
+                    Log.d("StreamHG_Final", "Successfully submitted the link via callback.")
+                    return 
+                } else {
+                    Log.e("StreamHG_Final", "Unpacked JS, but the final regex FAILED to find the 'hls2' link.")
+                }
+
+            } catch (e: Exception) {
+                Log.e("StreamHG_Final", "An error occurred during unpacking or regex matching: ${e.message}")
+            }
         }
+
+        Log.d("StreamHG_Final", "================== getUrl FINISHED (No link found) ==================")
     }
-
-    private fun removeUnderscores(input: String): String = input.replace("_", "")
-
-    private fun charShift(input: String, shift: Int): String {
-        return input.map { (it.code - shift).toChar() }.joinToString("")
-    }
-
-    private fun reverse(input: String): String = input.reversed()
-
 }
+
+class StreamHG : StreamHGBase("StreamHG", "hglink.to")
