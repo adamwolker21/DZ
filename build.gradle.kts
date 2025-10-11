@@ -1,7 +1,6 @@
 import com.android.build.gradle.BaseExtension
 import com.lagradost.cloudstream3.gradle.CloudstreamExtension
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 buildscript {
     repositories {
@@ -52,32 +51,20 @@ subprojects {
             sourceCompatibility = JavaVersion.VERSION_1_8
             targetCompatibility = JavaVersion.VERSION_1_8
         }
+    }
 
-
-        kotlin {
-    jvmToolchain(8)
-    
-    // إضافة هذا للإعدادات العامة
-    sourceSets.all {
-        languageSettings {
-            optIn("kotlin.RequiresOptIn")
-            languageVersion = KotlinVersion.KOTLIN_1_8
+    // نقل إعدادات Kotlin خارج كتلة android
+    tasks.withType<KotlinCompile>().configureEach {
+        kotlinOptions {
+            jvmTarget = "1.8"
+            allWarningsAsErrors = false // هذا السطر مهم
+            freeCompilerArgs = freeCompilerArgs + listOf(
+                "-Xno-deprecation-warnings",
+                "-Xno-call-assertions",
+                "-Xno-param-assertions",
+                "-Xno-receiver-assertions"
+            )
         }
-    }
-}
-
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    kotlinOptions {
-        jvmTarget = "1.8"
-        allWarningsAsErrors = false // هذا السطر مهم
-        freeCompilerArgs = freeCompilerArgs + listOf(
-            "-Xno-deprecation-warnings",
-            "-Xno-call-assertions",
-            "-Xno-param-assertions",
-            "-Xno-receiver-assertions"
-        )
-    }
-}
     }
 
     dependencies {
