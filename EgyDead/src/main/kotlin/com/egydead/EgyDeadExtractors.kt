@@ -37,7 +37,9 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
     }
 }
 
-private abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
+// =================== FIX: Removed 'private' keyword ===================
+// The classes must be public to be accessible in the public `extractorList`.
+abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
 
     // التركيز فقط على kravaxxa.com
@@ -113,4 +115,5 @@ private abstract class StreamHGBase(override var name: String, override var main
     }
 }
 
-private class StreamHG : StreamHGBase("StreamHG", "hglink.to")
+// =================== FIX: Removed 'private' keyword ===================
+class StreamHG : StreamHGBase("StreamHG", "hglink.to")
