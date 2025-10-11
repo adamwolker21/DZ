@@ -2,7 +2,7 @@ package com.egydead
 
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
-import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.network.CloudflareKiller
@@ -25,26 +25,8 @@ private val BROWSER_HEADERS = mapOf(
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
 // Safe function to get page as Document.
-private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
-    Log.d("StreamHG_Final", "safeGetAsDocument: Attempting to GET URL: $url")
-    return try {
-        val response = app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false)
-        Log.d("StreamHG_Final", "safeGetAsDocument: Successfully got response for URL: $url with status code: ${response.code}")
-        response.document
-    } catch (e: Exception) {
-        Log.e("StreamHG_Final", "safeGetAsDocument: FAILED to GET URL: $url. Error: ${e.message}")
-        null
-    }
-}
-
-// The classes must be public to be accessible in the public `extractorList`.
-abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
-    override val requiresReferer = true
-
-    // Focusing only on kravaxxa.com
-    private val potentialHosts = listOf(
-        "kravaxxa.com"
-    )
+class StreamHG : StreamHGBase("StreamHG", "hglink.to") {
+    // ... الكود الحالي ...
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         Log.d("StreamHG_Final", "================== getUrl CALLED ==================")
@@ -80,19 +62,15 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
                 val unpacked = getAndUnpack(packedJs)
                 Log.d("StreamHG_Final", "Successfully unpacked JS.")
                 
-                // Flexible regex to find the hls2 link, ignoring formatting.
                 val m3u8Link = Regex("""['"]hls2['"]\s*:\s*['"](.*?)['"]""").find(unpacked)?.groupValues?.get(1)
 
                 if (m3u8Link != null) {
                     Log.d("StreamHG_Final", "SUCCESS: Found 'hls2' link with flexible regex: $m3u8Link")
-                    Log.d("StreamHG_Final", "Submitting link directly using the deprecated ExtractorLink constructor.")
+                    Log.d("StreamHG_Final", "Submitting link using newExtractorLink.")
                     
-                    // =================== FINAL FIX IMPLEMENTATION ===================
-                    // Use the old constructor and suppress the deprecation warning
-                    // to ensure a successful build while including the referer.
-                    @Suppress("DEPRECATION")
+                    // استخدام الدالة الجديدة بدلاً من المُنشئ المُهمل
                     callback(
-                        ExtractorLink(
+                        newExtractorLink(
                             source = this.name,
                             name = this.name,
                             url = m3u8Link,
