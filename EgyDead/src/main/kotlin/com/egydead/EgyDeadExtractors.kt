@@ -10,9 +10,9 @@ import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import android.util.Log
 
-// The extractor list now contains our final, engineered solution.
+// The final extractor list, containing the user-designed solution.
 val extractorList = listOf(
-    StreamHGEngineeredExtractor()
+    StreamHGFinalEngine()
 )
 
 private val BROWSER_HEADERS = mapOf(
@@ -23,7 +23,7 @@ private val BROWSER_HEADERS = mapOf(
 
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
-// This helper function is our final solution to the build issues.
+// Helper function to create links and bypass build restrictions.
 @Suppress("DEPRECATION")
 private fun createLink(
     source: String,
@@ -51,64 +51,25 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
     }
 }
 
-// The final extractor, containing its own "Engine" to build the correct link.
-class StreamHGEngineeredExtractor : ExtractorApi() {
+// The final extractor, implementing the user's brilliant deobfuscation algorithm.
+class StreamHGFinalEngine : ExtractorApi() {
     override var name = "StreamHG"
     override var mainUrl = "kravaxxa.com"
     override val requiresReferer = true
 
     /**
-     * This is our "Engine". It perfectly simulates the packed script's logic
-     * to deobfuscate it and then extracts the true hls2 link.
+     * A direct Kotlin translation of the user's successful deobfuscateCode function.
+     * It simulates the "fill-in-the-blanks" logic of the packed script.
      */
-    private fun deobfuscateAndExtract(packedJs: String): String? {
-        // Stage 1: The Master Regex to deconstruct the packed function.
-        // It captures the template (p), radix (a), count (c), and dictionary (k).
-        val masterRegex = Regex("""eval\(function\(p,a,c,k,e,d\)\{.*?return p\}\('(.*?)',(\d+),(\d+),'(.*?)'\.split\('\|'\)\)\)""")
-        val match = masterRegex.find(packedJs)
-
-        if (match == null || match.groupValues.size < 5) {
-            Log.e(name, "Engine FAILED: Could not deconstruct the packed function structure.")
-            return null
-        }
-
-        var template = match.groupValues[1]
-        val radix = match.groupValues[2].toIntOrNull() ?: 36
-        val count = match.groupValues[3].toIntOrNull() ?: 0
-        val dictionary = match.groupValues[4].split("|")
-
-        if (count != dictionary.size) {
-            Log.e(name, "Engine FAILED: Dictionary count mismatch.")
-            return null
-        }
-        Log.d(name, "Engine Stage 1 SUCCESS: Deconstructed packed script.")
-
-        // Stage 2: The "Fill-in-the-blanks" machine.
-        // This loop perfectly simulates the logic of the original eval function.
-        for (i in (count - 1) downTo 0) {
-            val keyword = dictionary[i]
-            if (keyword.isNotBlank()) {
-                val placeholder = i.toString(radix)
-                // Using regex for whole-word replacement (\b = word boundary)
-                template = template.replace(Regex("\\b$placeholder\\b"), keyword)
+    private fun deobfuscate(p: String, a: Int, c: Int, k: List<String>): String {
+        var template = p
+        for (i in (c - 1) downTo 0) {
+            if (i < k.size && k[i].isNotBlank()) {
+                val placeholder = i.toString(a)
+                template = template.replace(Regex("\\b$placeholder\\b"), k[i])
             }
         }
-        Log.d(name, "Engine Stage 2 SUCCESS: Deobfuscation complete.")
-        // Log.d(name, "Deobfuscated Script: $template") // Uncomment for deep debugging
-
-        // Stage 3: Pluck the fruit.
-        // Now that the script is clean, we just need to find our prize.
-        val hls2Regex = Regex(""""hls2"\s*:\s*"([^"]+)"""")
-        val hls2Match = hls2Regex.find(template)
-
-        return if (hls2Match != null) {
-            val finalUrl = hls2Match.groupValues[1]
-            Log.d(name, "Engine Stage 3 SUCCESS: Found hls2 link: $finalUrl")
-            finalUrl
-        } else {
-            Log.e(name, "Engine Stage 3 FAILED: Could not find hls2 link in the deobfuscated script.")
-            null
-        }
+        return template
     }
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
@@ -120,24 +81,47 @@ class StreamHGEngineeredExtractor : ExtractorApi() {
             Log.e(name, "No packed 'eval' JavaScript found.")
             return
         }
-        Log.d(name, "Found packed JS. Executing the Final Engine...")
+        Log.d(name, "Found packed JS. Executing the user-designed Final Engine...")
 
-        // Call our custom-built engine to get the link.
-        val finalUrl = deobfuscateAndExtract(packedJs)
+        // Stage 1: Deconstruction using the user's proven regex.
+        val masterRegex = Regex("""eval\(function\(p,a,c,k,e,d\)\{.*?\}\('(.*?)',(\d+),(\d+),'(.*?)'\.split\('\|'\)\)\)""")
+        val match = masterRegex.find(packedJs)
 
-        if (finalUrl != null) {
-            Log.d(name, "✅ EXTRACTION & DEOBFUSCATION SUCCESSFUL! Final link: $finalUrl")
+        if (match == null || match.groupValues.size < 5) {
+            Log.e(name, "Engine FAILED: Could not deconstruct the packed function structure.")
+            return
+        }
+        Log.d(name, "Engine Stage 1 SUCCESS: Deconstructed packed script into its core components.")
+
+        val (packedString, baseStr, countStr, keyString) = match.destructured
+        val base = baseStr.toIntOrNull() ?: 36
+        val count = countStr.toIntOrNull() ?: 0
+        val keys = keyString.split("|")
+
+        // Stage 2: Re-construction using our deobfuscate function.
+        val deobfuscatedJs = deobfuscate(packedString, base, count, keys)
+        Log.d(name, "Engine Stage 2 SUCCESS: Deobfuscation complete.")
+
+        // Stage 3: Extraction of the final prize.
+        val hls2Regex = Regex(""""hls2"\s*:\s*"([^"]+)"""")
+        val urlMatch = hls2Regex.find(deobfuscatedJs)
+
+        if (urlMatch != null) {
+            val finalUrl = urlMatch.groupValues[1]
+            Log.d(name, "Engine Stage 3 SUCCESS: Found hls2 link: $finalUrl")
+            Log.d(name, "✅ EXTRACTION & DEOBFUSCATION SUCCESSFUL!")
+
             callback(
                 createLink(
                     source = this.name,
                     name = this.name,
                     url = finalUrl,
-                    referer = url, // Pass the crucial referer
+                    referer = url,
                     quality = Qualities.Unknown.value
                 )
             )
         } else {
-            Log.e(name, "❌ FAILED: The Final Engine could not find the link.")
+            Log.e(name, "Engine Stage 3 FAILED: Could not find 'hls2' link in the deobfuscated script.")
         }
     }
                               }
