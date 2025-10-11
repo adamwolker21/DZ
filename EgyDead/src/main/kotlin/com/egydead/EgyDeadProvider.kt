@@ -4,26 +4,28 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.json.JSONObject
-import org.jsoup.Jsoup // Import Jsoup directly for manual parsing
+import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import android.util.Log
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.resume
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 // =================================================================================
-// START of v46 - The Final Manual Fix
-// All logic is now inside the Provider, and we are manually parsing HTML
-// to bypass the `NoSuchMethodError`.
+// START of v47 - The Final Professional Fix
+// This version combines the stable provider base, the merged extractor logic,
+// and the correct, professional waiting mechanism (suspendCancellableCoroutine).
 // =================================================================================
 
-// --- Helper variables and functions moved here for the merged logic ---
+// --- Helper variables and functions for the merged logic ---
 private val BROWSER_HEADERS = mapOf(
     "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
     "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
     "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36",
 )
-
-// This separate cloudflareKiller instance is for our manual extraction logic.
 private val extractorCloudflareKiller by lazy { CloudflareKiller() }
+
 
 // --- Main Provider Class ---
 class EgyDeadProvider : MainAPI() {
@@ -42,8 +44,7 @@ class EgyDeadProvider : MainAPI() {
         "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "أفلام آسيوية",
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
-
-    // This is the provider's own cloudflareKiller.
+    
     private val providerCloudflareKiller by lazy { CloudflareKiller() }
 
     private suspend fun getWatchPage(url: String): Document? {
@@ -67,14 +68,14 @@ class EgyDeadProvider : MainAPI() {
         }
     }
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse { /* ... */
         val url = if (page == 1) "$mainUrl${request.data}" else "$mainUrl${request.data}page/$page/"
         val document = app.get(url, interceptor = providerCloudflareKiller).document
         val home = document.select("li.movieItem").mapNotNull { it.toSearchResult() }
         return newHomePageResponse(request.name, home)
     }
 
-    private fun Element.toSearchResult(): SearchResponse? {
+    private fun Element.toSearchResult(): SearchResponse? { /* ... */
         val href = this.selectFirst("a")?.attr("href") ?: return null
         val title = this.selectFirst("h1.BottomTitle")?.text() ?: return null
         val posterUrl = this.selectFirst("img")?.attr("src")
@@ -84,12 +85,12 @@ class EgyDeadProvider : MainAPI() {
         else newMovieSearchResponse(cleanedTitle, href, TvType.Movie) { this.posterUrl = posterUrl }
     }
 
-    override suspend fun search(query: String): List<SearchResponse> {
+    override suspend fun search(query: String): List<SearchResponse> { /* ... */
         val document = app.get("$mainUrl/?s=$query", interceptor = providerCloudflareKiller).document
         return document.select("li.movieItem").mapNotNull { it.toSearchResult() }
     }
 
-    override suspend fun load(url: String): LoadResponse? {
+    override suspend fun load(url: String): LoadResponse? { /* ... */
         val document = app.get(url, interceptor = providerCloudflareKiller).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
@@ -113,6 +114,10 @@ class EgyDeadProvider : MainAPI() {
         }
     }
     
+    // =================================================================================
+    // THE FINAL FIX: `loadLinks` now uses the professional `suspendCancellableCoroutine`
+    // to be both FAST (parallel) and PATIENT (wait for the first result).
+    // =================================================================================
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
@@ -121,60 +126,68 @@ class EgyDeadProvider : MainAPI() {
         val servers = watchPageDoc.select("div.mob-servers li")
         if (servers.isEmpty()) return false
 
-        for (server in servers) {
-            val link = server.attr("data-link")
-            if (link.isBlank()) continue
-            
-            Log.d("EgyDeadProvider", "Processing server link: $link")
+        // This creates the "waiting room". The function will pause here.
+        return suspendCancellableCoroutine { continuation ->
+            val hasResumed = AtomicBoolean(false)
+            var remainingServers = servers.size
 
-            try {
-                if (link.contains("hglink.to")) {
-                    val potentialHosts = listOf("kravaxxa.com", "cavanhabg.com", "dumbalag.com")
-                    val videoId = link.substringAfterLast("/")
-                    if (videoId.isBlank()) continue
-
-                    for (host in potentialHosts) {
+            servers.apmap { server ->
+                val link = server.attr("data-link")
+                if (link.isBlank()) {
+                    synchronized(this) { remainingServers-- } // Decrement for blank links too
+                } else {
+                    // We launch each extractor's logic in its own safe coroutine.
+                    ioSafe {
                         try {
-                            val finalPageUrl = "https://$host/e/$videoId"
-                            
-                            // =================== v46 MANUAL PARSING FIX ===================
-                            // Step 1: Get the raw HTML text.
-                            val htmlText = app.get(finalPageUrl, referer = data, headers = BROWSER_HEADERS, interceptor = extractorCloudflareKiller, verify = false).text
-                            // Step 2: Manually parse the text into a Jsoup Document.
-                            val doc = Jsoup.parse(htmlText)
-                            // =============================================================
+                            // --- StreamHG Logic ---
+                            if (link.contains("hglink.to")) {
+                                val potentialHosts = listOf("kravaxxa.com", "cavanhabg.com", "dumbalag.com")
+                                val videoId = link.substringAfterLast("/")
+                                if (videoId.isNotBlank()) {
+                                    for (host in potentialHosts) {
+                                        try {
+                                            val finalPageUrl = "https://$host/e/$videoId"
+                                            val htmlText = app.get(finalPageUrl, referer = data, headers = BROWSER_HEADERS, interceptor = extractorCloudflareKiller, verify = false).text
+                                            val doc = Jsoup.parse(htmlText)
+                                            val packedJs = doc.select("script").map { it.data() }.filter { it.contains("eval(function(p,a,c,k,e,d)") }.maxByOrNull { it.length } ?: continue
+                                            val unpacked = getAndUnpack(packedJs)
+                                            val jsonObjectString = unpacked.substringAfter("var links = ").substringBefore(";").trim()
+                                            val jsonObject = JSONObject(jsonObjectString)
+                                            val m3u8Link = jsonObject.getString("hls2")
 
-                            val packedJs = doc.select("script")
-                                .map { it.data() }
-                                .filter { it.contains("eval(function(p,a,c,k,e,d)") }
-                                .maxByOrNull { it.length } ?: continue
-                            
-                            val unpacked = getAndUnpack(packedJs)
-                            val jsonObjectString = unpacked.substringAfter("var links = ").substringBefore(";").trim()
-                            val jsonObject = JSONObject(jsonObjectString)
-                            val m3u8Link = jsonObject.getString("hls2")
-
-                            if (m3u8Link.isNotBlank() && m3u8Link.startsWith("http")) {
-                                callback(
-                                    newExtractorLink("StreamHG", "StreamHG", m3u8Link, type = ExtractorLinkType.M3U8) {
-                                        this.referer = finalPageUrl
-                                        this.quality = Qualities.Unknown.value
+                                            if (m3u8Link.isNotBlank() && m3u8Link.startsWith("http")) {
+                                                callback(newExtractorLink("StreamHG", "StreamHG", m3u8Link, type = ExtractorLinkType.M3U8) {
+                                                    this.referer = finalPageUrl
+                                                })
+                                                if (hasResumed.compareAndSet(false, true) && continuation.isActive) {
+                                                    continuation.resume(true)
+                                                }
+                                                break // Exit host loop
+                                            }
+                                        } catch (e: Exception) { /* Continue to next host */ }
                                     }
-                                )
-                                break 
+                                }
+                            } else {
+                                // --- Built-in Extractor Logic ---
+                                loadExtractor(link, data, subtitleCallback) { foundLink ->
+                                    callback(foundLink)
+                                    if (hasResumed.compareAndSet(false, true) && continuation.isActive) {
+                                        continuation.resume(true)
+                                    }
+                                }
                             }
-                        } catch (e: Exception) {
-                            Log.e("EgyDeadProvider", "StreamHG failed on host '$host': ${e.message}")
+                        } finally {
+                            // This block ensures the counter always decrements, even if an error occurs.
+                            synchronized(this) {
+                                remainingServers--
+                                if (remainingServers == 0 && !hasResumed.get() && continuation.isActive) {
+                                    continuation.resume(false)
+                                }
+                            }
                         }
                     }
-                } else {
-                    // For other servers, we can still use the built-in `loadExtractor`.
-                    loadExtractor(link, data, subtitleCallback, callback)
                 }
-            } catch (e: Exception) {
-                Log.e("EgyDeadProvider", "Failed to process server $link: ${e.message}")
             }
         }
-        return true
     }
 }
