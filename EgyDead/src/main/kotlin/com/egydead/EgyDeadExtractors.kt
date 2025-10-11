@@ -3,7 +3,7 @@ package com.egydead
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.newExtractorLink  // ← هذا هو الاستيراد المفقود!
+import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.network.CloudflareKiller
@@ -21,7 +21,7 @@ val extractorList = listOf(
 private val BROWSER_HEADERS = mapOf(
     "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
     "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
-    "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36", // ← صححت User-Agent هنا أيضاً
+    "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
 )
 
 private val cloudflareKiller by lazy { CloudflareKiller() }
@@ -71,7 +71,7 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
             }
             Log.d("StreamHG_Final", "Successfully retrieved document.")
 
-            val packedJs = doc.select("script").find { it.data().contains("eval(function(p,a,c,k,e,d)") }?.data() // ← استخدمت select بدلاً من selectFirst
+            val packedJs = doc.select("script").find { it.data().contains("eval(function(p,a,c,k,e,d)") }?.data()
             if (packedJs == null || packedJs.isBlank()) {
                 Log.e("StreamHG_Final", "Could not find the packed JS (eval) script on the page.")
                 continue
@@ -82,33 +82,33 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
                 val unpacked = getAndUnpack(packedJs)
                 Log.d("StreamHG_Final", "Successfully unpacked JS.")
                 
-                // Flexible regex to find the hls2 link.
-                val m3u8Link = Regex("""['"]hls2['"]\s*:\s*['"](.*?)['"]""").find(unpacked)?.groupValues?.get(1)
+                // =================== v24 FIX: Robust String Manipulation ===================
+                // Instead of a fragile regex, we use direct string search which is more reliable.
+                val m3u8Link = unpacked.substringAfter("""hls2":"_URL_""").substringBefore("""_URL_"""")
 
-                if (m3u8Link != null) {
-                    Log.d("StreamHG_Final", "SUCCESS: Found 'hls2' link with flexible regex: $m3u8Link")
+                if (m3u8Link.isNotBlank() && m3u8Link.startsWith("http")) {
+                    Log.d("StreamHG_Final", "SUCCESS: Found 'hls2' link using robust string manipulation: $m3u8Link")
                     Log.d("StreamHG_Final", "Submitting link using the correct newExtractorLink syntax.")
                     
-                    // =================== SOLUTION ===================
                     callback(
-                        newExtractorLink(  // ← الآن هذه الدالة معروفة بسبب الاستيراد
+                        newExtractorLink(
                             source = this.name,
                             name = this.name,
                             url = m3u8Link,
                             type = ExtractorLinkType.M3U8
                         ) {
-                            this.referer = finalPageUrl  // ← الآن هذه الخصائص معروفة
+                            this.referer = finalPageUrl
                             this.quality = Qualities.Unknown.value
                         }
                     )
                     Log.d("StreamHG_Final", "Successfully submitted the link via callback.")
                     return 
                 } else {
-                    Log.e("StreamHG_Final", "Unpacked JS, but the final regex FAILED to find the 'hls2' link.")
+                    Log.e("StreamHG_Final", "Robust string manipulation FAILED to find a valid 'hls2' link.")
                 }
 
             } catch (e: Exception) {
-                Log.e("StreamHG_Final", "An error occurred during unpacking or regex matching: ${e.message}")
+                Log.e("StreamHG_Final", "An error occurred during unpacking or link extraction: ${e.message}")
             }
         }
 
