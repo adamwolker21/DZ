@@ -3,11 +3,12 @@ package com.egydead
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.newExtractorLink  // ← هذا هو الاستيراد المفقود!
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.ExtractorLinkType // Import the required type
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import org.jsoup.nodes.Document
 import android.util.Log
 
@@ -20,7 +21,7 @@ val extractorList = listOf(
 private val BROWSER_HEADERS = mapOf(
     "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
     "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
-    "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/5.0 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+    "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36", // ← صححت User-Agent هنا أيضاً
 )
 
 private val cloudflareKiller by lazy { CloudflareKiller() }
@@ -70,7 +71,7 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
             }
             Log.d("StreamHG_Final", "Successfully retrieved document.")
 
-            val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
+            val packedJs = doc.select("script").find { it.data().contains("eval(function(p,a,c,k,e,d)") }?.data() // ← استخدمت select بدلاً من selectFirst
             if (packedJs == null || packedJs.isBlank()) {
                 Log.e("StreamHG_Final", "Could not find the packed JS (eval) script on the page.")
                 continue
@@ -88,17 +89,15 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
                     Log.d("StreamHG_Final", "SUCCESS: Found 'hls2' link with flexible regex: $m3u8Link")
                     Log.d("StreamHG_Final", "Submitting link using the correct newExtractorLink syntax.")
                     
-                    // =================== YOUR DISCOVERED SOLUTION ===================
-                    // Using the modern newExtractorLink with the correct configuration
-                    // block syntax to set optional properties.
+                    // =================== SOLUTION ===================
                     callback(
-                        newExtractorLink(
+                        newExtractorLink(  // ← الآن هذه الدالة معروفة بسبب الاستيراد
                             source = this.name,
                             name = this.name,
                             url = m3u8Link,
                             type = ExtractorLinkType.M3U8
                         ) {
-                            this.referer = finalPageUrl
+                            this.referer = finalPageUrl  // ← الآن هذه الخصائص معروفة
                             this.quality = Qualities.Unknown.value
                         }
                     )
