@@ -2,7 +2,7 @@ package com.egydead
 
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
-import com.lagradost.cloudstream3.utils.newExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.network.CloudflareKiller
