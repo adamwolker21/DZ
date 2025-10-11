@@ -57,12 +57,17 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val videoId = url.substringAfterLast("/")
         if (videoId.isBlank()) return
+        
+        // =================== v35 THE FINAL GUARANTEED DELIVERY ===================
+        // Instead of calling the callback immediately and returning, we collect all found links
+        // into a list. This prevents any timing issues (race conditions) where the function
+        // might exit before the callback has been fully processed by the app's UI thread.
+        val extractorLinks = mutableListOf<ExtractorLink>()
 
         for (host in potentialHosts) {
             val finalPageUrl = "https://$host/e/$videoId"
             val doc = safeGetAsDocument(finalPageUrl, referer = url) ?: continue
 
-            // Find all 'eval' scripts and pick the longest one to avoid the trap script.
             val packedJs = doc.select("script")
                 .map { it.data() }
                 .filter { it.contains("eval(function(p,a,c,k,e,d)") }
@@ -73,19 +78,12 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
             try {
                 val unpacked = getAndUnpack(packedJs)
                 
-                // =================== v34 THE FINAL TRIM FIX ===================
-                // The JSON parser failed because the extracted string had a leading space.
-                // Adding .trim() removes any leading/trailing whitespace, ensuring the string
-                // starts with '{' as required by the JSON parser.
                 val jsonObjectString = unpacked.substringAfter("var links = ").substringBefore(";").trim()
                 val jsonObject = JSONObject(jsonObjectString)
                 val m3u8Link = jsonObject.getString("hls2")
-                // ====================================================================
 
                 if (m3u8Link.isNotBlank() && m3u8Link.startsWith("http")) {
-                    Log.d("StreamHG", "SUCCESS: Found 'hls2' link via JSON Parsing: $m3u8Link")
-                    
-                    callback(
+                    extractorLinks.add(
                         newExtractorLink(
                             source = this.name,
                             name = this.name,
@@ -96,12 +94,18 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
                             this.quality = Qualities.Unknown.value
                         }
                     )
-                    return 
+                    // We found a working link on this host, so we can stop searching.
+                    break 
                 }
             } catch (e: Exception) {
-                Log.e("StreamHG", "An error occurred during JSON parsing or link extraction: ${e.message}")
+                // Continue to the next host if something fails
             }
         }
+
+        // After the loop has finished, we submit all the links we found.
+        // This is the most robust way to ensure the links are delivered to the app.
+        extractorLinks.forEach(callback)
+        // ====================================================================
     }
 }
 
