@@ -3,11 +3,20 @@ package com.egydead
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.network.CloudflareKiller
+import org.json.JSONObject
+import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import android.util.Log
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.coroutines.resume
-import kotlinx.coroutines.suspendCancellableCoroutine
+
+// --- Helper variables and functions for the merged logic ---
+private val BROWSER_HEADERS = mapOf(
+    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
+    "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36",
+)
+private val extractorCloudflareKiller by lazy { CloudflareKiller() }
 
 class EgyDeadProvider : MainAPI() {
     // This is the known working base of the provider.
@@ -26,11 +35,11 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
-    private val cloudflareKiller by lazy { CloudflareKiller() }
+    private val providerCloudflareKiller by lazy { CloudflareKiller() }
 
     private suspend fun getWatchPage(url: String): Document? {
         try {
-            val initialResponse = app.get(url, interceptor = cloudflareKiller)
+            val initialResponse = app.get(url, interceptor = providerCloudflareKiller)
             val document = initialResponse.document
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
@@ -41,7 +50,7 @@ class EgyDeadProvider : MainAPI() {
                     "Origin" to mainUrl
                 )
                 val data = mapOf("View" to "1")
-                return app.post(url, headers = headers, data = data, cookies = cookies, interceptor = cloudflareKiller).document
+                return app.post(url, headers = headers, data = data, cookies = cookies, interceptor = providerCloudflareKiller).document
             }
             return document
         } catch (e: Exception) {
@@ -52,7 +61,7 @@ class EgyDeadProvider : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page == 1) "$mainUrl${request.data}" else "$mainUrl${request.data}page/$page/"
-        val document = app.get(url, interceptor = cloudflareKiller).document
+        val document = app.get(url, interceptor = providerCloudflareKiller).document
         val home = document.select("li.movieItem").mapNotNull { it.toSearchResult() }
         return newHomePageResponse(request.name, home)
     }
@@ -68,12 +77,12 @@ class EgyDeadProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val document = app.get("$mainUrl/?s=$query", interceptor = cloudflareKiller).document
+        val document = app.get("$mainUrl/?s=$query", interceptor = providerCloudflareKiller).document
         return document.select("li.movieItem").mapNotNull { it.toSearchResult() }
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url, interceptor = cloudflareKiller).document
+        val document = app.get(url, interceptor = providerCloudflareKiller).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
         val plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
@@ -100,10 +109,9 @@ class EgyDeadProvider : MainAPI() {
     }
 
     // =================================================================================
-    // START of THE FIX
-    // The previous implementation was overly complex and caused errors.
-    // `apmap` already runs its lambda in a suspendable context, so `launch` is not needed.
-    // We use AtomicBoolean to safely track if any link was found across parallel executions.
+    // START of v54 - The Final Surgical Fix
+    // This function now uses the simple and effective waiting mechanism you fixed,
+    // but crucially, it bypasses `loadExtractor` for StreamHG and does the work directly.
     // =================================================================================
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
@@ -114,20 +122,52 @@ class EgyDeadProvider : MainAPI() {
 
         if (servers.isEmpty()) return false
 
-        // A thread-safe boolean to track if we have successfully found any link.
         val foundAUrl = AtomicBoolean(false)
 
-        // `apmap` executes the code block for each server in parallel.
-        // The lambda passed to it is already a `suspend` function.
         servers.apmap { serverLi: Element ->
             try {
                 val link = serverLi.attr("data-link")
                 if (link.isNotBlank()) {
-                    // We can call `loadExtractor` directly because we are in a suspend context.
-                    loadExtractor(link, data, subtitleCallback) { foundLink ->
-                        callback(foundLink)
-                        // Set the flag to true. This is safe to do from multiple threads.
-                        foundAUrl.set(true)
+                    
+                    // --- THE SURGICAL FIX ---
+                    // Instead of calling the problematic `loadExtractor` for StreamHG,
+                    // we do the work directly here.
+                    if (link.contains("hglink.to")) {
+                        Log.d("EgyDeadProvider", "Manually processing StreamHG link: $link")
+                        val potentialHosts = listOf("kravaxxa.com", "cavanhabg.com", "dumbalag.com")
+                        val videoId = link.substringAfterLast("/")
+                        if (videoId.isNotBlank()) {
+                            for (host in potentialHosts) {
+                                try {
+                                    val finalPageUrl = "https://$host/e/$videoId"
+                                    val htmlText = app.get(finalPageUrl, referer = data, headers = BROWSER_HEADERS, interceptor = extractorCloudflareKiller, verify = false).text
+                                    val doc = Jsoup.parse(htmlText)
+                                    val packedJs = doc.select("script").map { it.data() }.filter { it.contains("eval(function(p,a,c,k,e,d)") }.maxByOrNull { it.length } ?: continue
+                                    val unpacked = getAndUnpack(packedJs)
+                                    val jsonObjectString = unpacked.substringAfter("var links = ").substringBefore(";").trim()
+                                    val jsonObject = JSONObject(jsonObjectString)
+                                    val m3u8Link = jsonObject.getString("hls2")
+
+                                    if (m3u8Link.isNotBlank() && m3u8Link.startsWith("http")) {
+                                        callback(
+                                            newExtractorLink("StreamHG", "StreamHG", m3u8Link, type = ExtractorLinkType.M3U8) {
+                                                this.referer = finalPageUrl
+                                            }
+                                        )
+                                        foundAUrl.set(true)
+                                        break // Found link, break from host loop
+                                    }
+                                } catch (e: Exception) {
+                                    // continue to next host
+                                }
+                            }
+                        }
+                    } else {
+                        // For all other servers, we continue to use the reliable `loadExtractor`.
+                        loadExtractor(link, data, subtitleCallback) { foundLink ->
+                            callback(foundLink)
+                            foundAUrl.set(true)
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -135,10 +175,6 @@ class EgyDeadProvider : MainAPI() {
             }
         }
 
-        // Return true if any of the parallel executions found a URL, false otherwise.
         return foundAUrl.get()
     }
-    // =================================================================================
-    // END of THE FIX
-    // =================================================================================
 }
