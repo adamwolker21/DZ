@@ -4,9 +4,9 @@ import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
-import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.network.CloudflareKiller
+import com.lagradost.cloudstream3.utils.Qualities
 import org.jsoup.nodes.Document
 import android.util.Log
 
@@ -80,28 +80,31 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
                 val unpacked = getAndUnpack(packedJs)
                 Log.d("StreamHG_Final", "Successfully unpacked JS.")
                 
-                // =================== v20 FIX: More flexible Regex ===================
-                // This new regex is more robust and ignores formatting issues like newlines or extra spaces.
-                // It looks for 'hls2', then a colon, then a quote, and captures everything until the next quote.
+                // Flexible regex to find the hls2 link, ignoring formatting.
                 val m3u8Link = Regex("""['"]hls2['"]\s*:\s*['"](.*?)['"]""").find(unpacked)?.groupValues?.get(1)
 
                 if (m3u8Link != null) {
-                    Log.d("StreamHG_Final", "SUCCESS: Found 'hls2' link with new regex: $m3u8Link")
-                    Log.d("StreamHG_Final", "Calling M3u8Helper.generateM3u8...")
+                    Log.d("StreamHG_Final", "SUCCESS: Found 'hls2' link with flexible regex: $m3u8Link")
+                    Log.d("StreamHG_Final", "Submitting link directly using the deprecated ExtractorLink constructor.")
                     
-                    M3u8Helper.generateM3u8(
-                        this.name,
-                        m3u8Link,
-                        finalPageUrl, // Referer for the m3u8 request
-                        headers = BROWSER_HEADERS
-                    ).forEach { link ->
-                        Log.d("StreamHG_Final", "M3u8Helper provided a link: ${link.url} with quality: ${link.quality}")
-                        callback(link)
-                    }
-                    Log.d("StreamHG_Final", "Finished calling M3u8Helper.")
+                    // =================== FINAL FIX IMPLEMENTATION ===================
+                    // Use the old constructor and suppress the deprecation warning
+                    // to ensure a successful build while including the referer.
+                    @Suppress("DEPRECATION")
+                    callback(
+                        ExtractorLink(
+                            source = this.name,
+                            name = this.name,
+                            url = m3u8Link,
+                            referer = finalPageUrl,
+                            quality = Qualities.Unknown.value,
+                            isM3u8 = true
+                        )
+                    )
+                    Log.d("StreamHG_Final", "Successfully submitted the link via callback.")
                     return 
                 } else {
-                    Log.e("StreamHG_Final", "Unpacked JS, but the FINAL regex FAILED to find the 'hls2' link.")
+                    Log.e("StreamHG_Final", "Unpacked JS, but the final regex FAILED to find the 'hls2' link.")
                 }
 
             } catch (e: Exception) {
