@@ -4,124 +4,113 @@ import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
-import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.M3u8Helper
+import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import android.util.Log
 
-// The final extractor list, containing a direct translation of the user's proven algorithm.
+// قائمة المستخرجات تحتوي فقط على StreamHG للتركيز عليه
 val extractorList = listOf(
-    StreamHGFinalEngine()
+    StreamHG()
 )
 
+// ترويسات متصفح كاملة للمحاكاة
 private val BROWSER_HEADERS = mapOf(
     "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-    "Accept-Language" to "en-US,en;q=0.9,ar=q=0.8",
+    "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
     "User-Agent" to "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
 )
 
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
-// Helper function to create links and bypass build restrictions.
-@Suppress("DEPRECATION")
-private fun createLink(
-    source: String,
-    name: String,
-    url: String,
-    referer: String,
-    quality: Int
-): ExtractorLink {
-    return ExtractorLink(
-        source = source,
-        name = name,
-        url = url,
-        referer = referer,
-        quality = quality,
-        type = ExtractorLinkType.M3U8
-    )
-}
-
+// دالة آمنة لجلب الصفحة كـ Document
 private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
+    Log.d("StreamHG_Debug", "safeGetAsDocument: Attempting to GET URL: $url")
     return try {
-        app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false).document
+        val response = app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false)
+        Log.d("StreamHG_Debug", "safeGetAsDocument: Successfully got response for URL: $url with status code: ${response.code}")
+        response.document
     } catch (e: Exception) {
-        Log.e("SafeGetAsDocument", "Request failed for $url. Error: ${e.message}")
+        Log.e("StreamHG_Debug", "safeGetAsDocument: FAILED to GET URL: $url. Error: ${e.message}")
         null
     }
 }
 
-// The final extractor, implementing the user's brilliant deobfuscation algorithm.
-class StreamHGFinalEngine : ExtractorApi() {
-    override var name = "StreamHG"
-    override var mainUrl = "kravaxxa.com"
+private abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
 
-    /**
-     * A direct Kotlin translation of the user's successful deobfuscateCode function.
-     */
-    private fun deobfuscate(p: String, a: Int, c: Int, k: List<String>): String {
-        var template = p
-        for (i in (c - 1) downTo 0) {
-            if (i < k.size && k[i].isNotBlank()) {
-                val placeholder = i.toString(a)
-                template = template.replace(Regex("\\b$placeholder\\b"), k[i])
-            }
-        }
-        return template
-    }
+    // التركيز فقط على kravaxxa.com
+    private val potentialHosts = listOf(
+        "kravaxxa.com"
+    )
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val doc = safeGetAsDocument(url, referer) ?: return
-        Log.d(name, "Page loaded successfully from $url")
+        Log.d("StreamHG_Debug", "================== getUrl CALLED ==================")
+        Log.d("StreamHG_Debug", "Initial URL: $url")
+        Log.d("StreamHG_Debug", "Referer: $referer")
 
-        val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
-        if (packedJs == null) {
-            Log.e(name, "No packed 'eval' JavaScript found.")
+        val videoId = url.substringAfterLast("/")
+        if (videoId.isBlank()) {
+            Log.e("StreamHG_Debug", "Failed to extract video ID from URL.")
             return
         }
-        Log.d(name, "Found packed JS. Executing the user's exact algorithm...")
+        Log.d("StreamHG_Debug", "Extracted Video ID: $videoId")
 
-        // Stage 1: Deconstruction using a literal, 1-to-1 translation of the user's proven regex.
-        // No more simplification, no more "flexible" versions. This is the real one.
-        val masterRegex = Regex("""eval\(function\(p,a,c,k,e,d\)\{.*?\}\s?\(\s?'(.*? P)',(\d+),(\d+),'(.*?)'\.split\('\|'\)\s?\)\s?\)""")
-        val match = masterRegex.find(packedJs)
+        // The loop will only run once for kravaxxa.com
+        for (host in potentialHosts) {
+            Log.d("StreamHG_Debug", "Trying host: $host")
+            val finalPageUrl = "https://$host/e/$videoId"
+            Log.d("StreamHG_Debug", "Constructed final page URL: $finalPageUrl")
 
-        if (match == null || match.groupValues.size < 5) {
-            Log.e(name, "Engine FAILED: Could not deconstruct the packed function with the user's exact regex.")
-            return
+            val doc = safeGetAsDocument(finalPageUrl, referer = url)
+
+            if (doc == null) {
+                Log.e("StreamHG_Debug", "Failed to get document from $finalPageUrl. Document is null.")
+                continue // In this case, it will just end the loop
+            }
+            Log.d("StreamHG_Debug", "Successfully retrieved document. Title: ${doc.title()}")
+
+            val packedJs = doc.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
+            if (packedJs == null || packedJs.isBlank()) {
+                Log.e("StreamHG_Debug", "Could not find the packed JS (eval) script on the page.")
+                continue
+            }
+            Log.d("StreamHG_Debug", "Found packed JS script. Length: ${packedJs.length}")
+
+            try {
+                val unpacked = getAndUnpack(packedJs)
+                Log.d("StreamHG_Debug", "Successfully unpacked JS. Unpacked content length: ${unpacked.length}")
+                
+                // This regex was from v13, which we identified as potentially incorrect.
+                // We keep it for now as per the base version.
+                val m3u8Link = Regex("""(https?://.*?/master\.m3u8)""").find(unpacked)?.groupValues?.get(1)
+
+                if (m3u8Link != null) {
+                    Log.d("StreamHG_Debug", "SUCCESS: Found m3u8 link in unpacked JS: $m3u8Link")
+                    Log.d("StreamHG_Debug", "Calling M3u8Helper.generateM3u8...")
+                    M3u8Helper.generateM3u8(
+                        this.name,
+                        m3u8Link,
+                        finalPageUrl, // Referer for the m3u8 request
+                        headers = BROWSER_HEADERS
+                    ).forEach { link ->
+                        Log.d("StreamHG_Debug", "M3u8Helper provided a link: ${link.url} with quality: ${link.quality}")
+                        callback(link)
+                    }
+                    Log.d("StreamHG_Debug", "Finished calling M3u8Helper.")
+                    return // Exit immediately after success
+                } else {
+                    Log.e("StreamHG_Debug", "Unpacked JS, but the regex did not find a master.m3u8 link.")
+                }
+
+            } catch (e: Exception) {
+                Log.e("StreamHG_Debug", "An error occurred during unpacking or regex matching: ${e.message}")
+            }
         }
-        Log.d(name, "Engine Stage 1 SUCCESS: Deconstructed packed script into its core components.")
 
-        val (packedString, baseStr, countStr, keyString) = match.destructured
-        val base = baseStr.toIntOrNull() ?: 36
-        val count = countStr.toIntOrNull() ?: 0
-        val keys = keyString.split("|")
-
-        // Stage 2: Re-construction using our deobfuscate function.
-        val deobfuscatedJs = deobfuscate(packedString, base, count, keys)
-        Log.d(name, "Engine Stage 2 SUCCESS: Deobfuscation complete.")
-
-        // Stage 3: Extraction of the final prize.
-        val hls2Regex = Regex(""""hls2"\s*:\s*"([^"]+)"""")
-        val urlMatch = hls2Regex.find(deobfuscatedJs)
-
-        if (urlMatch != null) {
-            val finalUrl = urlMatch.groupValues[1]
-            Log.d(name, "Engine Stage 3 SUCCESS: Found hls2 link: $finalUrl")
-            Log.d(name, "✅ EXTRACTION & DEOBFUSCATION SUCCESSFUL!")
-
-            callback(
-                createLink(
-                    source = this.name,
-                    name = this.name,
-                    url = finalUrl,
-                    referer = url,
-                    quality = Qualities.Unknown.value
-                )
-            )
-        } else {
-            Log.e(name, "Engine Stage 3 FAILED: Could not find 'hls2' link in the deobfuscated script.")
-        }
+        Log.d("StreamHG_Debug", "================== getUrl FINISHED (No link found) ==================")
     }
-                              }
+}
+
+private class StreamHG : StreamHGBase("StreamHG", "hglink.to")
