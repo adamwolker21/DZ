@@ -88,6 +88,7 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
                     Log.d("StreamHG_Final", "SUCCESS: Found 'hls2' link with flexible regex: $m3u8Link")
                     Log.d("StreamHG_Final", "Submitting link directly using the deprecated ExtractorLink constructor.")
                     
+                    @Suppress("DEPRECATION")
                     callback(
                         ExtractorLink(
                             source = this.name,
@@ -113,4 +114,5 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
     }
 }
 
+@Suppress("DEPRECATION")
 class StreamHG : StreamHGBase("StreamHG", "hglink.to")
