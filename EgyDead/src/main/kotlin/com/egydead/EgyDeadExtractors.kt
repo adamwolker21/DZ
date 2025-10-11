@@ -10,6 +10,7 @@ import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import android.util.Log
 
+// The final extractor list, containing the user-designed solution with a robust regex.
 val extractorList = listOf(
     StreamHGFinalEngine()
 )
@@ -22,6 +23,7 @@ private val BROWSER_HEADERS = mapOf(
 
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
+// Helper function to create links and bypass build restrictions.
 @Suppress("DEPRECATION")
 private fun createLink(
     source: String,
@@ -49,11 +51,15 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
     }
 }
 
+// The final extractor, implementing the user's brilliant deobfuscation algorithm.
 class StreamHGFinalEngine : ExtractorApi() {
     override var name = "StreamHG"
     override var mainUrl = "kravaxxa.com"
     override val requiresReferer = true
 
+    /**
+     * A direct Kotlin translation of the user's successful deobfuscateCode function.
+     */
     private fun deobfuscate(p: String, a: Int, c: Int, k: List<String>): String {
         var template = p
         for (i in (c - 1) downTo 0) {
@@ -75,33 +81,28 @@ class StreamHGFinalEngine : ExtractorApi() {
             return
         }
         Log.d(name, "Found packed JS. Executing the user-designed Final Engine...")
-        // Log.d(name, "RAW SCRIPT CONTENT: $packedJs") // يمكنك إبقاء هذا السطر للتصحيح المستقبلي
 
-        // ======================= التحديث الرئيسي هنا =======================
-        // Regex جديد يقبل علامات التنصيص الفردية والمزدوجة
-        val masterRegex = Regex("""eval\(function\(p,a,c,k,e,d\)\{.*?\}\((['"])(.*?)\1,(\d+),(\d+),(['"])(.*?)\5\.split\(['"]\|['"]\)\)\)""")
+        // Stage 1: The NEW, more FLEXIBLE deconstruction regex.
+        // It focuses on the core pattern and is resilient to minor structural changes.
+        val masterRegex = Regex("""\('(.*?)',(\d+),(\d+),'(.*?)'\.split\('\|'\)\)""")
         val match = masterRegex.find(packedJs)
-        // ==============================================================
 
-        if (match == null || match.groupValues.size < 7) {
-            Log.e(name, "Engine FAILED: Could not deconstruct the packed function structure.")
+        if (match == null || match.groupValues.size < 5) {
+            Log.e(name, "Engine FAILED: Could not deconstruct the packed function structure with the flexible regex.")
             return
         }
         Log.d(name, "Engine Stage 1 SUCCESS: Deconstructed packed script into its core components.")
 
-        // ======================= تحديث طريقة الاستخلاص =======================
-        // استخلاص البيانات بناءً على المجموعات الجديدة في Regex
-        val packedString = match.groupValues[2]
-        val base = match.groupValues[3].toIntOrNull() ?: 36
-        val count = match.groupValues[4].toIntOrNull() ?: 0
-        val keyString = match.groupValues[6]
-        // ================================================================
-        
+        val (packedString, baseStr, countStr, keyString) = match.destructured
+        val base = baseStr.toIntOrNull() ?: 36
+        val count = countStr.toIntOrNull() ?: 0
         val keys = keyString.split("|")
 
+        // Stage 2: Re-construction using our deobfuscate function.
         val deobfuscatedJs = deobfuscate(packedString, base, count, keys)
         Log.d(name, "Engine Stage 2 SUCCESS: Deobfuscation complete.")
 
+        // Stage 3: Extraction of the final prize.
         val hls2Regex = Regex(""""hls2"\s*:\s*"([^"]+)"""")
         val urlMatch = hls2Regex.find(deobfuscatedJs)
 
@@ -123,4 +124,4 @@ class StreamHGFinalEngine : ExtractorApi() {
             Log.e(name, "Engine Stage 3 FAILED: Could not find 'hls2' link in the deobfuscated script.")
         }
     }
-}
+                              }
