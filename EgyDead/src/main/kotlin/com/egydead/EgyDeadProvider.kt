@@ -6,9 +6,8 @@ import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import android.util.Log 
-import android.util.Base64
+import java.util.Base64 
 
-// v11 Change: Define comprehensive browser headers to be used in all requests
 private val BROWSER_HEADERS = mapOf(
     "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
     "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
@@ -36,47 +35,31 @@ class EgyDeadProvider : MainAPI() {
 
     private val cloudflareKiller by lazy { CloudflareKiller() }
 
+    private suspend fun getDocument(url: String): Document {
+        return app.get(url, interceptor = cloudflareKiller, headers = BROWSER_HEADERS).document
+    }
+
     private suspend fun getWatchPage(url: String): Document? {
         try {
-            // v11 Change: Apply browser headers
             val initialResponse = app.get(url, interceptor = cloudflareKiller, headers = BROWSER_HEADERS)
             val document = initialResponse.document
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
-                // v11 Change: Add browser headers to POST request as well
                 val postHeaders = BROWSER_HEADERS + mapOf(
-                    "Content-Type" to "application/x-www-form-urlencoded",
-                    "Referer" to url,
-                    "Origin" to mainUrl,
-                    "sec-fetch-dest" to "document",
-                    "sec-fetch-mode" to "navigate",
-                    "sec-fetch-site" to "same-origin",
-                    "sec-fetch-user" to "?1"
+                    "Content-Type" to "application/x-www-form-urlencoded", "Referer" to url, "Origin" to mainUrl,
+                    "sec-fetch-dest" to "document", "sec-fetch-mode" to "navigate",
+                    "sec-fetch-site" to "same-origin", "sec-fetch-user" to "?1"
                 )
-                val data = mapOf("View" to "1")
-                return app.post(url, headers = postHeaders, data = data, cookies = cookies, interceptor = cloudflareKiller).document
+                return app.post(url, headers = postHeaders, data = mapOf("View" to "1"), cookies = cookies, interceptor = cloudflareKiller).document
             }
             return document
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return null
-        }
+        } catch (e: Exception) { e.printStackTrace(); return null }
     }
 
-    override suspend fun getMainPage(
-        page: Int,
-        request: MainPageRequest
-    ): HomePageResponse {
-        val url = if (page == 1) {
-            "$mainUrl${request.data}"
-        } else {
-            "$mainUrl${request.data}page/$page/"
-        }
-        // v11 Change: Apply browser headers
-        val document = app.get(url, interceptor = cloudflareKiller, headers = BROWSER_HEADERS).document
-        val home = document.select("li.movieItem").mapNotNull {
-            it.toSearchResult()
-        }
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        val url = if (page == 1) "$mainUrl${request.data}" else "$mainUrl${request.data}page/$page/"
+        val document = getDocument(url)
+        val home = document.select("li.movieItem").mapNotNull { it.toSearchResult() }
         return newHomePageResponse(request.name, home)
     }
 
@@ -88,24 +71,17 @@ class EgyDeadProvider : MainAPI() {
         val cleanedTitle = title.replace("مشاهدة", "").trim().replace(Regex("^(فيلم|مسلسل)"), "").trim()
         val isSeries = title.contains("مسلسل") || title.contains("الموسم")
 
-        return if (isSeries) {
-            newTvSeriesSearchResponse(cleanedTitle, href, TvType.TvSeries) { this.posterUrl = posterUrl }
-        } else {
-            newMovieSearchResponse(cleanedTitle, href, TvType.Movie) { this.posterUrl = posterUrl }
-        }
+        return if (isSeries) newTvSeriesSearchResponse(cleanedTitle, href, TvType.TvSeries) { this.posterUrl = posterUrl }
+        else newMovieSearchResponse(cleanedTitle, href, TvType.Movie) { this.posterUrl = posterUrl }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = "$mainUrl/?s=$query"
-        // v11 Change: Apply browser headers
-        val document = app.get(searchUrl, interceptor = cloudflareKiller, headers = BROWSER_HEADERS).document
-        return document.select("li.movieItem").mapNotNull { it.toSearchResult() }
+        return getDocument("$mainUrl/?s=$query").select("li.movieItem").mapNotNull { it.toSearchResult() }
     }
 
-    override suspend fun load(url: String): LoadResponse? {
-        // v11 Change: Apply browser headers
-        val document = app.get(url, interceptor = cloudflareKiller, headers = BROWSER_HEADERS).document
-        val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
+    override suspend fun load(url: String): LoadResponse {
+        val document = getDocument(url)
+        val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: throw ErrorLoadingException("Could not load page title")
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
         val plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
@@ -113,23 +89,24 @@ class EgyDeadProvider : MainAPI() {
         val duration = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()?.filter { it.isDigit() }?.toIntOrNull()
         val isSeries = document.selectFirst("li:has(span:contains(القسم)) a")?.text()?.contains("مسلسلات") == true || pageTitle.contains("مسلسل") || pageTitle.contains("الموسم") || document.select("div.EpsList").isNotEmpty()
 
-        if (isSeries) {
+        return if (isSeries) {
             val episodesDoc = getWatchPage(url) ?: document
-            val episodes = episodesDoc.select("div.EpsList li a").mapNotNull { epElement ->
-                val epNum = epElement.attr("title").substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
-                epNum?.let { newEpisode(epElement.attr("href")) { name = epElement.text().trim(); episode = it } }
+            val episodes = episodesDoc.select("div.EpsList li a").mapNotNull { ep ->
+                ep.attr("title").substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()?.let {
+                    newEpisode(ep.attr("href")) { name = ep.text().trim(); episode = it }
+                }
             }.distinctBy { it.episode }.toMutableList()
             val seriesTitle = pageTitle.replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "").trim()
             val currentEpNum = pageTitle.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
             if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
-                 episodes.add(newEpisode(url) { name = pageTitle.substringAfter(seriesTitle).trim().ifBlank { "حلقة $currentEpNum" }; this.episode = currentEpNum })
+                episodes.add(newEpisode(url) { name = pageTitle.substringAfter(seriesTitle).trim().ifBlank { "حلقة $currentEpNum" }; this.episode = currentEpNum })
             }
-            return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
+            newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
                 this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
             }
         } else {
             val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
-            return newMovieLoadResponse(movieTitle, url, TvType.Movie, url) {
+            newMovieLoadResponse(movieTitle, url, TvType.Movie, url) {
                 this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags; this.duration = duration
             }
         }
@@ -140,21 +117,34 @@ class EgyDeadProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val watchPageDoc = getWatchPage(data) ?: return false
-        val servers = watchPageDoc.select("div.mob-servers li")
         
-        servers.apmap { serverLi ->
+        // 1. Process Streaming Servers (with debugging)
+        watchPageDoc.select("div.mob-servers li").apmap { serverLi ->
+            Log.d("EgyDeadProvider_HTML_DEBUG", "Streaming Server LI Element: ${serverLi.outerHtml()}")
+
             var link = serverLi.attr("data-link")
             if (link.isBlank()) {
                 val onclickAttr = serverLi.attr("onclick")
                 val base64Url = Regex("""GoTo\('([^']+)""").find(onclickAttr)?.groupValues?.get(1)
                 if (base64Url != null) {
-                    link = try { String(Base64.decode(base64Url, Base64.URL_SAFE or Base64.NO_WRAP)) } catch (e: Exception) { "" }
+                    link = try { String(Base64.getDecoder().decode(base64Url)) } 
+                    catch (e: Exception) { Log.e("EgyDeadProvider", "Base64 decoding failed for '$base64Url': ${e.message}"); "" }
                 }
             }
-            if (link.isNotBlank()) {
+            if (link.isNotBlank()) loadExtractor(link, data, subtitleCallback, callback)
+        }
+
+        // 2. Process Download Links (with corrected selector)
+        watchPageDoc.select("ul.donwload-servers-list li").apmap { downloadLi ->
+            Log.d("EgyDeadProvider_HTML_DEBUG", "Download LI Element: ${downloadLi.outerHtml()}")
+
+            val link = downloadLi.selectFirst("a.ser-link")?.attr("href")
+            if (!link.isNullOrBlank()) {
+                Log.d("EgyDeadProvider", "Found download link: $link")
                 loadExtractor(link, data, subtitleCallback, callback)
             }
         }
+        
         return true
     }
 }
