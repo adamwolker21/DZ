@@ -12,6 +12,21 @@ import org.jsoup.nodes.Element
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 
+// More realistic mobile browser headers to bypass anti-bot measures
+private val MOBILE_BROWSER_HEADERS = mapOf(
+    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+    "Accept-Language" to "en-US,en;q=0.9,ar-EG;q=0.8,ar;q=0.7",
+    "Sec-Ch-Ua" to "\"Chromium\";v=\"118\", \"Google Chrome\";v=\"118\", \"Not=A?Brand\";v=\"99\"",
+    "Sec-Ch-Ua-Mobile" to "?1",
+    "Sec-Ch-Ua-Platform" to "\"Android\"",
+    "Sec-Fetch-Dest" to "document",
+    "Sec-Fetch-Mode" to "navigate",
+    "Sec-Fetch-Site" to "none",
+    "Sec-Fetch-User" to "?1",
+    "Upgrade-Insecure-Requests" to "1",
+    "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Mobile Safari/537.36",
+)
+
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
     override var name = "EgyDead"
@@ -32,18 +47,17 @@ class EgyDeadProvider : MainAPI() {
 
     private suspend fun getWatchPage(url: String): Document? {
         try {
-            val initialResponse = app.get(url, interceptor = providerCloudflareKiller)
+            val initialResponse = app.get(url, headers = MOBILE_BROWSER_HEADERS, interceptor = providerCloudflareKiller)
             val document = initialResponse.document
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
-                val headers = mapOf(
+                val postHeaders = MOBILE_BROWSER_HEADERS + mapOf(
                     "Content-Type" to "application/x-www-form-urlencoded",
                     "Referer" to url,
-                    "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
                     "Origin" to mainUrl
                 )
                 val data = mapOf("View" to "1")
-                return app.post(url, headers = headers, data = data, cookies = cookies, interceptor = providerCloudflareKiller).document
+                return app.post(url, headers = postHeaders, data = data, cookies = cookies, interceptor = providerCloudflareKiller).document
             }
             return document
         } catch (e: Exception) {
@@ -54,7 +68,7 @@ class EgyDeadProvider : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page == 1) "$mainUrl${request.data}" else "$mainUrl${request.data}page/$page/"
-        val document = app.get(url, interceptor = providerCloudflareKiller).document
+        val document = app.get(url, headers = MOBILE_BROWSER_HEADERS, interceptor = providerCloudflareKiller).document
         val home = document.select("li.movieItem").mapNotNull { it.toSearchResult() }
         return newHomePageResponse(request.name, home)
     }
@@ -70,12 +84,12 @@ class EgyDeadProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val document = app.get("$mainUrl/?s=$query", interceptor = providerCloudflareKiller).document
+        val document = app.get("$mainUrl/?s=$query", headers = MOBILE_BROWSER_HEADERS, interceptor = providerCloudflareKiller).document
         return document.select("li.movieItem").mapNotNull { it.toSearchResult() }
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url, interceptor = providerCloudflareKiller).document
+        val document = app.get(url, headers = MOBILE_BROWSER_HEADERS, interceptor = providerCloudflareKiller).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
         val plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
@@ -151,24 +165,23 @@ class EgyDeadProvider : MainAPI() {
 private const val TAG = "StreamHG"
 
 val extractorList = listOf(
-    StreamHG(), Davioad(), Haxloppd(), Kravaxxa(), Cavanhabg(), Dumbalag(),
-    Forafile(),
-    DoodStream(), DsvPlay(),
-    Mixdrop(), Mdfx9dc8n(), Mxdrop(),
-    Bigwarp(), BigwarpPro(),
-)
-
-private val BROWSER_HEADERS = mapOf(
-    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-    "Accept-Language" to "en-US,en;q=0.9,ar=q=0.8",
-    "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36",
+    StreamHG(),
+    Kravaxxa(),
+    DoodStream(),
+    DsvPlay(),
+    Mixdrop(),
+    Mdfx9dc8n(),
+    Mxdrop(),
+    Bigwarp(),
+    BigwarpPro(),
 )
 
 private val extractorCloudflareKiller by lazy { CloudflareKiller() }
 
 private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
     return try {
-        app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = extractorCloudflareKiller, verify = false).document
+        // Now using the unified mobile headers for all extractor requests
+        app.get(url, referer = referer, headers = MOBILE_BROWSER_HEADERS, interceptor = extractorCloudflareKiller, verify = false).document
     } catch (e: Exception) {
         Log.e(TAG, "safeGetAsDocument FAILED for $url", e)
         null
@@ -177,9 +190,7 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
 
 abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
-    private val potentialHosts = listOf(
-        "kravaxxa.com", "cavanhabg.com", "dumbalag.com", "davioad.com", "haxloppd.com"
-    )
+    private val potentialHosts = listOf("kravaxxa.com")
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         Log.d(TAG, "extractor selected: ${this.name}")
@@ -223,8 +234,6 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
 
                 val m3u8Link = when {
                     jsonObject.optString("hls2").contains(".m3u8") -> jsonObject.getString("hls2")
-                    jsonObject.optString("hls4").contains(".m3u8") -> jsonObject.getString("hls4")
-                    jsonObject.optString("hls").contains(".m3u8") -> jsonObject.getString("hls")
                     else -> "" 
                 }
                 Log.d(TAG, "Found potential m3u8 link from JSON: '$m3u8Link'")
@@ -238,7 +247,6 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
                     }
                     Log.d(TAG, "Processed final link: $finalLink")
                     
-                    // The one and only correct structure
                     callback(
                         newExtractorLink(
                             source = this.name,
@@ -266,40 +274,17 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
 }
 
 class StreamHG : StreamHGBase("StreamHG", "hglink.to")
-class Davioad : StreamHGBase("StreamHG (Davioad)", "davioad.com")
-class Haxloppd : StreamHGBase("StreamHG (Haxloppd)", "haxloppd.com")
 class Kravaxxa : StreamHGBase("StreamHG (Kravaxxa)", "kravaxxa.com")
-class Cavanhabg : StreamHGBase("StreamHG (Cavanhabg)", "cavanhabg.com")
-class Dumbalag : StreamHGBase("StreamHG (Dumbalag)", "dumbalag.com")
-
-class Forafile : ExtractorApi() {
-    override var name = "Forafile"; override var mainUrl = "forafile.com"; override val requiresReferer = true
-    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val document = safeGetAsDocument(url, referer)
-        val packedJs = document?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
-        if (packedJs != null) {
-            val unpacked = getAndUnpack(packedJs)
-            val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
-            mp4Link?.let { 
-                callback(
-                    newExtractorLink(this.name, this.name, it) {
-                        this.referer = url
-                    }
-                ) 
-            }
-        }
-    }
-}
 
 abstract class DoodStreamBase : ExtractorApi() {
     override val requiresReferer = true
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val newUrl = if (url.contains("/e/")) url else url.replace("/d/", "/e/")
-        val responseText = try { app.get(newUrl, referer = referer, headers = BROWSER_HEADERS).text } catch (e: Exception) { null } ?: return
+        val responseText = try { app.get(newUrl, referer = referer, headers = MOBILE_BROWSER_HEADERS).text } catch (e: Exception) { null } ?: return
         val doodToken = responseText.substringAfter("'/pass_md5/").substringBefore("',")
         if (doodToken.isBlank()) return
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
-        val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z"
+        val trueUrl = app.get(md5PassUrl, referer = newUrl, headers = MOBILE_BROWSER_HEADERS).text + "z"
         callback(
             newExtractorLink(this.name, this.name, trueUrl, type = ExtractorLinkType.M3U8) {
                 this.referer = newUrl
