@@ -23,10 +23,8 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
-    // The interceptor to be used for the main site requests
     private val cloudflareKiller by lazy { CloudflareKiller() }
 
-    // This function will now use CloudflareKiller to get the real watch page
     private suspend fun getWatchPage(url: String): Document? {
         try {
             val initialResponse = app.get(url, interceptor = cloudflareKiller)
@@ -44,7 +42,6 @@ class EgyDeadProvider : MainAPI() {
                     "sec-fetch-user" to "?1"
                 )
                 val data = mapOf("View" to "1")
-                // The POST request also needs the interceptor
                 return app.post(url, headers = headers, data = data, cookies = cookies, interceptor = cloudflareKiller).document
             }
             return document
@@ -149,7 +146,7 @@ class EgyDeadProvider : MainAPI() {
         } else {
              val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
 
-            return newMovieLoadResponse(movieTitle, url, TvType.Movie, url) {
+            return newMovieSearchResponse(movieTitle, url, TvType.Movie, url) {
                 this.posterUrl = posterUrl
                 this.plot = plot
                 this.year = year
@@ -166,22 +163,39 @@ class EgyDeadProvider : MainAPI() {
         Log.d("EgyDeadProvider", "loadLinks invoked for URL: $data")
         val watchPageDoc = getWatchPage(data)
         
-        if(watchPageDoc == null) {
+        if (watchPageDoc == null) {
             Log.e("EgyDeadProvider", "Failed to get watch page document.")
             return false
         }
         
         Log.d("EgyDeadProvider", "Successfully got watch page document. Title: ${watchPageDoc.title()}")
 
-        // We only use the streaming servers as requested
         val servers = watchPageDoc.select("div.mob-servers li")
         
         Log.d("EgyDeadProvider", "Found ${servers.size} potential server elements.")
 
         servers.apmap { serverLi ->
-            val link = serverLi.attr("data-link")
-            // ADDED LOG: This will print every server link found on the page.
-            Log.d("EgyDeadProvider", "Found server link from data-link attribute: $link")
+            var link = serverLi.attr("data-link")
+            
+            // v5 Change: If data-link is blank, check for special cases like EarnVids
+            if (link.isBlank()) {
+                val serverText = serverLi.text()
+                Log.d("EgyDeadProvider", "data-link is blank. Checking server text: '$serverText'")
+
+                // Let's assume the server name is inside the text or an image alt attribute
+                if (serverText.contains("EarnVids", ignoreCase = true) || serverLi.selectFirst("img")?.attr("alt")?.contains("EarnVids", ignoreCase = true) == true) {
+                    val onclickAttr = serverLi.attr("onclick")
+                    Log.d("EgyDeadProvider", "Found EarnVids server. Found onclick attribute: $onclickAttr")
+                    
+                    // Regex to extract URL from functions like GoTo('url') or open_url('url')
+                    val urlRegex = Regex("""['"](https?://[^'"]+)['"]""")
+                    link = urlRegex.find(onclickAttr)?.groupValues?.get(1) ?: ""
+                    Log.d("EgyDeadProvider", "Extracted URL from onclick: $link")
+                }
+            } else {
+                 Log.d("EgyDeadProvider", "Found server link from data-link attribute: $link")
+            }
+
             if (link.isNotBlank()) {
                 loadExtractor(link, data, subtitleCallback, callback)
             }
