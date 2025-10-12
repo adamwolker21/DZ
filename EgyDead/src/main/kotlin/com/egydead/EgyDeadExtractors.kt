@@ -9,13 +9,13 @@ import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 
-// The list now includes the new EarnVids extractor.
+// The list is updated with the new, specialized Dingtezuni extractor.
 val extractorList = listOf(
     Forafile(),
     DoodStream(), DsvPlay(),
     Mixdrop(), Mdfx9dc8n(), Mxdrop(),
     Bigwarp(), BigwarpPro(),
-    EarnVids(), // Added EarnVids server
+    Dingtezuni(), // Replaced the old EarnVids with the new specific extractor
 )
 
 // Using a mobile User-Agent.
@@ -35,6 +35,37 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
         null
     }
 }
+
+// --- New Specialized Extractor for Dingtezuni / EarnVids ---
+class Dingtezuni : ExtractorApi() {
+    override var name = "EarnVids" // We can keep the name user-friendly
+    override var mainUrl = "dingtezuni.com"
+    override val requiresReferer = true
+
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        val document = safeGetAsDocument(url, referer) ?: return
+        
+        // Find the packed script, same as before
+        val packedJs = document.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data() ?: return
+        
+        // Unpack the script to reveal the links object
+        val unpackedJs = getAndUnpack(packedJs)
+        
+        // New Regex to specifically target the "hls2" link
+        val hls2Regex = Regex(""""hls2":\s*"([^"]+)"""")
+        val hls2Link = hls2Regex.find(unpackedJs)?.groupValues?.get(1)
+
+        if (hls2Link != null) {
+            callback(
+                newExtractorLink(this.name, this.name, hls2Link) {
+                    // This link works directly without a referer, as you tested
+                    this.referer = "" 
+                }
+            )
+        }
+    }
+}
+
 
 // --- Forafile Handler (Fixed) ---
 class Forafile : ExtractorApi() {
@@ -114,6 +145,6 @@ class Mxdrop : PackedJsExtractorBase("Mxdrop", "mxdrop.to", """MDCore\.wurl="([^
 class Bigwarp : PackedJsExtractorBase("Bigwarp", "bigwarp.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
 class BigwarpPro : PackedJsExtractorBase("Bigwarp Pro", "bigwarp.pro", """\s*file\s*:\s*"([^"]+)""".toRegex())
 
-// Added EarnVids using the existing PackedJsExtractorBase
-class EarnVids : PackedJsExtractorBase("EarnVids", "dingtezuni.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
+// We no longer need the generic EarnVids class from v2
+// class EarnVids : PackedJsExtractorBase("EarnVids", "earnvids.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
 
