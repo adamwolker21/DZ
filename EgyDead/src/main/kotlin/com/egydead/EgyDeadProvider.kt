@@ -114,12 +114,10 @@ class EgyDeadProvider : MainAPI() {
             val hasResumed = AtomicBoolean(false)
             var remainingServers = servers.size
 
-            servers.apmap { serverLi: Element -> // FIX 1: Explicitly set type
-                // FIX 2: Removed the "ioSafe" wrapper which no longer exists.
+            servers.apmap { serverLi: Element ->
                 try {
                     val link = serverLi.attr("data-link")
                     if (link.isNotBlank()) {
-                        // FIX 3: This now works because apmap provides the coroutine scope
                         loadExtractor(link, data, subtitleCallback) { foundLink ->
                             callback(foundLink)
                             if (hasResumed.compareAndSet(false, true)) {
@@ -240,13 +238,16 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
                     }
                     Log.d(TAG, "Processed final link: $finalLink")
                     
+                    // THIS IS THE FINAL FIX: Using the new signature for newExtractorLink
                     callback(
                         newExtractorLink(
-                            source = this.name, name = this.name, url = finalLink, type = ExtractorLinkType.M3U8
-                        ) {
-                            this.referer = finalPageUrl
-                            this.quality = Qualities.Unknown.value
-                        }
+                            source = this.name,
+                            name = this.name,
+                            url = finalLink,
+                            referer = finalPageUrl,
+                            type = ExtractorLinkType.M3U8,
+                            quality = Qualities.Unknown.value
+                        )
                     )
                     Log.d(TAG, "Success! Called back with link. Stopping search.")
                     Log.d(TAG, "================================")
@@ -278,7 +279,11 @@ class Forafile : ExtractorApi() {
         if (packedJs != null) {
             val unpacked = getAndUnpack(packedJs)
             val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
-            mp4Link?.let { callback(newExtractorLink(this.name, this.name, it) { this.referer = url }) }
+            mp4Link?.let { 
+                callback(
+                    newExtractorLink(this.name, this.name, it, referer = url)
+                ) 
+            }
         }
     }
 }
@@ -292,7 +297,9 @@ abstract class DoodStreamBase : ExtractorApi() {
         if (doodToken.isBlank()) return
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
         val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z"
-        callback(newExtractorLink(this.name, this.name, trueUrl, type = ExtractorLinkType.M3U8) { this.referer = newUrl })
+        callback(
+            newExtractorLink(this.name, this.name, trueUrl, referer = newUrl, type = ExtractorLinkType.M3U8)
+        )
     }
 }
 class DoodStream : DoodStreamBase() { override var name = "DoodStream"; override var mainUrl = "doodstream.com" }
@@ -310,7 +317,9 @@ abstract class PackedJsExtractorBase(
             val videoUrl = regex.find(unpacked)?.groupValues?.get(1)
             if (videoUrl != null && videoUrl.isNotBlank()) {
                 val finalUrl = if (videoUrl.startsWith("//")) "https:${videoUrl}" else videoUrl
-                callback(newExtractorLink(this.name, this.name, finalUrl) { this.referer = url })
+                callback(
+                    newExtractorLink(this.name, this.name, finalUrl, referer = url)
+                )
             }
         }
     }
