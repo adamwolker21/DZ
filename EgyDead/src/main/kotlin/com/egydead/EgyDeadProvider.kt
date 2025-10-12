@@ -146,7 +146,8 @@ class EgyDeadProvider : MainAPI() {
         } else {
              val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
 
-            return newMovieSearchResponse(movieTitle, url, TvType.Movie, url) {
+            // v6 FIX: Changed newMovieSearchResponse to the correct newMovieLoadResponse
+            return newMovieLoadResponse(movieTitle, url, TvType.Movie, url) {
                 this.posterUrl = posterUrl
                 this.plot = plot
                 this.year = year
@@ -177,17 +178,14 @@ class EgyDeadProvider : MainAPI() {
         servers.apmap { serverLi ->
             var link = serverLi.attr("data-link")
             
-            // v5 Change: If data-link is blank, check for special cases like EarnVids
             if (link.isBlank()) {
                 val serverText = serverLi.text()
                 Log.d("EgyDeadProvider", "data-link is blank. Checking server text: '$serverText'")
 
-                // Let's assume the server name is inside the text or an image alt attribute
                 if (serverText.contains("EarnVids", ignoreCase = true) || serverLi.selectFirst("img")?.attr("alt")?.contains("EarnVids", ignoreCase = true) == true) {
                     val onclickAttr = serverLi.attr("onclick")
                     Log.d("EgyDeadProvider", "Found EarnVids server. Found onclick attribute: $onclickAttr")
                     
-                    // Regex to extract URL from functions like GoTo('url') or open_url('url')
                     val urlRegex = Regex("""['"](https?://[^'"]+)['"]""")
                     link = urlRegex.find(onclickAttr)?.groupValues?.get(1) ?: ""
                     Log.d("EgyDeadProvider", "Extracted URL from onclick: $link")
