@@ -163,26 +163,25 @@ class EgyDeadProvider : MainAPI() {
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        Log.d("EgyDead", "Loading links for URL: $data")
+        Log.d("EgyDeadProvider", "loadLinks invoked for URL: $data")
         val watchPageDoc = getWatchPage(data)
         
         if(watchPageDoc == null) {
-            Log.e("EgyDead", "Failed to get watch page document.")
+            Log.e("EgyDeadProvider", "Failed to get watch page document.")
             return false
         }
         
-        Log.d("EgyDead", "Document title: ${watchPageDoc.title()}")
+        Log.d("EgyDeadProvider", "Successfully got watch page document. Title: ${watchPageDoc.title()}")
 
         // We only use the streaming servers as requested
         val servers = watchPageDoc.select("div.mob-servers li")
         
-        Log.d("EgyDead", "Found ${servers.size} potential server elements.")
-        servers.forEachIndexed { index, server ->
-            Log.d("EgyDead", "Server data-link $index: ${server.attr("data-link")}")
-        }
+        Log.d("EgyDeadProvider", "Found ${servers.size} potential server elements.")
 
         servers.apmap { serverLi ->
             val link = serverLi.attr("data-link")
+            // ADDED LOG: This will print every server link found on the page.
+            Log.d("EgyDeadProvider", "Found server link from data-link attribute: $link")
             if (link.isNotBlank()) {
                 loadExtractor(link, data, subtitleCallback, callback)
             }
