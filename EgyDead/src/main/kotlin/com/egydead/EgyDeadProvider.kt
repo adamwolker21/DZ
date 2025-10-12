@@ -5,8 +5,6 @@ import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import android.util.Log 
-import android.util.Base64 // v7 Change: Import Base64 for decoding
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -161,50 +159,11 @@ class EgyDeadProvider : MainAPI() {
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        Log.d("EgyDeadProvider", "loadLinks invoked for URL: $data")
-        val watchPageDoc = getWatchPage(data)
+        val watchPageDoc = getWatchPage(data) ?: return false
         
-        if (watchPageDoc == null) {
-            Log.e("EgyDeadProvider", "Failed to get watch page document.")
-            return false
-        }
-        
-        Log.d("EgyDeadProvider", "Successfully got watch page document. Title: ${watchPageDoc.title()}")
-
-        val servers = watchPageDoc.select("div.mob-servers li")
-        
-        Log.d("EgyDeadProvider", "Found ${servers.size} potential server elements.")
-
-        servers.apmap { serverLi ->
-            var link = serverLi.attr("data-link")
-            
-            if (link.isBlank()) {
-                val serverText = serverLi.text()
-                Log.d("EgyDeadProvider", "data-link is blank. Checking server text: '$serverText'")
-
-                if (serverText.contains("EarnVids", ignoreCase = true) || serverLi.selectFirst("img")?.attr("alt")?.contains("EarnVids", ignoreCase = true) == true) {
-                    val onclickAttr = serverLi.attr("onclick")
-                    Log.d("EgyDeadProvider", "Found EarnVids server. Found onclick attribute: $onclickAttr")
-                    
-                    // v7 Change: New regex to capture the Base64 content from GoTo('...')
-                    val base64Regex = Regex("""GoTo\('([^']+)""")
-                    val base64Url = base64Regex.find(onclickAttr)?.groupValues?.get(1)
-
-                    if (base64Url != null) {
-                        // v7 Change: Decode the Base64 string to get the real URL
-                        link = try {
-                            String(Base64.decode(base64Url, Base64.DEFAULT))
-                        } catch (e: Exception) {
-                            Log.e("EgyDeadProvider", "Base64 decoding failed for: $base64Url")
-                            "" // Return empty string on failure
-                        }
-                        Log.d("EgyDeadProvider", "Decoded URL from Base64: $link")
-                    }
-                }
-            } else {
-                 Log.d("EgyDeadProvider", "Found server link from data-link attribute: $link")
-            }
-
+        // Simplified logic: Directly select servers and get the 'data-link' attribute.
+        watchPageDoc.select("div.mob-servers li").apmap { serverLi ->
+            val link = serverLi.attr("data-link")
             if (link.isNotBlank()) {
                 loadExtractor(link, data, subtitleCallback, callback)
             }
