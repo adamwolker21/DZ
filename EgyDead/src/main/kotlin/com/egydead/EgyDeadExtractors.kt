@@ -17,19 +17,14 @@ val extractorList = listOf(
     Dingtezuni(), 
 )
 
-// v11 Change: Update headers to be more comprehensive and mimic a real mobile browser
 private val BROWSER_HEADERS = mapOf(
     "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
     "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
     "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
-    "sec-ch-ua" to """"Chromium";v="137", "Not/A)Brand";v="24"""",
-    "sec-ch-ua-mobile" to "?1",
-    "sec-ch-ua-platform" to """"Android"""",
 )
 
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
-// This function now uses the comprehensive headers by default
 private suspend fun safeGetAsDocument(url: String, referer: String? = null): Document? {
     return try {
         app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false).document
@@ -38,19 +33,22 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
     }
 }
 
-// All extractors below will now automatically use the updated BROWSER_HEADERS
-// via the safeGetAsDocument function without needing individual changes.
-
 class Dingtezuni : ExtractorApi() {
     override var name = "EarnVids"
     override var mainUrl = "dingtezuni.com"
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val document = safeGetAsDocument(url, referer) ?: return
+        // Handle both /v/ (streaming) and /file/ (download) links by normalizing them
+        val pageUrl = url.replace("/file/", "/v/")
+        val document = safeGetAsDocument(pageUrl, referer) ?: return
         val packedJs = document.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data() ?: return
+        
         val unpackedJs = getAndUnpack(packedJs)
+        
+        // v17 Final Fix: The regex was wrong, it should look for double quotes, not single quotes.
         val hls2Link = Regex(""""hls2":\s*"([^"]+)"""").find(unpackedJs)?.groupValues?.get(1)
+
         if (hls2Link != null) {
             callback(newExtractorLink(this.name, this.name, hls2Link) { this.referer = "" })
         }
