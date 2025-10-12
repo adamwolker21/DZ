@@ -9,12 +9,13 @@ import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 
-// The list now only contains the other working extractors.
+// The list now includes the new EarnVids extractor.
 val extractorList = listOf(
     Forafile(),
     DoodStream(), DsvPlay(),
     Mixdrop(), Mdfx9dc8n(), Mxdrop(),
     Bigwarp(), BigwarpPro(),
+    EarnVids(), // Added EarnVids server
 )
 
 // Using a mobile User-Agent.
@@ -112,3 +113,7 @@ class Mxdrop : PackedJsExtractorBase("Mxdrop", "mxdrop.to", """MDCore\.wurl="([^
 
 class Bigwarp : PackedJsExtractorBase("Bigwarp", "bigwarp.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
 class BigwarpPro : PackedJsExtractorBase("Bigwarp Pro", "bigwarp.pro", """\s*file\s*:\s*"([^"]+)""".toRegex())
+
+// Added EarnVids using the existing PackedJsExtractorBase
+class EarnVids : PackedJsExtractorBase("EarnVids", "earnvids.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
+
