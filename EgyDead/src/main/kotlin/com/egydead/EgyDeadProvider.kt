@@ -5,10 +5,12 @@ import android.util.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import com.lagradost.cloudstream3.utils.*
+import kotlinx.coroutines.suspendCancellableCoroutine
 import org.json.JSONObject
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.resume
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -98,7 +100,8 @@ class EgyDeadProvider : MainAPI() {
             }
         }
     }
-
+    
+    // THE FINAL FIX IS HERE: Re-implementing the "waiting room" to solve the race condition.
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
@@ -108,22 +111,44 @@ class EgyDeadProvider : MainAPI() {
 
         if (servers.isEmpty()) return false
 
-        val foundAUrl = AtomicBoolean(false)
+        return suspendCancellableCoroutine { continuation ->
+            val hasResumed = AtomicBoolean(false)
+            var remainingServers = servers.size
 
-        servers.apmap { serverLi: Element ->
-            try {
-                val link = serverLi.attr("data-link")
-                if (link.isNotBlank()) {
-                    loadExtractor(link, data, subtitleCallback) { foundLink ->
-                        callback(foundLink)
-                        foundAUrl.set(true)
+            servers.apmap { serverLi ->
+                // This ensures we're running inside a coroutine scope
+                ioSafe {
+                    try {
+                        val link = serverLi.attr("data-link")
+                        if (link.isNotBlank()) {
+                            loadExtractor(link, data, subtitleCallback) { foundLink ->
+                                // Pass every found link to the UI
+                                callback(foundLink)
+                                // The first one to find a link resumes the function with "true"
+                                if (hasResumed.compareAndSet(false, true)) {
+                                    if (continuation.isActive) {
+                                        continuation.resume(true)
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    } finally {
+                        // This block ensures we always count down
+                        synchronized(this) {
+                            remainingServers--
+                            // If this is the last server and we haven't found anything, resume with "false"
+                            if (remainingServers == 0 && !hasResumed.get()) {
+                                if (continuation.isActive) {
+                                    continuation.resume(false)
+                                }
+                            }
+                        }
                     }
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
             }
         }
-        return foundAUrl.get()
     }
 }
 
