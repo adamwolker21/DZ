@@ -100,8 +100,7 @@ class EgyDeadProvider : MainAPI() {
             }
         }
     }
-    
-    // THE FINAL FIX IS HERE: Re-implementing the "waiting room" to solve the race condition.
+
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
@@ -115,34 +114,29 @@ class EgyDeadProvider : MainAPI() {
             val hasResumed = AtomicBoolean(false)
             var remainingServers = servers.size
 
-            servers.apmap { serverLi ->
-                // This ensures we're running inside a coroutine scope
-                ioSafe {
-                    try {
-                        val link = serverLi.attr("data-link")
-                        if (link.isNotBlank()) {
-                            loadExtractor(link, data, subtitleCallback) { foundLink ->
-                                // Pass every found link to the UI
-                                callback(foundLink)
-                                // The first one to find a link resumes the function with "true"
-                                if (hasResumed.compareAndSet(false, true)) {
-                                    if (continuation.isActive) {
-                                        continuation.resume(true)
-                                    }
+            servers.apmap { serverLi: Element -> // FIX 1: Explicitly set type
+                // FIX 2: Removed the "ioSafe" wrapper which no longer exists.
+                try {
+                    val link = serverLi.attr("data-link")
+                    if (link.isNotBlank()) {
+                        // FIX 3: This now works because apmap provides the coroutine scope
+                        loadExtractor(link, data, subtitleCallback) { foundLink ->
+                            callback(foundLink)
+                            if (hasResumed.compareAndSet(false, true)) {
+                                if (continuation.isActive) {
+                                    continuation.resume(true)
                                 }
                             }
                         }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    } finally {
-                        // This block ensures we always count down
-                        synchronized(this) {
-                            remainingServers--
-                            // If this is the last server and we haven't found anything, resume with "false"
-                            if (remainingServers == 0 && !hasResumed.get()) {
-                                if (continuation.isActive) {
-                                    continuation.resume(false)
-                                }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    synchronized(this) {
+                        remainingServers--
+                        if (remainingServers == 0 && !hasResumed.get()) {
+                            if (continuation.isActive) {
+                                continuation.resume(false)
                             }
                         }
                     }
