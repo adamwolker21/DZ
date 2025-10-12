@@ -3,28 +3,12 @@ package com.egydead
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.network.CloudflareKiller
-import org.json.JSONObject
-import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import android.util.Log
+import java.util.concurrent.atomic.AtomicBoolean
 
-// =================================================================================
-// START of v55 - The Final Unified Fix
-// This version uses a single, unified CloudflareKiller instance for all requests,
-// solving the timeout issue caused by separate sessions.
-// =================================================================================
-
-// --- Helper variables are now part of the class to share the Cloudflare instance ---
-private val BROWSER_HEADERS = mapOf(
-    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-    "Accept-Language" to "en-US,en;q=0.9,ar;q=0.8",
-    "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36",
-)
-
-// --- Main Provider Class ---
 class EgyDeadProvider : MainAPI() {
-    // Using the stable base provider code.
+    
     override var mainUrl = "https://tv6.egydead.live"
     override var name = "EgyDead"
     override val hasMainPage = true
@@ -39,12 +23,8 @@ class EgyDeadProvider : MainAPI() {
         "/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "أفلام آسيوية",
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
-    
-    // =================== THE UNIFIED IDENTITY FIX ===================
-    // There is now only ONE CloudflareKiller instance for the entire provider.
-    // This ensures cookies and session data are shared across all requests.
+
     private val cloudflareKiller by lazy { CloudflareKiller() }
-    // ===============================================================
 
     private suspend fun getWatchPage(url: String): Document? {
         try {
@@ -52,13 +32,14 @@ class EgyDeadProvider : MainAPI() {
             val document = initialResponse.document
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
-                val postHeaders = mapOf(
-                    "Content-Type" to "application/x-www-form-urlencoded", "Referer" to url,
+                val headers = mapOf(
+                    "Content-Type" to "application/x-www-form-urlencoded",
+                    "Referer" to url,
                     "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
                     "Origin" to mainUrl
                 )
                 val data = mapOf("View" to "1")
-                return app.post(url, headers = postHeaders, data = data, cookies = cookies, interceptor = cloudflareKiller).document
+                return app.post(url, headers = headers, data = data, cookies = cookies, interceptor = cloudflareKiller).document
             }
             return document
         } catch (e: Exception) {
@@ -67,14 +48,14 @@ class EgyDeadProvider : MainAPI() {
         }
     }
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse { /* ... */
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page == 1) "$mainUrl${request.data}" else "$mainUrl${request.data}page/$page/"
         val document = app.get(url, interceptor = cloudflareKiller).document
         val home = document.select("li.movieItem").mapNotNull { it.toSearchResult() }
         return newHomePageResponse(request.name, home)
     }
 
-    private fun Element.toSearchResult(): SearchResponse? { /* ... */
+    private fun Element.toSearchResult(): SearchResponse? {
         val href = this.selectFirst("a")?.attr("href") ?: return null
         val title = this.selectFirst("h1.BottomTitle")?.text() ?: return null
         val posterUrl = this.selectFirst("img")?.attr("src")
@@ -84,12 +65,12 @@ class EgyDeadProvider : MainAPI() {
         else newMovieSearchResponse(cleanedTitle, href, TvType.Movie) { this.posterUrl = posterUrl }
     }
 
-    override suspend fun search(query: String): List<SearchResponse> { /* ... */
+    override suspend fun search(query: String): List<SearchResponse> {
         val document = app.get("$mainUrl/?s=$query", interceptor = cloudflareKiller).document
         return document.select("li.movieItem").mapNotNull { it.toSearchResult() }
     }
 
-    override suspend fun load(url: String): LoadResponse? { /* ... */
+    override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url, interceptor = cloudflareKiller).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
@@ -98,8 +79,11 @@ class EgyDeadProvider : MainAPI() {
 
         if (isSeries) {
             val episodes = document.select("div.EpsList li a").mapNotNull { ep ->
-                val epNum = ep.attr("title").substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull() ?: return@mapNotNull null
-                newEpisode(ep.attr("href")) { this.name = ep.text().trim(); this.episode = epNum }
+                val epNum = ep.attr("title").substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
+                newEpisode(ep.attr("href")) {
+                    this.name = ep.text().trim()
+                    this.episode = epNum
+                }
             }
             val seriesTitle = pageTitle.replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "").trim()
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
@@ -112,65 +96,32 @@ class EgyDeadProvider : MainAPI() {
             }
         }
     }
-    
+
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val watchPageDoc = getWatchPage(data) ?: return false
         val servers = watchPageDoc.select("div.mob-servers li")
+
         if (servers.isEmpty()) return false
 
-        for (server in servers) {
-            val link = server.attr("data-link")
-            if (link.isBlank()) continue
-            
-            Log.d("EgyDeadProvider", "Processing server link: $link")
+        val foundAUrl = AtomicBoolean(false)
 
+        servers.apmap { serverLi: Element ->
             try {
-                if (link.contains("hglink.to")) {
-                    val potentialHosts = listOf("kravaxxa.com", "cavanhabg.com", "dumbalag.com")
-                    val videoId = link.substringAfterLast("/")
-                    if (videoId.isBlank()) continue
-
-                    for (host in potentialHosts) {
-                        try {
-                            val finalPageUrl = "https://$host/e/$videoId"
-                            
-                            // It now uses the single, unified `cloudflareKiller` instance.
-                            val htmlText = app.get(finalPageUrl, referer = data, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false).text
-                            val doc = Jsoup.parse(htmlText)
-                            
-                            val packedJs = doc.select("script")
-                                .map { it.data() }
-                                .filter { it.contains("eval(function(p,a,c,k,e,d)") }
-                                .maxByOrNull { it.length } ?: continue
-                            
-                            val unpacked = getAndUnpack(packedJs)
-                            val jsonObjectString = unpacked.substringAfter("var links = ").substringBefore(";").trim()
-                            val jsonObject = JSONObject(jsonObjectString)
-                            val m3u8Link = jsonObject.getString("hls2")
-
-                            if (m3u8Link.isNotBlank() && m3u8Link.startsWith("http")) {
-                                callback(
-                                    newExtractorLink("StreamHG", "StreamHG", m3u8Link, type = ExtractorLinkType.M3U8) {
-                                        this.referer = finalPageUrl
-                                        this.quality = Qualities.Unknown.value
-                                    }
-                                )
-                                break 
-                            }
-                        } catch (e: Exception) {
-                            Log.e("EgyDeadProvider", "StreamHG failed on host '$host': ${e.message}")
-                        }
+                val link = serverLi.attr("data-link")
+                if (link.isNotBlank()) {
+                    loadExtractor(link, data, subtitleCallback) { foundLink ->
+                        callback(foundLink)
+                        foundAUrl.set(true)
                     }
-                } else {
-                    loadExtractor(link, data, subtitleCallback, callback)
                 }
             } catch (e: Exception) {
-                Log.e("EgyDeadProvider", "Failed to process server $link: ${e.message}")
+                e.printStackTrace()
             }
         }
-        return true
+        
+        return foundAUrl.get()
     }
 }
