@@ -1,5 +1,6 @@
 package com.egydead
 
+import android.util.Log // Added for logging
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
@@ -36,32 +37,64 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
     }
 }
 
-// --- New Specialized Extractor for Dingtezuni / EarnVids ---
+// --- New Specialized Extractor for Dingtezuni / EarnVids with Detailed Logging ---
 class Dingtezuni : ExtractorApi() {
     override var name = "EarnVids" // We can keep the name user-friendly
     override var mainUrl = "dingtezuni.com"
     override val requiresReferer = true
 
-    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val document = safeGetAsDocument(url, referer) ?: return
-        
-        // Find the packed script, same as before
-        val packedJs = document.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data() ?: return
-        
-        // Unpack the script to reveal the links object
-        val unpackedJs = getAndUnpack(packedJs)
-        
-        // New Regex to specifically target the "hls2" link
-        val hls2Regex = Regex(""""hls2":\s*"([^"]+)"""")
-        val hls2Link = hls2Regex.find(unpackedJs)?.groupValues?.get(1)
+    companion object {
+        // TAG for organized logging
+        private const val TAG = "DingtezuniExtractor"
+    }
 
-        if (hls2Link != null) {
-            callback(
-                newExtractorLink(this.name, this.name, hls2Link) {
-                    // This link works directly without a referer, as you tested
-                    this.referer = "" 
-                }
-            )
+    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        Log.d(TAG, "Extractor invoked for URL: $url")
+
+        val document = safeGetAsDocument(url, referer)
+        if (document == null) {
+            Log.e(TAG, "Failed to get document from URL: $url")
+            return
+        }
+        Log.d(TAG, "Successfully fetched document.")
+
+        val packedJs = document.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
+        if (packedJs == null || packedJs.isBlank()) {
+            Log.e(TAG, "Could not find the packed JS script in the page.")
+            return
+        }
+        Log.d(TAG, "Found packed JS script.")
+
+        try {
+            val unpackedJs = getAndUnpack(packedJs)
+            Log.d(TAG, "Unpacked JS successfully. Content length: ${unpackedJs.length}")
+
+            val hls2Regex = Regex(""""hls2":\s*"([^"]+)"""")
+            val matchResult = hls2Regex.find(unpackedJs)
+
+            if (matchResult == null) {
+                Log.e(TAG, "Regex did not find a match for 'hls2' link.")
+                // Log the full unpacked script ONLY if the regex fails, for easier debugging.
+                Log.d(TAG, "Unpacked JS Content for debugging: $unpackedJs")
+                return
+            }
+
+            val hls2Link = matchResult.groupValues[1]
+            Log.d(TAG, "Successfully extracted hls2 link: $hls2Link")
+
+            if (hls2Link.isNotBlank()) {
+                Log.d(TAG, "Invoking callback with the extracted link.")
+                callback(
+                    newExtractorLink(this.name, this.name, hls2Link) {
+                        // This link works directly without a referer, as you tested
+                        this.referer = "" 
+                    }
+                )
+            } else {
+                Log.e(TAG, "Extracted hls2 link is blank.")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "An error occurred during unpacking or regex matching: ${e.message}", e)
         }
     }
 }
@@ -144,7 +177,3 @@ class Mxdrop : PackedJsExtractorBase("Mxdrop", "mxdrop.to", """MDCore\.wurl="([^
 
 class Bigwarp : PackedJsExtractorBase("Bigwarp", "bigwarp.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
 class BigwarpPro : PackedJsExtractorBase("Bigwarp Pro", "bigwarp.pro", """\s*file\s*:\s*"([^"]+)""".toRegex())
-
-// We no longer need the generic EarnVids class from v2
-// class EarnVids : PackedJsExtractorBase("EarnVids", "earnvids.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
-
