@@ -115,5 +115,5 @@ class Bigwarp : PackedJsExtractorBase("Bigwarp", "bigwarp.com", """\s*file\s*:\s
 class BigwarpPro : PackedJsExtractorBase("Bigwarp Pro", "bigwarp.pro", """\s*file\s*:\s*"([^"]+)""".toRegex())
 
 // Added EarnVids using the existing PackedJsExtractorBase
-class EarnVids : PackedJsExtractorBase("EarnVids", "earnvids.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
+class EarnVids : PackedJsExtractorBase("EarnVids", "dingtezuni.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
 
