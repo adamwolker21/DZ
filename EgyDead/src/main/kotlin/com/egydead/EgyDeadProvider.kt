@@ -131,6 +131,8 @@ class EgyDeadProvider : MainAPI() {
 // START OF EXTRACTORS
 // =================================================================================
 
+private const val TAG = "StreamHG"
+
 val extractorList = listOf(
     StreamHG(), Davioad(), Haxloppd(), Kravaxxa(), Cavanhabg(), Dumbalag(),
     Forafile(),
@@ -151,7 +153,7 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
     return try {
         app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = extractorCloudflareKiller, verify = false).document
     } catch (e: Exception) {
-        Log.e("Extractor", "safeGetAsDocument FAILED for $url: ${e.message}")
+        Log.e(TAG, "safeGetAsDocument FAILED for $url", e)
         null
     }
 }
@@ -163,41 +165,82 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
     )
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
+        Log.d(TAG, "extractor selected: ${this.name}")
+        Log.d(TAG, "starting getUrl for: $url")
         val videoId = url.substringAfterLast("/")
-        if (videoId.isBlank()) return
+        if (videoId.isBlank()) {
+            Log.e(TAG, "Could not extract videoId from URL: $url")
+            return
+        }
+        Log.d(TAG, "Extracted videoId: $videoId")
 
         for (host in potentialHosts) {
+            Log.d(TAG, "--------------------------------")
+            Log.d(TAG, "Attempting host: $host")
             val finalPageUrl = "https://$host/e/$videoId"
-            val doc = safeGetAsDocument(finalPageUrl, referer = url) ?: continue
+            Log.d(TAG, "Requesting page: $finalPageUrl")
+            val doc = safeGetAsDocument(finalPageUrl, referer = url)
+            if (doc == null) {
+                Log.e(TAG, "Failed to get document for host: $host. Trying next host.")
+                continue
+            }
+            
             val packedJs = doc.select("script")
                 .map { it.data() }
-                .firstOrNull { it.contains("eval(function(p,a,c,k,e,d)") }
+                .filter { it.contains("eval(function(p,a,c,k,e,d)") }
+                .maxByOrNull { it.length }
 
-            if (packedJs.isNullOrBlank()) continue
+            if (packedJs.isNullOrBlank()) {
+                Log.e(TAG, "No packed JS found on host: $host. Trying next host.")
+                continue
+            }
+            Log.d(TAG, "Found packed JS with length: ${packedJs.length}")
 
             try {
-                // FIX for v2: Removed 'referer' parameter from getAndUnpack call
                 val unpacked = getAndUnpack(packedJs)
+                Log.d(TAG, "Successfully unpacked JS.")
                 
                 val jsonObjectString = unpacked.substringAfter("var links = ").substringBefore(";").trim()
+                Log.d(TAG, "Extracted JSON string: $jsonObjectString")
                 val jsonObject = JSONObject(jsonObjectString)
-                val m3u8Link = jsonObject.getString("hls2")
 
-                if (m3u8Link.isNotBlank() && m3u8Link.startsWith("http")) {
+                val m3u8Link = when {
+                    jsonObject.optString("hls2").contains(".m3u8") -> jsonObject.getString("hls2")
+                    jsonObject.optString("hls4").contains(".m3u8") -> jsonObject.getString("hls4")
+                    jsonObject.optString("hls").contains(".m3u8") -> jsonObject.getString("hls")
+                    else -> "" 
+                }
+                Log.d(TAG, "Found potential m3u8 link from JSON: '$m3u8Link'")
+
+
+                if (m3u8Link.isNotBlank()) {
+                    val finalLink = if (m3u8Link.startsWith("/")) {
+                         "https://$host$m3u8Link"
+                    } else {
+                         m3u8Link
+                    }
+                    Log.d(TAG, "Processed final link: $finalLink")
+                    
                     callback(
                         newExtractorLink(
-                            source = this.name, name = this.name, url = m3u8Link, type = ExtractorLinkType.M3U8
+                            source = this.name, name = this.name, url = finalLink, type = ExtractorLinkType.M3U8
                         ) {
                             this.referer = finalPageUrl
                             this.quality = Qualities.Unknown.value
                         }
                     )
+                    Log.d(TAG, "Success! Called back with link. Stopping search.")
+                    Log.d(TAG, "================================")
                     return 
+                } else {
+                    Log.e(TAG, "m3u8 link was blank or invalid after JSON parsing.")
                 }
             } catch (e: Exception) {
-                Log.e("StreamHG", "Failed on host '$host': ${e.message}")
+                Log.e(TAG, "An exception occurred on host '$host'. Trying next host.", e)
             }
         }
+        Log.e(TAG, "Exhausted all hosts, no link found for $url")
+        Log.d(TAG, "================================")
     }
 }
 
@@ -214,7 +257,6 @@ class Forafile : ExtractorApi() {
         val document = safeGetAsDocument(url, referer)
         val packedJs = document?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
         if (packedJs != null) {
-            // FIX for v2: Removed 'referer' parameter from getAndUnpack call
             val unpacked = getAndUnpack(packedJs)
             val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
             mp4Link?.let { callback(newExtractorLink(this.name, this.name, it) { this.referer = url }) }
@@ -245,7 +287,6 @@ abstract class PackedJsExtractorBase(
         val doc = safeGetAsDocument(url, referer)
         val script = doc?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d)))")?.data()
         if (script != null) {
-            // FIX for v2: Removed 'referer' parameter from getAndUnpack call
             val unpacked = getAndUnpack(script)
             val videoUrl = regex.find(unpacked)?.groupValues?.get(1)
             if (videoUrl != null && videoUrl.isNotBlank()) {
