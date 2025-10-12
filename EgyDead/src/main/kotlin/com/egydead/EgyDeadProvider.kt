@@ -2,10 +2,11 @@ package com.egydead
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.network.CloudflareKiller // The correct import
+import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import android.util.Log 
+import android.util.Base64 // v7 Change: Import Base64 for decoding
 
 class EgyDeadProvider : MainAPI() {
     override var mainUrl = "https://tv6.egydead.live"
@@ -146,7 +147,6 @@ class EgyDeadProvider : MainAPI() {
         } else {
              val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
 
-            // v6 FIX: Changed newMovieSearchResponse to the correct newMovieLoadResponse
             return newMovieLoadResponse(movieTitle, url, TvType.Movie, url) {
                 this.posterUrl = posterUrl
                 this.plot = plot
@@ -186,9 +186,20 @@ class EgyDeadProvider : MainAPI() {
                     val onclickAttr = serverLi.attr("onclick")
                     Log.d("EgyDeadProvider", "Found EarnVids server. Found onclick attribute: $onclickAttr")
                     
-                    val urlRegex = Regex("""['"](https?://[^'"]+)['"]""")
-                    link = urlRegex.find(onclickAttr)?.groupValues?.get(1) ?: ""
-                    Log.d("EgyDeadProvider", "Extracted URL from onclick: $link")
+                    // v7 Change: New regex to capture the Base64 content from GoTo('...')
+                    val base64Regex = Regex("""GoTo\('([^']+)""")
+                    val base64Url = base64Regex.find(onclickAttr)?.groupValues?.get(1)
+
+                    if (base64Url != null) {
+                        // v7 Change: Decode the Base64 string to get the real URL
+                        link = try {
+                            String(Base64.decode(base64Url, Base64.DEFAULT))
+                        } catch (e: Exception) {
+                            Log.e("EgyDeadProvider", "Base64 decoding failed for: $base64Url")
+                            "" // Return empty string on failure
+                        }
+                        Log.d("EgyDeadProvider", "Decoded URL from Base64: $link")
+                    }
                 }
             } else {
                  Log.d("EgyDeadProvider", "Found server link from data-link attribute: $link")
