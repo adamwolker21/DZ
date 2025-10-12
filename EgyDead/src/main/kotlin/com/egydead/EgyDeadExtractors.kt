@@ -7,15 +7,10 @@ import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.network.CloudflareKiller
-import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import org.json.JSONObject
 import org.jsoup.nodes.Document
-import android.util.Log
 
-// The complete list of extractors, all fixed to work with the modern API.
+// The list now only contains the other working extractors.
 val extractorList = listOf(
-    StreamHG(), Davioad(), Haxloppd(), Kravaxxa(), Cavanhabg(), Dumbalag(),
     Forafile(),
     DoodStream(), DsvPlay(),
     Mixdrop(), Mdfx9dc8n(), Mxdrop(),
@@ -36,79 +31,9 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
     return try {
         app.get(url, referer = referer, headers = BROWSER_HEADERS, interceptor = cloudflareKiller, verify = false).document
     } catch (e: Exception) {
-        Log.e("Extractor", "safeGetAsDocument FAILED for $url: ${e.message}")
         null
     }
 }
-
-// The classes must be public to be accessible in the public `extractorList`.
-abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
-    override val requiresReferer = true
-
-    // The full list of potential hosts.
-    private val potentialHosts = listOf(
-        "kravaxxa.com",
-        "cavanhabg.com",
-        "dumbalag.com",
-        "davioad.com",
-        "haxloppd.com"
-    )
-
-    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val videoId = url.substringAfterLast("/")
-        if (videoId.isBlank()) return
-
-        for (host in potentialHosts) {
-            val finalPageUrl = "https://$host/e/$videoId"
-            val doc = safeGetAsDocument(finalPageUrl, referer = url) ?: continue
-
-            // Find all 'eval' scripts and pick the longest one to avoid the trap script.
-            val packedJs = doc.select("script")
-                .map { it.data() }
-                .filter { it.contains("eval(function(p,a,c,k,e,d)") }
-                .maxByOrNull { it.length }
-
-            if (packedJs.isNullOrBlank()) continue
-
-            try {
-                val unpacked = getAndUnpack(packedJs)
-                
-                // The final, guaranteed fix: Extract the JSON object and parse it.
-                // The .trim() is crucial to remove leading whitespace.
-                val jsonObjectString = unpacked.substringAfter("var links = ").substringBefore(";").trim()
-                val jsonObject = JSONObject(jsonObjectString)
-                val m3u8Link = jsonObject.getString("hls2")
-
-                if (m3u8Link.isNotBlank() && m3u8Link.startsWith("http")) {
-                    callback(
-                        newExtractorLink(
-                            source = this.name,
-                            name = this.name,
-                            url = m3u8Link,
-                            type = ExtractorLinkType.M3U8
-                        ) {
-                            this.referer = finalPageUrl
-                            this.quality = Qualities.Unknown.value
-                        }
-                    )
-                    // Once we find a working link, we can stop searching other hosts.
-                    return 
-                }
-            } catch (e: Exception) {
-                Log.e("StreamHG", "Failed on host '$host': ${e.message}")
-            }
-        }
-    }
-}
-
-// Defining the classes for each domain.
-class StreamHG : StreamHGBase("StreamHG", "hglink.to")
-class Davioad : StreamHGBase("StreamHG (Davioad)", "davioad.com")
-class Haxloppd : StreamHGBase("StreamHG (Haxloppd)", "haxloppd.com")
-class Kravaxxa : StreamHGBase("StreamHG (Kravaxxa)", "kravaxxa.com")
-class Cavanhabg : StreamHGBase("StreamHG (Cavanhabg)", "cavanhabg.com")
-class Dumbalag : StreamHGBase("StreamHG (Dumbalag)", "dumbalag.com" )
-
 
 // --- Forafile Handler (Fixed) ---
 class Forafile : ExtractorApi() {
@@ -146,7 +71,7 @@ abstract class DoodStreamBase : ExtractorApi() {
         val md5PassUrl = "https://${this.mainUrl}/pass_md5/$doodToken"
         val trueUrl = app.get(md5PassUrl, referer = newUrl).text + "z"
         callback(
-            newExtractorLink(this.name, this.name, trueUrl, type = ExtractorLinkType.M3U8) {
+            newExtractorLink(this.name, this.name, trueUrl) {
                 this.referer = newUrl
             }
         )
