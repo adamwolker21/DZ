@@ -73,7 +73,7 @@ class StreamHG : ExtractorApi() {
     override var mainUrl = "hglink.to"
     override val requiresReferer = true
     private val logTag = "StreamHGExtractor"
-    private val host = "https://kravaxxa.com"
+    private val host = "https://davioad.com"
 
     override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
         try {
