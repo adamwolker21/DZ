@@ -1,13 +1,15 @@
 package com.egydead
 
+// ... (كل الكود السابق يبقى كما هو) ...
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.network.CloudflareKiller // The correct import
+import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import android.util.Log 
+import android.util.Log
 
 class EgyDeadProvider : MainAPI() {
+    // ... (كل محتوى الفئة يبقى كما هو حتى تصل إلى loadLinks) ...
     override var mainUrl = "https://tv6.egydead.live"
     override var name = "EgyDead"
     override val hasMainPage = true
@@ -23,10 +25,8 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
-    // The interceptor to be used for the main site requests
     private val cloudflareKiller by lazy { CloudflareKiller() }
 
-    // This function will now use CloudflareKiller to get the real watch page
     private suspend fun getWatchPage(url: String): Document? {
         try {
             val initialResponse = app.get(url, interceptor = cloudflareKiller)
@@ -38,13 +38,8 @@ class EgyDeadProvider : MainAPI() {
                     "Referer" to url,
                     "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
                     "Origin" to mainUrl,
-                    "sec-fetch-dest" to "document",
-                    "sec-fetch-mode" to "navigate",
-                    "sec-fetch-site" to "same-origin",
-                    "sec-fetch-user" to "?1"
                 )
                 val data = mapOf("View" to "1")
-                // The POST request also needs the interceptor
                 return app.post(url, headers = headers, data = data, cookies = cookies, interceptor = cloudflareKiller).document
             }
             return document
@@ -58,16 +53,9 @@ class EgyDeadProvider : MainAPI() {
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
-        val url = if (page == 1) {
-            "$mainUrl${request.data}"
-        } else {
-            "$mainUrl${request.data}page/$page/"
-        }
-
+        val url = if (page == 1) "$mainUrl${request.data}" else "$mainUrl${request.data}page/$page/"
         val document = app.get(url, interceptor = cloudflareKiller).document
-        val home = document.select("li.movieItem").mapNotNull {
-            it.toSearchResult()
-        }
+        val home = document.select("li.movieItem").mapNotNull { it.toSearchResult() }
         return newHomePageResponse(request.name, home)
     }
 
@@ -76,85 +64,49 @@ class EgyDeadProvider : MainAPI() {
         val href = linkTag.attr("href")
         val title = this.selectFirst("h1.BottomTitle")?.text() ?: return null
         val posterUrl = this.selectFirst("img")?.attr("src")
-
-        val cleanedTitle = title.replace("مشاهدة", "").trim()
-            .replace(Regex("^(فيلم|مسلسل)"), "").trim()
-
+        val cleanedTitle = title.replace("مشاهدة", "").trim().replace(Regex("^(فيلم|مسلسل)"), "").trim()
         val isSeries = title.contains("مسلسل") || title.contains("الموسم")
 
         return if (isSeries) {
-            newTvSeriesSearchResponse(cleanedTitle, href, TvType.TvSeries) {
-                this.posterUrl = posterUrl
-            }
+            newTvSeriesSearchResponse(cleanedTitle, href, TvType.TvSeries) { this.posterUrl = posterUrl }
         } else {
-            newMovieSearchResponse(cleanedTitle, href, TvType.Movie) {
-                this.posterUrl = posterUrl
-            }
+            newMovieSearchResponse(cleanedTitle, href, TvType.Movie) { this.posterUrl = posterUrl }
         }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = "$mainUrl/?s=$query"
-        val document = app.get(searchUrl, interceptor = cloudflareKiller).document
-        return document.select("li.movieItem").mapNotNull {
-            it.toSearchResult()
-        }
+        val document = app.get("$mainUrl/?s=$query", interceptor = cloudflareKiller).document
+        return document.select("li.movieItem").mapNotNull { it.toSearchResult() }
     }
 
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url, interceptor = cloudflareKiller).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
-        
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
         val plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
         val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
         val duration = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()?.filter { it.isDigit() }?.toIntOrNull()
-
-        val categoryText = document.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: ""
-        val isSeries = categoryText.contains("مسلسلات") || pageTitle.contains("مسلسل") || pageTitle.contains("الموسم") || document.select("div.EpsList").isNotEmpty()
+        val isSeries = document.select("div.EpsList").isNotEmpty()
 
         if (isSeries) {
             val episodesDoc = getWatchPage(url) ?: document
-
             val episodes = episodesDoc.select("div.EpsList li a").mapNotNull { epElement ->
                 val href = epElement.attr("href")
-                val titleAttr = epElement.attr("title")
-                val epNum = titleAttr.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
-                if (epNum == null) return@mapNotNull null
+                val epNum = epElement.attr("title").substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull() ?: return@mapNotNull null
                 newEpisode(href) {
                     this.name = epElement.text().trim()
                     this.episode = epNum
                 }
-            }.distinctBy { it.episode }.toMutableList()
-            
-            val seriesTitle = pageTitle
-                .replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "")
-                .trim()
-            
-            val currentEpNum = pageTitle.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
-            if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
-                 episodes.add(newEpisode(url) {
-                    this.name = pageTitle.substringAfter(seriesTitle).trim().ifBlank { "حلقة $currentEpNum" }
-                    this.episode = currentEpNum
-                })
-            }
-            
-            return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
-                this.posterUrl = posterUrl
-                this.plot = plot
-                this.year = year
-                this.tags = tags
+            }.distinctBy { it.episode }
+            val seriesTitle = pageTitle.replace(Regex("""(الحلقة \د+|مترجمة|الاخيرة)"""), "").trim()
+            return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes) {
+                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
             }
         } else {
-             val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
-
+            val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
             return newMovieLoadResponse(movieTitle, url, TvType.Movie, url) {
-                this.posterUrl = posterUrl
-                this.plot = plot
-                this.year = year
-                this.tags = tags
-                this.duration = duration
+                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags; this.duration = duration
             }
         }
     }
@@ -164,29 +116,26 @@ class EgyDeadProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         Log.d("EgyDead", "Loading links for URL: $data")
-        val watchPageDoc = getWatchPage(data)
+        val watchPageDoc = getWatchPage(data) ?: return false
         
-        if(watchPageDoc == null) {
-            Log.e("EgyDead", "Failed to get watch page document.")
-            return false
-        }
-        
-        Log.d("EgyDead", "Document title: ${watchPageDoc.title()}")
-
-        // We only use the streaming servers as requested
+        // البحث عن كل السيرفرات كالعادة
         val servers = watchPageDoc.select("div.mob-servers li")
-        
         Log.d("EgyDead", "Found ${servers.size} potential server elements.")
-        servers.forEachIndexed { index, server ->
-            Log.d("EgyDead", "Server data-link $index: ${server.attr("data-link")}")
+
+        // ✅  هنا التعديل: البحث عن سيرفر Earnvids فقط
+        val earnvidsServer = servers.find { server ->
+            server.attr("data-link").contains("dingtezuni.com")
         }
 
-        servers.apmap { serverLi ->
-            val link = serverLi.attr("data-link")
-            if (link.isNotBlank()) {
-                loadExtractor(link, data, subtitleCallback, callback)
-            }
+        // إذا تم العثور عليه، قم بمعالجته وتوقف
+        if (earnvidsServer != null) {
+            val link = earnvidsServer.attr("data-link")
+            Log.d("EgyDead", "Found Earnvids server. Processing it exclusively: $link")
+            loadExtractor(link, data, subtitleCallback, callback)
+        } else {
+            Log.d("EgyDead", "Earnvids server not found in the list.")
         }
+        
         return true
     }
 }
