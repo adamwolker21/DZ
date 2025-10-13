@@ -85,20 +85,33 @@ class EgyDeadProvider : MainAPI() {
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
         val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
         val duration = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()?.filter { it.isDigit() }?.toIntOrNull()
-        val isSeries = document.select("div.EpsList").isNotEmpty()
+        val categoryText = document.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: ""
+        val isSeries = categoryText.contains("مسلسلات") || pageTitle.contains("مسلسل") || pageTitle.contains("الموسم")
 
         if (isSeries) {
             val episodesDoc = getWatchPage(url) ?: document
+            val seriesTitle = pageTitle.replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "").trim()
+
             val episodes = episodesDoc.select("div.EpsList li a").mapNotNull { epElement ->
                 val href = epElement.attr("href")
-                val epNum = epElement.attr("title").substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull() ?: return@mapNotNull null
+                val epNumString = epElement.attr("title").substringAfter("الحلقة").trim().split(" ")[0]
+                val epNum = epNumString.toIntOrNull() ?: return@mapNotNull null
+                
                 newEpisode(href) {
                     this.name = epElement.text().trim()
                     this.episode = epNum
                 }
-            }.distinctBy { it.episode }
-            val seriesTitle = pageTitle.replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "").trim()
-            return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes) {
+            }.toMutableList()
+
+            val currentEpNum = pageTitle.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
+            if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
+                episodes.add(newEpisode(url) {
+                    this.name = pageTitle.substringAfter(seriesTitle).trim().ifBlank { "حلقة $currentEpNum" }
+                    this.episode = currentEpNum
+                })
+            }
+            
+            return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
                 this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
             }
         } else {
@@ -109,31 +122,23 @@ class EgyDeadProvider : MainAPI() {
         }
     }
     
-    // ✅  النسخة النهائية والمستقرة من دالة تحميل الروابط
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        Log.d("EgyDeadProvider", "Loading links for URL: $data")
         val watchPageDoc = getWatchPage(data) ?: return false
-        
         val servers = watchPageDoc.select("div.mob-servers li")
-        Log.d("EgyDeadProvider", "Found ${servers.size} potential server elements.")
 
-        // معالجة كل سيرفر بشكل متوازٍ وآمن
         servers.apmap { server ->
             try {
                 val link = server.attr("data-link")
                 if (link.isNotBlank()) {
-                    // تمرير الرابط إلى الموزع الذكي
                     loadExtractor(link, data, subtitleCallback, callback)
                 }
             } catch (e: Exception) {
-                // تسجيل أي خطأ يحدث أثناء معالجة سيرفر معين دون إيقاف العملية بأكملها
                 Log.e("EgyDeadProvider", "Failed to load extractor for a server: ${e.message}")
             }
         }
-        
         return true
     }
 }
