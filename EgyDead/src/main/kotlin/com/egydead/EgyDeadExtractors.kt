@@ -4,13 +4,13 @@ import com.lagradost.cloudstream3.USER_AGENT
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType // ✅ تم إضافة هذا الاستيراد
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import com.lagradost.cloudstream3.utils.JsUnpacker
 import android.util.Log
 import org.json.JSONObject
 
-// ✅ هذه القائمة سيتم تسجيلها الآن في ملف Plugin
 val extractorList = listOf(
     Earnvids()
 )
@@ -39,8 +39,15 @@ open class PackedExtractorBase(override var name: String, override var mainUrl: 
             val headers = mapOf("Referer" to url, "User-Agent" to USER_AGENT)
             val finalUrlWithHeaders = "$videoLink#headers=${JSONObject(headers)}"
             
+            // ✅  هذا هو التعديل الرئيسي
+            // لقد قمنا بتحديد نوع الرابط بشكل صريح للمشغل الداخلي
             return listOf(
-                newExtractorLink(source = this.name, name = this.name, url = finalUrlWithHeaders) {
+                newExtractorLink(
+                    source = this.name,
+                    name = this.name,
+                    url = finalUrlWithHeaders,
+                    type = ExtractorLinkType.M3U8 // <--- هذا هو السطر الجديد
+                ) {
                     this.referer = url
                 }
             )
