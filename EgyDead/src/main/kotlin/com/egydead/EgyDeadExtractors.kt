@@ -22,7 +22,7 @@ val extractorList = listOf(
 )
 
 // =========================================================================
-//  StreamHG CODE
+//  StreamHG CODE (No changes here)
 // =========================================================================
 
 private val BROWSER_HEADERS = mapOf(
@@ -47,74 +47,30 @@ private suspend fun safeGetAsDocument(url: String, referer: String? = null): Doc
 
 abstract class StreamHGBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
-
-    private val potentialHosts = listOf(
-        "kravaxxa.com"
-    )
-
+    private val potentialHosts = listOf("kravaxxa.com")
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        Log.d("StreamHG_Final", "================== getUrl CALLED ==================")
-        Log.d("StreamHG_Final", "Initial URL: $url")
-
         val videoId = url.substringAfterLast("/")
-        if (videoId.isBlank()) {
-            Log.e("StreamHG_Final", "Failed to extract video ID from URL.")
-            return
-        }
-        Log.d("StreamHG_Final", "Extracted Video ID: $videoId")
-
+        if (videoId.isBlank()) return
         for (host in potentialHosts) {
             val finalPageUrl = "https://$host/e/$videoId"
-            Log.d("StreamHG_Final", "Constructed final page URL: $finalPageUrl")
-
-            val doc = safeGetAsDocument(finalPageUrl, referer = url)
-
-            if (doc == null) {
-                Log.e("StreamHG_Final", "Failed to get document from $finalPageUrl. Document is null.")
-                continue
-            }
-            Log.d("StreamHG_Final", "Successfully retrieved document.")
-
-            val packedJs = doc.select("script").find { it.data().contains("eval(function(p,a,c,k,e,d)") }?.data()
-            if (packedJs == null || packedJs.isBlank()) {
-                Log.e("StreamHG_Final", "Could not find the packed JS (eval) script on the page.")
-                continue
-            }
-            Log.d("StreamHG_Final", "Found packed JS script.")
-
+            val doc = safeGetAsDocument(finalPageUrl, referer = url) ?: continue
+            val packedJs = doc.select("script").find { it.data().contains("eval(function(p,a,c,k,e,d)") }?.data() ?: continue
             try {
                 val unpacked = getAndUnpack(packedJs)
-                Log.d("StreamHG_Final", "Successfully unpacked JS.")
-                
                 val m3u8Link = unpacked.substringAfter("""hls2":"_URL_""").substringBefore("""_URL_"""")
-
                 if (m3u8Link.isNotBlank() && m3u8Link.startsWith("http")) {
-                    Log.d("StreamHG_Final", "SUCCESS: Found 'hls2' link using robust string manipulation: $m3u8Link")
-                    Log.d("StreamHG_Final", "Submitting link using the correct newExtractorLink syntax.")
-                    
                     callback(
-                        newExtractorLink(
-                            source = this.name,
-                            name = this.name,
-                            url = m3u8Link,
-                            type = ExtractorLinkType.M3U8
-                        ) {
+                        newExtractorLink(source = this.name, name = this.name, url = m3u8Link, type = ExtractorLinkType.M3U8) {
                             this.referer = finalPageUrl
                             this.quality = Qualities.Unknown.value
                         }
                     )
-                    Log.d("StreamHG_Final", "Successfully submitted the link via callback.")
                     return 
-                } else {
-                    Log.e("StreamHG_Final", "Robust string manipulation FAILED to find a valid 'hls2' link.")
                 }
-
             } catch (e: Exception) {
                 Log.e("StreamHG_Final", "An error occurred during unpacking or link extraction: ${e.message}")
             }
         }
-
-        Log.d("StreamHG_Final", "================== getUrl FINISHED (No link found) ==================")
     }
 }
 
@@ -122,33 +78,69 @@ class StreamHG : StreamHGBase("StreamHG", "hglink.to")
 
 
 // =========================================================================
-//  Packed Extractors (Vidshare, Earnvids)
+//  ✅ Packed Extractors (Vidshare, Earnvids) WITH DETAILED LOGGING
 // =========================================================================
 
 open class PackedExtractorBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
 
-    override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
-        val playerPageContent = app.get(url, referer = referer, headers = mapOf("User-Agent" to USER_AGENT)).text
-        
-        val videoLink = JsUnpacker(playerPageContent).unpack()?.let { unpackedJs ->
-            Regex("""(https?://[^\s'"]+\.(?:m3u8|mp4)[^\s'"]*)""").find(unpackedJs)?.groupValues?.get(1)
-        } ?: return null
+    // A consistent tag to easily filter logs for these types of extractors
+    private val logTag = "PackedExtractor"
 
-        val headers = mapOf("Referer" to url, "User-Agent" to USER_AGENT)
-        val headersJson = JSONObject(headers).toString()
-        val finalUrlWithHeaders = "$videoLink#headers=$headersJson"
-        
-        // ✅  هذا هو السطر الذي تم تصحيحه
-        return listOf(
-            newExtractorLink(
-                source = this.name,
-                name = this.name,
-                url = finalUrlWithHeaders,
-            ) {
-                this.referer = url
+    override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
+        // Log when the process starts for a specific server
+        Log.d(logTag, "Extractor '$name' started for URL: $url")
+
+        try {
+            // === STAGE 1: Get Page Content ===
+            Log.d(logTag, "[$name] Attempting to GET page content...")
+            val playerPageContent = app.get(url, referer = referer, headers = mapOf("User-Agent" to USER_AGENT)).text
+            
+            if (playerPageContent.isBlank()) {
+                Log.e(logTag, "[$name] FAILED: Page content is empty or couldn't be retrieved.")
+                return null
             }
-        )
+            Log.d(logTag, "[$name] SUCCESS: Page content retrieved successfully.")
+
+            // === STAGE 2: Unpack JavaScript ===
+            Log.d(logTag, "[$name] Attempting to unpack JavaScript...")
+            val videoLink = JsUnpacker(playerPageContent).unpack()?.let { unpackedJs ->
+                Log.d(logTag, "[$name] SUCCESS: JS unpacked. Now searching for video link...")
+                
+                // === STAGE 3: Find Video Link with Regex ===
+                Regex("""(https?://[^\s'"]+\.(?:m3u8|mp4)[^\s'"]*)""").find(unpackedJs)?.groupValues?.get(1)
+            }
+
+            if (videoLink == null) {
+                Log.e(logTag, "[$name] FAILED: Could not find a video link (m3u8/mp4) in the unpacked JS.")
+                return null
+            }
+            Log.d(logTag, "[$name] SUCCESS: Found video link: $videoLink")
+
+            // === STAGE 4: Construct Final URL with Headers ===
+            Log.d(logTag, "[$name] Constructing final URL with headers...")
+            val headers = mapOf("Referer" to url, "User-Agent" to USER_AGENT)
+            val headersJson = JSONObject(headers).toString()
+            val finalUrlWithHeaders = "$videoLink#headers=$headersJson"
+            Log.d(logTag, "[$name] Final URL created: $finalUrlWithHeaders")
+
+            // === STAGE 5: Return the Link ===
+            Log.d(logTag, "[$name] Process finished successfully. Returning link.")
+            return listOf(
+                newExtractorLink(
+                    source = this.name,
+                    name = this.name,
+                    url = finalUrlWithHeaders,
+                ) {
+                    this.referer = url
+                }
+            )
+
+        } catch (e: Exception) {
+            // This will catch any unexpected errors during the process (e.g., network failure)
+            Log.e(logTag, "[$name] An unexpected error occurred: ${e.message}", e)
+            return null
+        }
     }
 }
 
