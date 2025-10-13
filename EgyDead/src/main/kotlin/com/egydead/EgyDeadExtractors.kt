@@ -15,7 +15,6 @@ import org.jsoup.nodes.Document
 import android.util.Log
 import org.json.JSONObject
 
-// ✅  تم تحديث القائمة لتشمل جميع السيرفرات
 val extractorList = listOf(
     StreamHG(),
     Vidshare(),
@@ -23,7 +22,7 @@ val extractorList = listOf(
 )
 
 // =========================================================================
-//  StreamHG CODE (No changes needed here)
+//  StreamHG CODE
 // =========================================================================
 
 private val BROWSER_HEADERS = mapOf(
@@ -123,38 +122,35 @@ class StreamHG : StreamHGBase("StreamHG", "hglink.to")
 
 
 // =========================================================================
-//  ✅  الكود الجديد الذي تمت إضافته للسيرفرات الأخرى
+//  Packed Extractors (Vidshare, Earnvids)
 // =========================================================================
 
-// هذه فئة أساسية (Base Class) قابلة لإعادة الاستخدام للسيرفرات التي تستخدم نفس طريقة التشفير
 open class PackedExtractorBase(override var name: String, override var mainUrl: String) : ExtractorApi() {
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
         val playerPageContent = app.get(url, referer = referer, headers = mapOf("User-Agent" to USER_AGENT)).text
         
-        // استخدام JsUnpacker للعثور على الرابط
         val videoLink = JsUnpacker(playerPageContent).unpack()?.let { unpackedJs ->
             Regex("""(https?://[^\s'"]+\.(?:m3u8|mp4)[^\s'"]*)""").find(unpackedJs)?.groupValues?.get(1)
         } ?: return null
 
-        // إضافة الهيدرز (headers) إلى الرابط لضمان التشغيل
         val headers = mapOf("Referer" to url, "User-Agent" to USER_AGENT)
         val headersJson = JSONObject(headers).toString()
         val finalUrlWithHeaders = "$videoLink#headers=$headersJson"
         
+        // ✅  هذا هو السطر الذي تم تصحيحه
         return listOf(
             newExtractorLink(
-                this.name,
-                this.name,
-                finalUrlWithHeaders,
-                referer = url
-            )
+                source = this.name,
+                name = this.name,
+                url = finalUrlWithHeaders,
+            ) {
+                this.referer = url
+            }
         )
     }
 }
 
-// تعريف كل سيرفر جديد باستخدام الفئة الأساسية
 class Vidshare : PackedExtractorBase("Vidshare", "1vid1shar.com")
 class Earnvids : PackedExtractorBase("Earnvids", "dingtezuni.com")
-
