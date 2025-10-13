@@ -84,21 +84,22 @@ class EgyDeadProvider : MainAPI() {
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
         val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
         
-        // استخلاص القصة الأصلية
         var plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
 
-        // ✅ استخلاص المعلومات الإضافية
         val country = document.selectFirst("li:has(span:contains(البلد)) a")?.text()
-        val channel = document.selectFirst("li:has(span:contains(القناه)) a")?.text()
-        val durationText = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()
         
-        // ✅ بناء النص المنسق
+        // ✅  استخلاص جميع القنوات ودمجها
+        val channels = document.select("li:has(span:contains(القناه)) a").joinToString(", ") { it.text() }
+        
+        val durationText = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()
+        val duration = durationText?.filter { it.isDigit() }?.toIntOrNull()
+        
         val extraInfo = mutableListOf<String>()
         country?.let { extraInfo.add("البلد: $it") }
-        channel?.let { extraInfo.add("القناة: $it") }
-        durationText?.let { extraInfo.add("المدة: $it") }
+        if(channels.isNotBlank()) { extraInfo.add("القناة: $channels") }
+        // تم نقل المدة إلى الأعلى، لم نعد بحاجة إليها هنا
+        // durationText?.let { extraInfo.add("المدة: $it") }
         
-        // ✅ دمج القصة مع المعلومات الإضافية باستخدام HTML
         if(extraInfo.isNotEmpty()) {
             plot += "<br><br>${extraInfo.joinToString(" | ")}"
         }
@@ -126,13 +127,14 @@ class EgyDeadProvider : MainAPI() {
             
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
                 this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
+                // ✅  إضافة مدة الحلقة في الأعلى للمسلسلات
+                this.duration = duration
             }
         } else {
             val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
             return newMovieLoadResponse(movieTitle, url, TvType.Movie, url) {
                 this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
-                // مدة الفيلم يتم التعامل معها بشكل منفصل
-                this.duration = durationText?.filter { it.isDigit() }?.toIntOrNull()
+                this.duration = duration
             }
         }
     }
