@@ -124,7 +124,7 @@ class EgyDeadProvider : MainAPI() {
 
         // ✅  هنا التعديل: البحث عن سيرفر Earnvids فقط
         val earnvidsServer = servers.find { server ->
-            server.attr("data-link").contains("dingtezuni.com")
+            server.attr("data-link").contains("hglink.to")
         }
 
         // إذا تم العثور عليه، قم بمعالجته وتوقف
