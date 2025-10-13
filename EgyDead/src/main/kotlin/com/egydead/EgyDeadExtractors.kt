@@ -57,14 +57,23 @@ class Dingtezuni : ExtractorApi() {
 
 class Forafile : ExtractorApi() {
     override var name = "Forafile"; override var mainUrl = "forafile.com"; override val requiresReferer = true
-    override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val document = safeGetAsDocument(url, referer)
-        val packedJs = document?.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
-        if (packedJs != null) {
-            val unpacked = getAndUnpack(packedJs)
-            val mp4Link = Regex("""file:"(https?://.*?/video\.mp4)""").find(unpacked)?.groupValues?.get(1)
-            if (mp4Link != null) {
-                callback(newExtractorLink(this.name, this.name, mp4Link) { this.referer = url })
+    override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
+        val serverName = when {
+            url.contains("1vid1shar") -> "Vidshare"
+            url.contains("dingtezuni") -> "Earnvids"
+            else -> "General Packed"
+        }
+
+        val playerPageContent = app.get(url, referer = referer, headers = mapOf("User-Agent" to USER_AGENT)).text
+        
+        val videoLink = JsUnpacker(playerPageContent).unpack()?.let { unpackedJs ->
+            Regex("""(https?://[^\s'"]+\.(?:m3u8|mp4)[^\s'"]*)""").find(unpackedJs)?.groupValues?.get(1)
+        } ?: return null
+
+        val headers = mapOf("Referer" to url, "User-Agent" to USER_AGENT)
+        val headersJson = JSONObject(headers).toString()
+        val finalUrlWithHeaders = "$videoLink#headers=$headersJson"
+        
             }
         }
     }
@@ -101,8 +110,8 @@ abstract class PackedJsExtractorBase(override var name: String, override var mai
     }
 }
 
-class Mixdrop : PackedJsExtractorBase("Mixdrop", "mixdrop.ag", """MDCore\.wurl="([^"]+)""".toRegex())
-class Mdfx9dc8n : PackedJsExtractorBase("Mdfx9dc8n", "mdfx9dc8n.net", """MDCore\.wurl="([^"]+)""".toRegex())
+class Mixdrop : PackedJsExtractorBase("dingtezuni", "dingtezuni.com", """MDCore\.wurl="([^"]+)""".toRegex())
+class Mdfx9dc8n : PackedJsExtractorBase("Mdfx9dc8n", "dingtezuni.com", """MDCore\.wurl="([^"]+)""".toRegex())
 class Mxdrop : PackedJsExtractorBase("Mxdrop", "mxdrop.to", """MDCore\.wurl="([^"]+)""".toRegex())
-class Bigwarp : PackedJsExtractorBase("Bigwarp", "bigwarp.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
-class BigwarpPro : PackedJsExtractorBase("Bigwarp Pro", "bigwarp.pro", """\s*file\s*:\s*"([^"]+)""".toRegex())
+class Bigwarp : PackedJsExtractorBase("dingtezuni", "dingtezuni.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
+class BigwarpPro : PackedJsExtractorBase("Bigwarp Pro", "dingtezuni.com", """\s*file\s*:\s*"([^"]+)""".toRegex())
