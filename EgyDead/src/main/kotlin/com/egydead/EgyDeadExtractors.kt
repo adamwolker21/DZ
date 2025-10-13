@@ -56,7 +56,7 @@ abstract class StreamHGBase(override var name: String, override var mainUrl: Str
     }
 }
 class StreamHG : StreamHGBase("StreamHG", "hglink.to")
-class StreamHG : StreamHGBase("StreamHG", "kravaxxa.com")
+class kravaxxa : StreamHGBase("kravaxxa", "kravaxxa.com")
 // Helper functions (common)
 private val BROWSER_HEADERS = mapOf(
     "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
