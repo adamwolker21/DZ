@@ -81,33 +81,46 @@ class EgyDeadProvider : MainAPI() {
         val document = app.get(url, interceptor = cloudflareKiller).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
-        val plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
         val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
-        val duration = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()?.filter { it.isDigit() }?.toIntOrNull()
+        
+        // استخلاص القصة الأصلية
+        var plot = document.selectFirst("div.extra-content p")?.text()?.trim() ?: ""
+
+        // ✅ استخلاص المعلومات الإضافية
+        val country = document.selectFirst("li:has(span:contains(البلد)) a")?.text()
+        val channel = document.selectFirst("li:has(span:contains(القناه)) a")?.text()
+        val durationText = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()
+        
+        // ✅ بناء النص المنسق
+        val extraInfo = mutableListOf<String>()
+        country?.let { extraInfo.add("البلد: $it") }
+        channel?.let { extraInfo.add("القناة: $it") }
+        durationText?.let { extraInfo.add("المدة: $it") }
+        
+        // ✅ دمج القصة مع المعلومات الإضافية باستخدام HTML
+        if(extraInfo.isNotEmpty()) {
+            plot += "<br><br>${extraInfo.joinToString(" | ")}"
+        }
+
         val categoryText = document.selectFirst("li:has(span:contains(القسم)) a")?.text() ?: ""
         val isSeries = categoryText.contains("مسلسلات") || pageTitle.contains("مسلسل") || pageTitle.contains("الموسم")
 
         if (isSeries) {
             val episodesDoc = getWatchPage(url) ?: document
             val seriesTitle = pageTitle.replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "").trim()
-
             val episodes = episodesDoc.select("div.EpsList li a").mapNotNull { epElement ->
                 val href = epElement.attr("href")
-                val epNumString = epElement.attr("title").substringAfter("الحلقة").trim().split(" ")[0]
-                val epNum = epNumString.toIntOrNull() ?: return@mapNotNull null
-                
+                val epNum = epElement.attr("title").substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull() ?: return@mapNotNull null
                 newEpisode(href) {
-                    this.name = epElement.text().trim()
-                    this.episode = epNum
+                    this.name = epElement.text().trim(); this.episode = epNum
                 }
             }.toMutableList()
 
             val currentEpNum = pageTitle.substringAfter("الحلقة").trim().split(" ")[0].toIntOrNull()
             if (currentEpNum != null && episodes.none { it.episode == currentEpNum }) {
                 episodes.add(newEpisode(url) {
-                    this.name = pageTitle.substringAfter(seriesTitle).trim().ifBlank { "حلقة $currentEpNum" }
-                    this.episode = currentEpNum
+                    this.name = pageTitle.substringAfter(seriesTitle).trim().ifBlank { "حلقة $currentEpNum" }; this.episode = currentEpNum
                 })
             }
             
@@ -117,7 +130,9 @@ class EgyDeadProvider : MainAPI() {
         } else {
             val movieTitle = pageTitle.replace("مشاهدة فيلم", "").trim()
             return newMovieLoadResponse(movieTitle, url, TvType.Movie, url) {
-                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags; this.duration = duration
+                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
+                // مدة الفيلم يتم التعامل معها بشكل منفصل
+                this.duration = durationText?.filter { it.isDigit() }?.toIntOrNull()
             }
         }
     }
@@ -128,7 +143,6 @@ class EgyDeadProvider : MainAPI() {
     ): Boolean {
         val watchPageDoc = getWatchPage(data) ?: return false
         val servers = watchPageDoc.select("div.mob-servers li")
-
         servers.apmap { server ->
             try {
                 val link = server.attr("data-link")
