@@ -7,11 +7,13 @@ import com.lagradost.cloudstream3.plugins.Plugin
 @CloudstreamPlugin
 class EgyDeadPlugin: Plugin() {
     override fun load(context: Context) {
-        // ✅  تسجيل البروفايدر
+        // تسجيل البروفايدر الرئيسي
         registerMainAPI(EgyDeadProvider())
 
-        // ✅  تسجيل قائمة المستخرِجات
-        // هذا السطر يخبر التطبيق بوجود المستخرِج الخاص بنا
-        registerExtractorAPI(extractorList.first())
+        // ✅  تسجيل جميع المستخرِجات الموجودة في القائمة
+        // هذا يضمن أن التطبيق سيتعرف على Earnvids و StreamHG
+        extractorList.forEach { extractor ->
+            registerExtractorAPI(extractor)
+        }
     }
 }
