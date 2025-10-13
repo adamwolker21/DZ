@@ -1,6 +1,5 @@
 package com.egydead
 
-// ... (كل الكود السابق يبقى كما هو) ...
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.network.CloudflareKiller
@@ -9,7 +8,6 @@ import org.jsoup.nodes.Element
 import android.util.Log
 
 class EgyDeadProvider : MainAPI() {
-    // ... (كل محتوى الفئة يبقى كما هو حتى تصل إلى loadLinks) ...
     override var mainUrl = "https://tv6.egydead.live"
     override var name = "EgyDead"
     override val hasMainPage = true
@@ -44,7 +42,7 @@ class EgyDeadProvider : MainAPI() {
             }
             return document
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("EgyDeadProvider", "Failed to get watch page: ${e.message}")
             return null
         }
     }
@@ -99,7 +97,7 @@ class EgyDeadProvider : MainAPI() {
                     this.episode = epNum
                 }
             }.distinctBy { it.episode }
-            val seriesTitle = pageTitle.replace(Regex("""(الحلقة \د+|مترجمة|الاخيرة)"""), "").trim()
+            val seriesTitle = pageTitle.replace(Regex("""(الحلقة \d+|مترجمة|الاخيرة)"""), "").trim()
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes) {
                 this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
             }
@@ -111,29 +109,29 @@ class EgyDeadProvider : MainAPI() {
         }
     }
     
+    // ✅  النسخة النهائية والمستقرة من دالة تحميل الروابط
     override suspend fun loadLinks(
         data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        Log.d("EgyDead", "Loading links for URL: $data")
+        Log.d("EgyDeadProvider", "Loading links for URL: $data")
         val watchPageDoc = getWatchPage(data) ?: return false
         
-        // البحث عن كل السيرفرات كالعادة
         val servers = watchPageDoc.select("div.mob-servers li")
-        Log.d("EgyDead", "Found ${servers.size} potential server elements.")
+        Log.d("EgyDeadProvider", "Found ${servers.size} potential server elements.")
 
-        // ✅  هنا التعديل: البحث عن سيرفر Earnvids فقط
-        val earnvidsServer = servers.find { server ->
-            server.attr("data-link").contains("hglink.to")
-        }
-
-        // إذا تم العثور عليه، قم بمعالجته وتوقف
-        if (earnvidsServer != null) {
-            val link = earnvidsServer.attr("data-link")
-            Log.d("EgyDead", "Found Earnvids server. Processing it exclusively: $link")
-            loadExtractor(link, data, subtitleCallback, callback)
-        } else {
-            Log.d("EgyDead", "Earnvids server not found in the list.")
+        // معالجة كل سيرفر بشكل متوازٍ وآمن
+        servers.apmap { server ->
+            try {
+                val link = server.attr("data-link")
+                if (link.isNotBlank()) {
+                    // تمرير الرابط إلى الموزع الذكي
+                    loadExtractor(link, data, subtitleCallback, callback)
+                }
+            } catch (e: Exception) {
+                // تسجيل أي خطأ يحدث أثناء معالجة سيرفر معين دون إيقاف العملية بأكملها
+                Log.e("EgyDeadProvider", "Failed to load extractor for a server: ${e.message}")
+            }
         }
         
         return true
