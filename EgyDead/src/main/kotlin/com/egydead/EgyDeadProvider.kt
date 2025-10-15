@@ -23,18 +23,12 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
-    // A WebViewResolver is used to solve Cloudflare challenges.
-    // It opens a mini-browser (WebView) in the background to get the necessary cookies.
+    // Use WebViewResolver to solve Cloudflare challenges.
     private val webViewResolver by lazy { WebViewResolver() }
-
-    // This is a helper function to make network requests with the WebView interceptor.
-    private suspend fun appGet(url: String): AppResponse {
-        return app.get(url, interceptor = webViewResolver)
-    }
 
     private suspend fun getWatchPage(url: String): Document? {
         try {
-            val initialResponse = appGet(url)
+            val initialResponse = app.get(url, interceptor = webViewResolver)
             val document = initialResponse.document
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
@@ -45,7 +39,6 @@ class EgyDeadProvider : MainAPI() {
                     "Origin" to mainUrl,
                 )
                 val data = mapOf("View" to "1")
-                // We use the regular app.post here but pass the cookies we got.
                 return app.post(url, headers = headers, data = data, cookies = cookies, interceptor = webViewResolver).document
             }
             return document
@@ -60,7 +53,7 @@ class EgyDeadProvider : MainAPI() {
         request: MainPageRequest
     ): HomePageResponse {
         val url = if (page == 1) "$mainUrl${request.data}" else "$mainUrl${request.data}page/$page/"
-        val document = appGet(url).document // Using the new appGet function
+        val document = app.get(url, interceptor = webViewResolver).document
         val home = document.select("li.movieItem").mapNotNull { it.toSearchResult() }
         return newHomePageResponse(request.name, home)
     }
@@ -69,7 +62,8 @@ class EgyDeadProvider : MainAPI() {
         val linkTag = this.selectFirst("a") ?: return null
         val href = linkTag.attr("href")
         val title = this.selectFirst("h1.BottomTitle")?.text() ?: return null
-        val posterUrl = this.selectFirst("img")?.attr("data-src") // Usually lazy-loaded images use 'data-src'
+        // Try to get poster from 'data-src' for lazy-loaded images, fallback to 'src'
+        val posterUrl = this.selectFirst("img")?.attr("data-src")?.ifBlank { null }
             ?: this.selectFirst("img")?.attr("src")
         val cleanedTitle = title.replace("مشاهدة", "").trim().replace(Regex("^(فيلم|مسلسل)"), "").trim()
         val isSeries = title.contains("مسلسل") || title.contains("الموسم")
@@ -82,12 +76,12 @@ class EgyDeadProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val document = appGet("$mainUrl/?s=$query").document // Using the new appGet function
+        val document = app.get("$mainUrl/?s=$query", interceptor = webViewResolver).document
         return document.select("li.movieItem").mapNotNull { it.toSearchResult() }
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = appGet(url).document // Using the new appGet function
+        val document = app.get(url, interceptor = webViewResolver).document
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
