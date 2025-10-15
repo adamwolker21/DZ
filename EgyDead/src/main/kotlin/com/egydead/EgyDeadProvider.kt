@@ -2,7 +2,7 @@ package com.egydead
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.network.CloudflareKiller
+import com.lagradost.cloudstream3.network.WebViewResolver
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import android.util.Log
@@ -23,11 +23,18 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
-    private val cloudflareKiller by lazy { CloudflareKiller() }
+    // A WebViewResolver is used to solve Cloudflare challenges.
+    // It opens a mini-browser (WebView) in the background to get the necessary cookies.
+    private val webViewResolver by lazy { WebViewResolver() }
+
+    // This is a helper function to make network requests with the WebView interceptor.
+    private suspend fun appGet(url: String): AppResponse {
+        return app.get(url, interceptor = webViewResolver)
+    }
 
     private suspend fun getWatchPage(url: String): Document? {
         try {
-            val initialResponse = app.get(url, interceptor = cloudflareKiller)
+            val initialResponse = appGet(url)
             val document = initialResponse.document
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
@@ -38,7 +45,8 @@ class EgyDeadProvider : MainAPI() {
                     "Origin" to mainUrl,
                 )
                 val data = mapOf("View" to "1")
-                return app.post(url, headers = headers, data = data, cookies = cookies, interceptor = cloudflareKiller).document
+                // We use the regular app.post here but pass the cookies we got.
+                return app.post(url, headers = headers, data = data, cookies = cookies, interceptor = webViewResolver).document
             }
             return document
         } catch (e: Exception) {
@@ -52,7 +60,7 @@ class EgyDeadProvider : MainAPI() {
         request: MainPageRequest
     ): HomePageResponse {
         val url = if (page == 1) "$mainUrl${request.data}" else "$mainUrl${request.data}page/$page/"
-        val document = app.get(url, interceptor = cloudflareKiller).document
+        val document = appGet(url).document // Using the new appGet function
         val home = document.select("li.movieItem").mapNotNull { it.toSearchResult() }
         return newHomePageResponse(request.name, home)
     }
@@ -61,7 +69,8 @@ class EgyDeadProvider : MainAPI() {
         val linkTag = this.selectFirst("a") ?: return null
         val href = linkTag.attr("href")
         val title = this.selectFirst("h1.BottomTitle")?.text() ?: return null
-        val posterUrl = this.selectFirst("img")?.attr("src")
+        val posterUrl = this.selectFirst("img")?.attr("data-src") // Usually lazy-loaded images use 'data-src'
+            ?: this.selectFirst("img")?.attr("src")
         val cleanedTitle = title.replace("مشاهدة", "").trim().replace(Regex("^(فيلم|مسلسل)"), "").trim()
         val isSeries = title.contains("مسلسل") || title.contains("الموسم")
 
@@ -73,12 +82,12 @@ class EgyDeadProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val document = app.get("$mainUrl/?s=$query", interceptor = cloudflareKiller).document
+        val document = appGet("$mainUrl/?s=$query").document // Using the new appGet function
         return document.select("li.movieItem").mapNotNull { it.toSearchResult() }
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url, interceptor = cloudflareKiller).document
+        val document = appGet(url).document // Using the new appGet function
         val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: return null
         val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
         val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
@@ -88,7 +97,6 @@ class EgyDeadProvider : MainAPI() {
 
         val country = document.selectFirst("li:has(span:contains(البلد)) a")?.text()
         
-        // ✅  استخلاص جميع القنوات ودمجها
         val channels = document.select("li:has(span:contains(القناه)) a").joinToString(", ") { it.text() }
         
         val durationText = document.selectFirst("li:has(span:contains(مده العرض)) a")?.text()
@@ -97,8 +105,6 @@ class EgyDeadProvider : MainAPI() {
         val extraInfo = mutableListOf<String>()
         country?.let { extraInfo.add("البلد: $it") }
         if(channels.isNotBlank()) { extraInfo.add("القناة: $channels") }
-        // تم نقل المدة إلى الأعلى، لم نعد بحاجة إليها هنا
-        // durationText?.let { extraInfo.add("المدة: $it") }
         
         if(extraInfo.isNotEmpty()) {
             plot += "<br><br>${extraInfo.joinToString(" | ")}"
@@ -127,7 +133,6 @@ class EgyDeadProvider : MainAPI() {
             
             return newTvSeriesLoadResponse(seriesTitle, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
                 this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
-                // ✅  إضافة مدة الحلقة في الأعلى للمسلسلات
                 this.duration = duration
             }
         } else {
