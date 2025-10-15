@@ -9,4 +9,4 @@ pluginManagement {
 rootProject.name = "CSX"
 
 include(":EgyDead")
-include(":Asia2tv")
+
