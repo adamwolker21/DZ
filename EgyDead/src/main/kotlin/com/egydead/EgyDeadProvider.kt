@@ -26,12 +26,14 @@ class EgyDeadProvider : MainAPI() {
         "/series-category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9/" to "مسلسلات اسيوية",
     )
 
-    private val webViewResolver by lazy { WebViewResolver(Regex("""\?__cf_chl_tk=""")) }
+    // V5 Change: Make the WebViewResolver intercept ANY request to the mainUrl.
+    // This is more aggressive and should catch the Cloudflare challenge immediately.
+    private val webViewResolver by lazy { WebViewResolver(Regex("""$mainUrl""")) }
 
     private suspend fun getWatchPage(url: String): Document? {
         Log.d(TAG, "getWatchPage called for URL: $url")
         try {
-            val initialResponse = app.get(url, interceptor = webViewResolver)
+            val initialResponse = app.get(url, interceptor = webViewResolver, timeout = 45)
             val document = initialResponse.document
             if (document.selectFirst("div.watchNow form") != null) {
                 val cookies = initialResponse.cookies
@@ -58,15 +60,14 @@ class EgyDeadProvider : MainAPI() {
         val url = if (page == 1) "$mainUrl${request.data}" else "$mainUrl${request.data}page/$page/"
         Log.d(TAG, "Requesting getMainPage URL: $url")
         try {
-            val document = app.get(url, interceptor = webViewResolver).document
+            // Added a 45 second timeout to prevent it from getting stuck
+            val document = app.get(url, interceptor = webViewResolver, timeout = 45).document
             Log.d(TAG, "getMainPage HTML received. Title: ${document.title()}")
-            // Uncomment the line below for VERY detailed debugging to see the full HTML
-            // Log.d(TAG, "Full HTML: ${document.html()}")
 
             val home = document.select("li.movieItem").mapNotNull { it.toSearchResult() }
             Log.d(TAG, "Found ${home.size} items on the main page for '${request.name}'.")
             if (home.isEmpty()) {
-                Log.w(TAG, "No items found. The CSS selector 'li.movieItem' might be incorrect or the page is empty.")
+                Log.w(TAG, "No items found. The CSS selector 'li.movieItem' might be incorrect or the page is empty/blocked.")
             }
             return newHomePageResponse(request.name, home)
         } catch (e: Exception) {
@@ -85,7 +86,7 @@ class EgyDeadProvider : MainAPI() {
             val cleanedTitle = title.replace("مشاهدة", "").trim().replace(Regex("^(فيلم|مسلسل)"), "").trim()
             val isSeries = title.contains("مسلسل") || title.contains("الموسم")
 
-            Log.d(TAG, "Parsed Item: Title='${cleanedTitle}', Poster='${posterUrl}'")
+            // Log.d(TAG, "Parsed Item: Title='${cleanedTitle}', Poster='${posterUrl}'")
 
             return if (isSeries) {
                 newTvSeriesSearchResponse(cleanedTitle, href, TvType.TvSeries) { this.posterUrl = posterUrl }
@@ -101,7 +102,7 @@ class EgyDeadProvider : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val url = "$mainUrl/?s=$query"
         Log.d(TAG, "Searching with URL: $url")
-        val document = app.get(url, interceptor = webViewResolver).document
+        val document = app.get(url, interceptor = webViewResolver, timeout = 45).document
         val results = document.select("li.movieItem").mapNotNull { it.toSearchResult() }
         Log.d(TAG, "Search for '$query' found ${results.size} items.")
         return results
@@ -110,14 +111,13 @@ class EgyDeadProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         Log.d(TAG, "Loading URL: $url")
         try {
-            val document = app.get(url, interceptor = webViewResolver).document
+            val document = app.get(url, interceptor = webViewResolver, timeout = 45).document
             Log.d(TAG, "Load page HTML received. Title: ${document.title()}")
             val pageTitle = document.selectFirst("div.singleTitle em")?.text()?.trim() ?: run {
                 Log.w(TAG, "Could not find page title in load function.")
                 return null
             }
-            // ... (rest of the load function is the same, no need to repeat it all)
-            // The existing code from v3 for the rest of this function is fine.
+            
             val posterUrl = document.selectFirst("div.single-thumbnail img")?.attr("src")
             val year = document.selectFirst("li:has(span:contains(السنه)) a")?.text()?.toIntOrNull()
             val tags = document.select("li:has(span:contains(النوع)) a").map { it.text() }
