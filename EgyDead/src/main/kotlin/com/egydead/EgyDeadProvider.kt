@@ -24,7 +24,8 @@ class EgyDeadProvider : MainAPI() {
     )
 
     // Use WebViewResolver to solve Cloudflare challenges.
-    private val webViewResolver by lazy { WebViewResolver() }
+    // The regex tells it to only activate on URLs that contain Cloudflare's challenge token.
+    private val webViewResolver by lazy { WebViewResolver(Regex("""\?__cf_chl_tk=""")) }
 
     private suspend fun getWatchPage(url: String): Document? {
         try {
