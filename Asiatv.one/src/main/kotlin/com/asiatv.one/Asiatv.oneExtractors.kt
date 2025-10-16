@@ -7,8 +7,6 @@ import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.Qualities
-import com.lagradost.cloudstream3.newExtractorLink
-import com.lagradost.cloudstream3.ExtractorLinkType
 
 // Base class for custom extractors
 abstract class AsiaTvExtractor : ExtractorApi() {
@@ -42,29 +40,28 @@ class AsiaTvPlayer : AsiaTvExtractor() {
         val script = document.selectFirst("script:containsData(eval)")?.data() ?: return
         val unpackedScript = getAndUnpack(script)
         
-        // Extract direct MP4 links using the new newExtractorLink function
+        // Extract direct MP4 links using the correct ExtractorLink constructor
         val mp4Regex = Regex("""file:"([^"]+\.mp4)"\s*,\s*label:"([^"]+)"""")
         mp4Regex.findAll(unpackedScript).forEach { match ->
             val fileUrl = match.groupValues[1]
             val qualityLabel = match.groupValues[2]
             callback(
-                newExtractorLink(
+                ExtractorLink(
                     source = this.name,
                     name = "${this.name} MP4",
                     url = fileUrl,
-                    type = ExtractorLinkType.FILE
-                ) {
-                    this.referer = url
-                    this.quality = when {
+                    referer = url,
+                    quality = when {
                         qualityLabel.contains("720") -> Qualities.P720.value
                         qualityLabel.contains("360") -> Qualities.P360.value
                         else -> Qualities.Unknown.value
-                    }
-                }
+                    },
+                    isM3u8 = false,
+                )
             )
         }
 
-        // Extract the m3u8 link using the new newExtractorLink function
+        // Extract the m3u8 link using the correct approach
         val m3u8Url = Regex("""file:"(.*?(?:\.m3u8))"""").find(unpackedScript)?.groupValues?.get(1)
         if (m3u8Url != null) {
             val m3u8Headers = mapOf(
