@@ -81,8 +81,13 @@ class AsiatvoneProvider : MainAPI() {
         val document = app.get(url, headers = commonHeaders).document
 
         val title = document.selectFirst("h1.title")?.text()?.trim() ?: return null
-        // Updated poster selector to handle both layouts
-        val poster = document.selectFirst("div.poster-wrapper img, div.poster img")?.attr("src")
+        
+        // Final update to poster selector to prioritize data-lazy-src
+        val posterElement = document.selectFirst("div.poster-wrapper img, div.poster img")
+        val poster = posterElement?.attr("data-lazy-src")?.ifBlank {
+            posterElement.attr("src")
+        }
+        
         var plot = document.selectFirst("div.description")?.text()?.trim()
         val tags = document.select("div.single_tax a[rel=tag]").map { it.text() }
         
@@ -100,7 +105,6 @@ class AsiatvoneProvider : MainAPI() {
             }
         }
 
-        // Updated actor image parsing to prioritize data-lazy-src
         val actors = document.select("div.single-team ul.team li").mapNotNull {
             val name = it.selectFirst("div > span")?.text() ?: return@mapNotNull null
             val imageElement = it.selectFirst("img")
@@ -173,3 +177,4 @@ class AsiatvoneProvider : MainAPI() {
         return linksLoaded
     }
 }
+
