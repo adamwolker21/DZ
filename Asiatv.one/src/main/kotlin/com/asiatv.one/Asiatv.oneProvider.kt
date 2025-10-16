@@ -3,6 +3,7 @@ package com.asiatv.one
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
+import java.util.regex.Pattern
 
 class AsiatvoneProvider : MainAPI() {
     override var mainUrl = "https://asiatv.one"
@@ -20,11 +21,11 @@ class AsiatvoneProvider : MainAPI() {
     )
 
     override val mainPage = mainPageOf(
-        "$mainUrl/%d8%af%d8%b1%d8%a7%d9%85%d8%a7-%d8%aa%d8%a8%d8%ab-%d8%ad%d8%a7%d9%84%d9%8a%d8%a7/" to "دراما تبث حاليا",
+        "$mainUrl/دراما-تبث-حاليا/" to "دراما تبث حاليا",
         "$mainUrl/types/الدراما-الكورية/" to "الدراما الكورية",
         "$mainUrl/types/الدراما-الصينية/" to "الدراما الصينية",
         "$mainUrl/types/الدراما-اليابانية/" to "الدراما اليابانية",
-        "$mainUrl/%d8%af%d8%b1%d8%a7%d9%85%d8%a7-%d9%85%d9%83%d8%aa%d9%85%d9%84%d8%a9/" to "دراما مكتملة",
+        "$mainUrl/دراما-مكتملة/" to "دراما مكتملة",
         "$mainUrl/types/افلام-اسيوية/" to "افلام اسيوية",
     )
 
@@ -34,28 +35,34 @@ class AsiatvoneProvider : MainAPI() {
     ): HomePageResponse {
         val url = if (page > 1) "${request.data}page/$page/" else request.data
         val document = app.get(url, headers = commonHeaders).document
-
-        val home = document.select("article.post").mapNotNull {
+        
+        // Select both types of articles to handle different page layouts
+        val home = document.select("article.post, article.postEp").mapNotNull {
             it.toSearchResult()
         }
         return newHomePageResponse(request.name, home)
     }
 
-    // Updated to prioritize data-img for posters
     private fun Element.toSearchResult(): SearchResponse? {
         val linkElement = this.selectFirst("a") ?: return null
         val href = linkElement.attr("href")
         val title = linkElement.attr("title") ?: return null
-        
-        // Prioritize 'data-img' and fallback to 'src'
-        val imageElement = this.selectFirst("img.imgLoaded")
-        val posterUrl = imageElement?.attr("data-img")?.ifBlank {
-            imageElement.attr("src")
+
+        val posterUrl = if (this.hasClass("postEp")) {
+            // Handle the structure for "دراما مكتملة" sections
+            this.selectFirst("div.imgSer")?.attr("data-img")
+        } else {
+            // Handle the default structure
+            val imageElement = this.selectFirst("img.imgLoaded")
+            imageElement?.attr("data-img")?.ifBlank {
+                imageElement.attr("src")
+            }
         }
 
-        val isSeries = href.contains("/drama/") || href.contains("/series/")
+        // Differentiate based on title content for main pages
+        val isMovie = title.contains("فيلم")
 
-        return if (isSeries) {
+        return if (!isMovie) {
             newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
                 this.posterUrl = posterUrl
             }
@@ -69,30 +76,56 @@ class AsiatvoneProvider : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "$mainUrl/?s=${query}"
         val document = app.get(searchUrl, headers = commonHeaders).document
-        return document.select("article.post").mapNotNull {
+        // Search results use the default layout
+        return document.select("article.post, article.postEp").mapNotNull {
             it.toSearchResult()
         }
     }
 
-    // Updated with all new selectors for the load function
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url, headers = commonHeaders).document
 
-        // New selectors for title, poster, plot, and tags
         val title = document.selectFirst("h1.title")?.text()?.trim() ?: return null
         val poster = document.selectFirst("div.poster-wrapper img")?.attr("src")
         val plot = document.selectFirst("div.description")?.text()?.trim()
-        val tags = document.select("div.single_tax a").map { it.text() }
+        val tags = document.select("div.single_tax a[rel=tag]").map { it.text() }
+        
+        // Extract the year from the broadcast date
+        var year: Int? = null
+        document.select("div.single_tax span").forEach { span ->
+            if (span.text().contains("مواعيد البث")) {
+                val dateText = span.nextElementSibling()?.text()
+                if (dateText != null) {
+                    val pattern = Pattern.compile("(\\d{4})")
+                    val matcher = pattern.matcher(dateText)
+                    if (matcher.find()) {
+                        year = matcher.group(1)?.toIntOrNull()
+                    }
+                }
+            }
+        }
 
-        // Logic to check if it's a series remains the same
-        val episodesList = document.select("ul.episodes-list > li")
-        val isSeries = episodesList.isNotEmpty()
+        // More robust movie/series detection
+        val isMovie: Boolean
+        val episodeCountText = document.select("div.single_tax span").find { it.text().contains("عدد الحلقات") }?.nextElementSibling()?.text()
+        val firstEpText = document.selectFirst("ul.eplist2 li a")?.text()
 
-        return if (isSeries) {
-            val episodes = episodesList.mapNotNull {
-                val epUrl = it.selectFirst("a")?.attr("href") ?: return@mapNotNull null
+        when {
+            episodeCountText?.contains("فيلم") == true -> isMovie = true
+            firstEpText?.contains("فيلم") == true -> isMovie = true
+            title.contains("فيلم") -> isMovie = true
+            else -> isMovie = false
+        }
+
+        return if (!isMovie) {
+            // Handle new and old episode list structures
+            val episodes = (document.select("ul.eplist2 > li") + document.select("ul.episodes-list > li")).mapNotNull {
+                val link = it.selectFirst("a") ?: return@mapNotNull null
+                val epUrl = link.attr("href")
+                val epName = link.attr("title").ifBlank { link.text() }
+                
                 newEpisode(epUrl) {
-                    this.name = it.selectFirst("a")?.text()?.trim()
+                    this.name = epName.trim()
                 }
             }.reversed()
 
@@ -100,12 +133,14 @@ class AsiatvoneProvider : MainAPI() {
                 this.posterUrl = poster
                 this.plot = plot
                 this.tags = tags
+                this.year = year
             }
         } else {
             newMovieLoadResponse(title, url, TvType.Movie, url) {
                 this.posterUrl = poster
                 this.plot = plot
                 this.tags = tags
+                this.year = year
             }
         }
     }
@@ -118,6 +153,7 @@ class AsiatvoneProvider : MainAPI() {
     ): Boolean {
         val document = app.get(data, headers = commonHeaders).document
         var linksLoaded = false
+        // Assuming servers list structure is consistent
         document.select("div.servers-list > ul > li").forEach { serverElement ->
             val serverUrl = serverElement.attr("data-server")
             if (serverUrl.isNotBlank()) {
