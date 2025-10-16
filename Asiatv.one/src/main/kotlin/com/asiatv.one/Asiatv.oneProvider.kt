@@ -5,6 +5,7 @@ import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
 
 class AsiatvoneProvider : MainAPI() {
+    // The base URL remains the same, /home/ is just a path
     override var mainUrl = "https://asiatv.one"
     override var name = "AsiaTV"
     override val hasMainPage = true
@@ -14,35 +15,52 @@ class AsiatvoneProvider : MainAPI() {
         TvType.Movie
     )
 
-    // Define sections for the main page
-    override val mainPage = mainPageOf(
-        "$mainUrl/category/k-drama/completed-k-drama/" to "دراما كورية مكتملة",
-        "$mainUrl/category/k-drama/ongoing-k-drama/" to "دراما كورية مستمرة",
-        "$mainUrl/category/asian-drama-movies/" to "أفلام آسيوية",
-        "$mainUrl/category/j-drama/" to "دراما يابانية",
-        "$mainUrl/category/c-drama/" to "دراما صينية",
+    // Common headers to mimic a browser, based on your cURL info
+    private val commonHeaders = mapOf(
+        "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
+        "Referer" to "$mainUrl/"
     )
 
-    // Fetch and parse main page sections
+    // Updated main page sections
+    override val mainPage = mainPageOf(
+        "$mainUrl/دراما-تبث-حاليا/" to "دراما تبث حاليا",
+        "$mainUrl/types/الدراما-الكورية/" to "الدراما الكورية",
+        "$mainUrl/types/الدراما-الصينية/" to "الدراما الصينية",
+        "$mainUrl/types/الدراما-اليابانية/" to "الدراما اليابانية",
+        "$mainUrl/دراما-مكتملة/" to "دراما مكتملة",
+        "$mainUrl/types/افلام-اسيوية/" to "افلام اسيوية",
+    )
+
+    // Fetch and parse main page sections with new selectors
     override suspend fun getMainPage(
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
         val url = if (page > 1) "${request.data}page/$page/" else request.data
-        val document = app.get(url).document
-        val home = document.select("article.post-listing").mapNotNull {
+        // Using headers in the request
+        val document = app.get(url, headers = commonHeaders).document
+
+        // Updated selector to find content items
+        val home = document.select("article.post").mapNotNull {
             it.toSearchResult()
         }
         return newHomePageResponse(request.name, home)
     }
 
-    // Helper function to parse search result items from HTML element
+    // Updated helper function to parse items based on the new HTML structure
     private fun Element.toSearchResult(): SearchResponse? {
-        val title = this.selectFirst("h2.post-card__title a")?.text() ?: return null
-        val href = this.selectFirst("h2.post-card__title a")?.attr("href") ?: return null
-        val posterUrl = this.selectFirst(".post-card__image img")?.attr("src")
+        val linkElement = this.selectFirst("a") ?: return null
+        val href = linkElement.attr("href")
+        // The title attribute on the <a> tag is more reliable
+        val title = linkElement.attr("title") ?: return null
+        // The poster is in the 'src' attribute of the img
+        val posterUrl = this.selectFirst("img.imgLoaded")?.attr("src")
 
-        return if (href.contains("/series/")) {
+        // Distinguish between series and movies based on URL structure
+        // /drama/ or /series/ are common for TV shows
+        val isSeries = href.contains("/drama/") || href.contains("/series/")
+
+        return if (isSeries) {
             newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
                 this.posterUrl = posterUrl
             }
@@ -53,18 +71,20 @@ class AsiatvoneProvider : MainAPI() {
         }
     }
 
-    // Handle search queries
+    // Handle search queries with new selectors
     override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "$mainUrl/?s=${query}"
-        val document = app.get(searchUrl).document
-        return document.select("article.post-listing").mapNotNull {
+        val document = app.get(searchUrl, headers = commonHeaders).document
+
+        // Use the same updated selector for search results
+        return document.select("article.post").mapNotNull {
             it.toSearchResult()
         }
     }
 
-    // Load series/movie details and episodes list
+    // Load series/movie details and episodes list (selectors for this page seem unchanged for now)
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url).document
+        val document = app.get(url, headers = commonHeaders).document
 
         val title = document.selectFirst("h1.name")?.text()?.trim() ?: return null
         val poster = document.selectFirst("div.poster > img")?.attr("src")
@@ -75,19 +95,16 @@ class AsiatvoneProvider : MainAPI() {
         return if (isSeries) {
             val episodes = document.select("ul.episodes-list > li").mapNotNull {
                 val epUrl = it.selectFirst("a")?.attr("href") ?: return@mapNotNull null
-                // Using the correct newEpisode builder
                 newEpisode(epUrl) {
                     this.name = it.selectFirst("a")?.text()?.trim()
                 }
             }.reversed()
 
-            // Reverting to the newTvSeriesLoadResponse helper method as requested by the new error log
             newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
                 this.posterUrl = poster
                 this.plot = plot
             }
         } else {
-            // Reverting to the newMovieLoadResponse helper method
             newMovieLoadResponse(title, url, TvType.Movie, url) {
                 this.posterUrl = poster
                 this.plot = plot
@@ -95,14 +112,14 @@ class AsiatvoneProvider : MainAPI() {
         }
     }
 
-    // Load video links from a movie or episode page
+    // Load video links (selectors for this page seem unchanged for now)
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val document = app.get(data).document
+        val document = app.get(data, headers = commonHeaders).document
         var linksLoaded = false
         document.select("div.servers-list > ul > li").forEach { serverElement ->
             val serverUrl = serverElement.attr("data-server")
