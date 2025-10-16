@@ -4,15 +4,16 @@ import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.getAndUnpack
-import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.M3u8Helper
-import com.lagradost.cloudstream3.utils.Qualities.Companion.qualityFromName
+import com.lagradost.cloudstream3.Qualities
+import com.lagradost.cloudstream3.newExtractorLink
+import com.lagradost.cloudstream3.ExtractorLinkType
 
 // Base class for custom extractors
-open class AsiaTvExtractor : ExtractorApi() {
+abstract class AsiaTvExtractor : ExtractorApi() {
     override val name = "AsiaTvCustom"
-    override var mainUrl = "" 
+    override var mainUrl = "" // Use var instead of val
     override val requiresReferer = true
 
     // getUrl will be implemented by specific extractor classes
@@ -27,7 +28,7 @@ open class AsiaTvExtractor : ExtractorApi() {
 // Extractor for AsiaTvPlayer
 class AsiaTvPlayer : AsiaTvExtractor() {
     override val name = "AsiaTvPlayer"
-    override val mainUrl = "asiatvplayer.com"
+    override var mainUrl = "asiatvplayer.com" // Use var
 
     override suspend fun getUrl(
         url: String,
@@ -35,35 +36,37 @@ class AsiaTvPlayer : AsiaTvExtractor() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        // The referer for the embed page is the asiawiki.me page
         val embedHeaders = mapOf("Referer" to (referer ?: "https://asiawiki.me/"))
         val document = app.get(url, headers = embedHeaders).document
         
-        // Find the script containing the packed player data
         val script = document.selectFirst("script:containsData(eval)")?.data() ?: return
         val unpackedScript = getAndUnpack(script)
         
-        // Extract direct MP4 links first as they are more reliable
+        // Extract direct MP4 links using the new newExtractorLink function
         val mp4Regex = Regex("""file:"([^"]+\.mp4)"\s*,\s*label:"([^"]+)"""")
         mp4Regex.findAll(unpackedScript).forEach { match ->
             val fileUrl = match.groupValues[1]
             val qualityLabel = match.groupValues[2]
             callback(
-                ExtractorLink(
-                    this.name,
-                    "${this.name} - MP4",
-                    fileUrl,
-                    url, // Referer for the video file
-                    qualityFromName(qualityLabel),
-                    isM3u8 = false,
-                )
+                newExtractorLink(
+                    source = this.name,
+                    name = "${this.name} MP4",
+                    url = fileUrl,
+                    type = ExtractorLinkType.FILE
+                ) {
+                    this.referer = url
+                    this.quality = when {
+                        qualityLabel.contains("720") -> Qualities.P720.value
+                        qualityLabel.contains("360") -> Qualities.P360.value
+                        else -> Qualities.Unknown.value
+                    }
+                }
             )
         }
 
-        // Extract the m3u8 link as a fallback/alternative
+        // Extract the m3u8 link using the new newExtractorLink function
         val m3u8Url = Regex("""file:"(.*?(?:\.m3u8))"""").find(unpackedScript)?.groupValues?.get(1)
         if (m3u8Url != null) {
-            // The referer for the m3u8 manifest should be the player's domain
             val m3u8Headers = mapOf(
                 "Origin" to "https://www.asiatvplayer.com",
                 "Referer" to "https://www.asiatvplayer.com/"
