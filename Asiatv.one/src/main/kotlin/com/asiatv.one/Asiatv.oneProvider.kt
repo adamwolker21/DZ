@@ -81,9 +81,8 @@ class AsiatvoneProvider : MainAPI() {
         val document = app.get(url, headers = commonHeaders).document
 
         val title = document.selectFirst("h1.title")?.text()?.trim() ?: return null
-        // Updated poster selector to be more robust
         val poster = document.selectFirst("div.poster img")?.attr("src")
-        val plot = document.selectFirst("div.description")?.text()?.trim()
+        var plot = document.selectFirst("div.description")?.text()?.trim()
         val tags = document.select("div.single_tax a[rel=tag]").map { it.text() }
         
         var year: Int? = null
@@ -100,15 +99,27 @@ class AsiatvoneProvider : MainAPI() {
             }
         }
 
-        val isMovie: Boolean
-        val episodeCountText = document.select("div.single_tax span").find { it.text().contains("عدد الحلقات") }?.nextElementSibling()?.text()
+        // Extract actors
+        val actors = document.select("div.single-team ul.team li").mapNotNull {
+            val name = it.selectFirst("div > span")?.text() ?: return@mapNotNull null
+            val image = it.selectFirst("img")?.attr("src")
+            Actor(name, image)
+        }
+
+        val episodeCountSpan = document.select("div.single_tax span").find { it.text().contains("عدد الحلقات") }
+        val episodeCountText = episodeCountSpan?.nextElementSibling()?.text()
         val firstEpText = document.selectFirst("ul.eplist2 li a")?.text()
 
-        when {
-            episodeCountText?.contains("فيلم") == true -> isMovie = true
-            firstEpText?.contains("فيلم") == true -> isMovie = true
-            title.contains("فيلم") -> isMovie = true
-            else -> isMovie = false
+        val isMovie = when {
+            episodeCountText?.contains("فيلم") == true -> true
+            firstEpText?.contains("فيلم") == true -> true
+            title.contains("فيلم") -> true
+            else -> false
+        }
+        
+        // Append episode count to plot for TV Series
+        if (!isMovie && !episodeCountText.isNullOrBlank()) {
+            plot += "<br><br>عدد الحلقات: $episodeCountText"
         }
 
         return if (!isMovie) {
@@ -127,6 +138,7 @@ class AsiatvoneProvider : MainAPI() {
                 this.plot = plot
                 this.tags = tags
                 this.year = year
+                this.actors = actors
             }
         } else {
             newMovieLoadResponse(title, url, TvType.Movie, url) {
@@ -134,6 +146,7 @@ class AsiatvoneProvider : MainAPI() {
                 this.plot = plot
                 this.tags = tags
                 this.year = year
+                this.actors = actors
             }
         }
     }
