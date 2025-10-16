@@ -2,6 +2,7 @@ package com.asiatv.one
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.util.regex.Pattern
 
@@ -82,7 +83,6 @@ class AsiatvoneProvider : MainAPI() {
 
         val title = document.selectFirst("h1.title")?.text()?.trim() ?: return null
         
-        // Final update to poster selector to prioritize data-lazy-src
         val posterElement = document.selectFirst("div.poster-wrapper img, div.poster img")
         val poster = posterElement?.attr("data-lazy-src")?.ifBlank {
             posterElement.attr("src")
@@ -158,18 +158,44 @@ class AsiatvoneProvider : MainAPI() {
         }
     }
 
+    // Updated loadLinks to handle the new extraction process
     override suspend fun loadLinks(
-        data: String,
+        data: String, // This is the episode page URL
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val document = app.get(data, headers = commonHeaders).document
+        // Step 1: Get the episode page to find the 'epwatch' value
+        val episodePage = app.get(data, headers = commonHeaders).document
+        val epwatch = episodePage.selectFirst("input[name=epwatch]")?.attr("value")
+            ?: return false // If no button found, exit
+
+        // Step 2: Make the POST request to get the redirect URL
+        // We set allowRedirects to false to capture the 'Location' header
+        val watchPageResponse = app.post(
+            "https://asiawiki.me",
+            data = mapOf("epwatch" to epwatch),
+            allowRedirects = false,
+            headers = commonHeaders.plus("Referer" to data)
+        )
+        
+        val watchPageUrl = watchPageResponse.headers["Location"]
+            ?: return false // If no redirect, exit
+
+        // Step 3: Get the actual watch page content
+        val watchPageDocument = app.get(watchPageUrl, headers = commonHeaders).document
+        
         var linksLoaded = false
-        document.select("div.servers-list > ul > li").forEach { serverElement ->
-            val serverUrl = serverElement.attr("data-server")
-            if (serverUrl.isNotBlank()) {
-                loadExtractor(serverUrl, data, subtitleCallback, callback)?.let {
+
+        // Step 4: Extract the iframe URL from each server
+        watchPageDocument.select("ul.ServerNames li").apmap { serverElement ->
+            val iframeHtml = serverElement.attr("data-server")
+            // The data-server attribute contains an iframe tag as a string, so we parse it
+            val embedUrl = Jsoup.parse(iframeHtml).selectFirst("iframe")?.attr("src")
+            
+            if (!embedUrl.isNullOrBlank()) {
+                // Let CloudStream handle the supported servers automatically
+                loadExtractor(embedUrl, watchPageUrl, subtitleCallback, callback)?.let {
                     linksLoaded = true
                 }
             }
@@ -177,4 +203,3 @@ class AsiatvoneProvider : MainAPI() {
         return linksLoaded
     }
 }
-
