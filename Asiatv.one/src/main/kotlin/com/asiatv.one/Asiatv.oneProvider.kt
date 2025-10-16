@@ -5,7 +5,7 @@ import com.lagradost.cloudstream3.utils.*
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.util.regex.Pattern
-import android.util.Log // Import the Log class
+import android.util.Log 
 
 class AsiatvoneProvider : MainAPI() {
     override var mainUrl = "https://asiatv.one"
@@ -168,7 +168,6 @@ class AsiatvoneProvider : MainAPI() {
         val logTag = "AsiaTVLogs"
         Log.d(logTag, "loadLinks started for: $data")
 
-        // Step 1: Get 'epwatch' value
         val episodePage = app.get(data, headers = commonHeaders).document
         val epwatch = episodePage.selectFirst("input[name=epwatch]")?.attr("value")
         if (epwatch.isNullOrBlank()) {
@@ -177,11 +176,12 @@ class AsiatvoneProvider : MainAPI() {
         }
         Log.d(logTag, "Found 'epwatch' value: $epwatch")
 
-        // Step 2: Make the POST request with correct headers
+        // Corrected headers to match the successful cURL request
         val postHeaders = mapOf(
+            "authority" to "asiawiki.me",
             "Content-Type" to "application/x-www-form-urlencoded",
             "Origin" to mainUrl,
-            "Referer" to data,
+            "Referer" to "$mainUrl/", // Using base domain as referer
             "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36"
         )
 
@@ -199,13 +199,10 @@ class AsiatvoneProvider : MainAPI() {
         }
         Log.d(logTag, "Got redirect URL: $watchPageUrl")
 
-        // Step 3: Get the watch page content
         val watchPageDocument = app.get(watchPageUrl, headers = commonHeaders).document
         Log.d(logTag, "Successfully fetched watch page content.")
         
         var linksLoaded = false
-
-        // Step 4: Extract embed URLs
         watchPageDocument.select("ul.ServerNames li").apmap { serverElement ->
             val iframeHtml = serverElement.attr("data-server")
             val embedUrl = Jsoup.parse(iframeHtml).selectFirst("iframe")?.attr("src")
