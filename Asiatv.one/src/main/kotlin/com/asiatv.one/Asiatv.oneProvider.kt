@@ -36,7 +36,6 @@ class AsiatvoneProvider : MainAPI() {
         val url = if (page > 1) "${request.data}page/$page/" else request.data
         val document = app.get(url, headers = commonHeaders).document
         
-        // Select both types of articles to handle different page layouts
         val home = document.select("article.post, article.postEp").mapNotNull {
             it.toSearchResult()
         }
@@ -49,17 +48,14 @@ class AsiatvoneProvider : MainAPI() {
         val title = linkElement.attr("title") ?: return null
 
         val posterUrl = if (this.hasClass("postEp")) {
-            // Handle the structure for "دراما مكتملة" sections
             this.selectFirst("div.imgSer")?.attr("data-img")
         } else {
-            // Handle the default structure
             val imageElement = this.selectFirst("img.imgLoaded")
             imageElement?.attr("data-img")?.ifBlank {
                 imageElement.attr("src")
             }
         }
 
-        // Differentiate based on title content for main pages
         val isMovie = title.contains("فيلم")
 
         return if (!isMovie) {
@@ -76,7 +72,6 @@ class AsiatvoneProvider : MainAPI() {
     override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "$mainUrl/?s=${query}"
         val document = app.get(searchUrl, headers = commonHeaders).document
-        // Search results use the default layout
         return document.select("article.post, article.postEp").mapNotNull {
             it.toSearchResult()
         }
@@ -86,11 +81,11 @@ class AsiatvoneProvider : MainAPI() {
         val document = app.get(url, headers = commonHeaders).document
 
         val title = document.selectFirst("h1.title")?.text()?.trim() ?: return null
-        val poster = document.selectFirst("div.poster-wrapper img")?.attr("src")
+        // Updated poster selector to be more robust
+        val poster = document.selectFirst("div.poster img")?.attr("src")
         val plot = document.selectFirst("div.description")?.text()?.trim()
         val tags = document.select("div.single_tax a[rel=tag]").map { it.text() }
         
-        // Extract the year from the broadcast date
         var year: Int? = null
         document.select("div.single_tax span").forEach { span ->
             if (span.text().contains("مواعيد البث")) {
@@ -105,7 +100,6 @@ class AsiatvoneProvider : MainAPI() {
             }
         }
 
-        // More robust movie/series detection
         val isMovie: Boolean
         val episodeCountText = document.select("div.single_tax span").find { it.text().contains("عدد الحلقات") }?.nextElementSibling()?.text()
         val firstEpText = document.selectFirst("ul.eplist2 li a")?.text()
@@ -118,7 +112,6 @@ class AsiatvoneProvider : MainAPI() {
         }
 
         return if (!isMovie) {
-            // Handle new and old episode list structures
             val episodes = (document.select("ul.eplist2 > li") + document.select("ul.episodes-list > li")).mapNotNull {
                 val link = it.selectFirst("a") ?: return@mapNotNull null
                 val epUrl = link.attr("href")
@@ -153,7 +146,6 @@ class AsiatvoneProvider : MainAPI() {
     ): Boolean {
         val document = app.get(data, headers = commonHeaders).document
         var linksLoaded = false
-        // Assuming servers list structure is consistent
         document.select("div.servers-list > ul > li").forEach { serverElement ->
             val serverUrl = serverElement.attr("data-server")
             if (serverUrl.isNotBlank()) {
