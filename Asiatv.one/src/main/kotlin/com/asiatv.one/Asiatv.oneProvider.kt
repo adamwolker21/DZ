@@ -99,11 +99,11 @@ class AsiatvoneProvider : MainAPI() {
             }
         }
 
-        // Extract actors
+        // Fixed the error by wrapping Actor in ActorData
         val actors = document.select("div.single-team ul.team li").mapNotNull {
             val name = it.selectFirst("div > span")?.text() ?: return@mapNotNull null
             val image = it.selectFirst("img")?.attr("src")
-            Actor(name, image)
+            ActorData(Actor(name, image))
         }
 
         val episodeCountSpan = document.select("div.single_tax span").find { it.text().contains("عدد الحلقات") }
@@ -117,7 +117,6 @@ class AsiatvoneProvider : MainAPI() {
             else -> false
         }
         
-        // Append episode count to plot for TV Series
         if (!isMovie && !episodeCountText.isNullOrBlank()) {
             plot += "<br><br>عدد الحلقات: $episodeCountText"
         }
