@@ -5,6 +5,7 @@ import com.lagradost.cloudstream3.utils.*
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.util.regex.Pattern
+import android.util.Log // Import the Log class
 
 class AsiatvoneProvider : MainAPI() {
     override var mainUrl = "https://asiatv.one"
@@ -158,48 +159,70 @@ class AsiatvoneProvider : MainAPI() {
         }
     }
 
-    // Updated loadLinks to handle the new extraction process
     override suspend fun loadLinks(
-        data: String, // This is the episode page URL
+        data: String, // Episode page URL
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // Step 1: Get the episode page to find the 'epwatch' value
+        val logTag = "AsiaTVLogs"
+        Log.d(logTag, "loadLinks started for: $data")
+
+        // Step 1: Get 'epwatch' value
         val episodePage = app.get(data, headers = commonHeaders).document
         val epwatch = episodePage.selectFirst("input[name=epwatch]")?.attr("value")
-            ?: return false // If no button found, exit
+        if (epwatch.isNullOrBlank()) {
+            Log.e(logTag, "Failed to find 'epwatch' value.")
+            return false
+        }
+        Log.d(logTag, "Found 'epwatch' value: $epwatch")
 
-        // Step 2: Make the POST request to get the redirect URL
-        // We set allowRedirects to false to capture the 'Location' header
+        // Step 2: Make the POST request with correct headers
+        val postHeaders = mapOf(
+            "Content-Type" to "application/x-www-form-urlencoded",
+            "Origin" to mainUrl,
+            "Referer" to data,
+            "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36"
+        )
+
         val watchPageResponse = app.post(
-            "https://asiawiki.me",
+            "https://asiawiki.me/",
             data = mapOf("epwatch" to epwatch),
             allowRedirects = false,
-            headers = commonHeaders.plus("Referer" to data)
+            headers = postHeaders
         )
         
         val watchPageUrl = watchPageResponse.headers["Location"]
-            ?: return false // If no redirect, exit
+        if (watchPageUrl.isNullOrBlank()) {
+            Log.e(logTag, "Failed to get redirect URL (Location header). Status: ${watchPageResponse.code}")
+            return false
+        }
+        Log.d(logTag, "Got redirect URL: $watchPageUrl")
 
-        // Step 3: Get the actual watch page content
+        // Step 3: Get the watch page content
         val watchPageDocument = app.get(watchPageUrl, headers = commonHeaders).document
+        Log.d(logTag, "Successfully fetched watch page content.")
         
         var linksLoaded = false
 
-        // Step 4: Extract the iframe URL from each server
+        // Step 4: Extract embed URLs
         watchPageDocument.select("ul.ServerNames li").apmap { serverElement ->
             val iframeHtml = serverElement.attr("data-server")
-            // The data-server attribute contains an iframe tag as a string, so we parse it
             val embedUrl = Jsoup.parse(iframeHtml).selectFirst("iframe")?.attr("src")
             
             if (!embedUrl.isNullOrBlank()) {
-                // Let CloudStream handle the supported servers automatically
+                Log.d(logTag, "Found embed URL: $embedUrl")
                 loadExtractor(embedUrl, watchPageUrl, subtitleCallback, callback)?.let {
                     linksLoaded = true
+                    Log.d(logTag, "Successfully loaded links from: $embedUrl")
                 }
             }
         }
+
+        if (!linksLoaded) {
+            Log.e(logTag, "No links were loaded from any server.")
+        }
+        
         return linksLoaded
     }
 }
