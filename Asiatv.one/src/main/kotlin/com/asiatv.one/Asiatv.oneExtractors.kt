@@ -6,15 +6,14 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.M3u8Helper
-//
-import com.lagradost.cloudstream3.Qualities // Import statement for Qualities
-import com.lagradost.cloudstream3.newExtractorLink // Import statement for newExtractorLink
-import com.lagradost.cloudstream3.ExtractorLinkType // Import statement for ExtractorLinkType
+import com.lagradost.cloudstream3.Qualities
+import com.lagradost.cloudstream3.newExtractorLink
+import com.lagradost.cloudstream3.ExtractorLinkType
 
 // Base class for custom extractors
 abstract class AsiaTvExtractor : ExtractorApi() {
     override val name = "AsiaTvCustom"
-    override var mainUrl = "" 
+    override var mainUrl = "" // Corrected to var
     override val requiresReferer = true
 
     // getUrl will be implemented by specific extractor classes
@@ -43,7 +42,6 @@ class AsiaTvPlayer : AsiaTvExtractor() {
         val script = document.selectFirst("script:containsData(eval)")?.data() ?: return
         val unpackedScript = getAndUnpack(script)
         
-        // Extract direct MP4 links using the correct newExtractorLink function
         val mp4Regex = Regex("""file:"([^"]+\.mp4)"\s*,\s*label:"([^"]+)"""")
         mp4Regex.findAll(unpackedScript).forEach { match ->
             val fileUrl = match.groupValues[1]
@@ -65,7 +63,6 @@ class AsiaTvPlayer : AsiaTvExtractor() {
             )
         }
 
-        // Extract the m3u8 link using the correct newExtractorLink function
         val m3u8Url = Regex("""file:"(.*?(?:\.m3u8))"""").find(unpackedScript)?.groupValues?.get(1)
         if (m3u8Url != null) {
             val m3u8Headers = mapOf(
