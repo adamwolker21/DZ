@@ -20,11 +20,11 @@ class AsiatvoneProvider : MainAPI() {
     )
 
     override val mainPage = mainPageOf(
-        "/%d8%af%d8%b1%d8%a7%d9%85%d8%a7-%d8%aa%d8%a8%d8%ab-%d8%ad%d8%a7%d9%84%d9%8a%d8%a7/" to "دراما تبث حاليا",
+        "$mainUrl/%d8%af%d8%b1%d8%a7%d9%85%d8%a7-%d8%aa%d8%a8%d8%ab-%d8%ad%d8%a7%d9%84%d9%8a%d8%a7/" to "دراما تبث حاليا",
         "$mainUrl/types/الدراما-الكورية/" to "الدراما الكورية",
         "$mainUrl/types/الدراما-الصينية/" to "الدراما الصينية",
         "$mainUrl/types/الدراما-اليابانية/" to "الدراما اليابانية",
-        "/دراما-مكتملة/" to "دراما مكتملة",
+        "$mainUrl/%d8%af%d8%b1%d8%a7%d9%85%d8%a7-%d9%85%d9%83%d8%aa%d9%85%d9%84%d8%a9/" to "دراما مكتملة",
         "$mainUrl/types/افلام-اسيوية/" to "افلام اسيوية",
     )
 
