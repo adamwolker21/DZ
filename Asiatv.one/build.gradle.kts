@@ -2,7 +2,7 @@ version = 1
 
 cloudstream {
     language = "ar"
-    description = "EgyDead"
+    description = "Asiatv.one"
     authors = listOf("adamwolker21")
 
     status = 1 
@@ -11,5 +11,5 @@ cloudstream {
         "TvSeries",
     )
 
-    iconUrl = "https://raw.githubusercontent.com/adamwolker21/DZ/refs/heads/master/EgyDead/Egydead.png"
+    iconUrl = "https://asiatv.one/wp-content/uploads/2021/09/cropped-asiadrama-192x192.png.webp"
 }
