@@ -3,8 +3,6 @@ package com.asiatv.one
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
-import com.lagradost.cloudstream3.LoadResponse.Companion.newMovieLoadResponse
-import com.lagradost.cloudstream3.LoadResponse.Companion.newTvSeriesLoadResponse
 
 class AsiatvoneProvider : MainAPI() {
     override var mainUrl = "https://asiatv.one"
@@ -42,7 +40,6 @@ class AsiatvoneProvider : MainAPI() {
     private fun Element.toSearchResult(): SearchResponse? {
         val title = this.selectFirst("h2.post-card__title a")?.text() ?: return null
         val href = this.selectFirst("h2.post-card__title a")?.attr("href") ?: return null
-        // Corrected poster image attribute from data-src to src based on new HTML
         val posterUrl = this.selectFirst(".post-card__image img")?.attr("src")
 
         return if (href.contains("/series/")) {
@@ -73,29 +70,38 @@ class AsiatvoneProvider : MainAPI() {
         val poster = document.selectFirst("div.poster > img")?.attr("src")
         val plot = document.selectFirst("div.story")?.text()?.trim()
 
-        // Check if it's a series page by looking for the episodes list
         val isSeries = document.select("ul.episodes-list").isNotEmpty()
 
         return if (isSeries) {
             val episodes = document.select("ul.episodes-list > li").mapNotNull {
-                val epName = it.selectFirst("a")?.text()?.trim() ?: return@mapNotNull null
                 val epUrl = it.selectFirst("a")?.attr("href") ?: return@mapNotNull null
-                Episode(
-                    data = epUrl,
-                    name = epName,
-                )
-            }.reversed() // Reverse to show oldest episode first
+                // Using the new 'newEpisode' builder
+                newEpisode(epUrl) {
+                    this.name = it.selectFirst("a")?.text()?.trim()
+                }
+            }.reversed()
 
-            newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
-                this.posterUrl = poster
-                this.plot = plot
-            }
+            // Using the new TvSeriesLoadResponse constructor
+            TvSeriesLoadResponse(
+                name = title,
+                url = url,
+                apiName = this.name,
+                type = TvType.TvSeries,
+                episodes = episodes,
+                posterUrl = poster,
+                plot = plot
+            )
         } else {
-            // It's a movie, the data passed to loadLinks will be the movie's own URL
-            newMovieLoadResponse(title, url, TvType.Movie, url) {
-                this.posterUrl = poster
-                this.plot = plot
-            }
+            // Using the new MovieLoadResponse constructor
+            MovieLoadResponse(
+                name = title,
+                url = url,
+                apiName = this.name,
+                type = TvType.Movie,
+                dataUrl = url, // The movie page url is the data for loadLinks
+                posterUrl = poster,
+                plot = plot
+            )
         }
     }
 
@@ -108,11 +114,9 @@ class AsiatvoneProvider : MainAPI() {
     ): Boolean {
         val document = app.get(data).document
         var linksLoaded = false
-        // Select all server list items and try to extract video links
         document.select("div.servers-list > ul > li").forEach { serverElement ->
             val serverUrl = serverElement.attr("data-server")
             if (serverUrl.isNotBlank()) {
-                // Use CloudStream's built-in extractor to handle the link
                 loadExtractor(serverUrl, data, subtitleCallback, callback)?.let {
                     linksLoaded = true
                 }
