@@ -2,78 +2,71 @@ package com.asiatv.one
 
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.extractors.helper.getAndUnpack
 import com.lagradost.cloudstream3.SubtitleFile
+import com.lagradost.cloudstream3.extractors.Extractor
 import com.lagradost.cloudstream3.Qualities
-import com.lagradost.cloudstream3.extractors.helper.AesHelper
-import javax.crypto.spec.SecretKeySpec
-import com.lagradost.cloudstream3.utils.M3u8Helper
-import com.lagradost.cloudstream3.extractors.MultiQuality
-import com.lagradost.cloudstream3.base64Decode
-import org.jsoup.Jsoup
-import com.lagradost.cloudstream3.MainAPI
-import com.lagradost.cloudstream3.getAndUnpack
-import com.lagradost.cloudstream3.amap
-import com.lagradost.cloudstream3.apmap
-import com.lagradost.cloudstream3.M3u8Load
-import com.lagradost.cloudstream3.unM3u8
-import com.lagradost.cloudstream3.scripting.safeUnpack
-import com.lagradost.cloudstream3.extractors.Vidstream
 
-// We use QuickExtractor as it's the modern and stable way
-open class AsiaTvPlayer : QuickExtractor() {
+// Define the extractor class for AsiaTvPlayer
+open class AsiaTvPlayer : Extractor() {
+    // Set the name for the extractor, which will be displayed in the UI
     override var name = "AsiaTvPlayer"
+    // The main URL of the extractor service
     override var mainUrl = "https://www.asiatvplayer.com"
-    override val requiresReferer = true
+    // The URL that will be used as a referer for video requests
+    private val refererUrl = "$mainUrl/"
 
-    override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
-        val embedHeaders = mapOf("Referer" to (referer ?: "https://asiawiki.me/"))
-        val document = app.get(url, headers = embedHeaders).document
-        
-        val script = document.selectFirst("script:containsData(eval)")?.data() ?: return null
+    // This function is called to extract video links from a given URL
+    override suspend fun getUrl(
+        url: String, // The embed URL e.g., https://www.asiatvplayer.com/embed-xxxx.html
+        referer: String?, // The page that contains the embed URL
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        // Step 1: Get the HTML content of the embed page, using the provided referer
+        val document = app.get(url, referer = referer).document
+
+        // Step 2: Find the script tag containing the packed/obfuscated code
+        // We look for a script that contains "eval(function(p,a,c,k,e,d))"
+        val script = document.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
+            ?: return // Exit if the script is not found
+
+        // Step 3: Use the built-in utility to deobfuscate the script
         val unpackedScript = getAndUnpack(script)
-        
-        // This will be our list of links to return
-        val links = mutableListOf<ExtractorLink>()
 
-        // Extract direct MP4 links
-        val mp4Regex = Regex("""file:"([^"]+\.mp4)"\s*,\s*label:"([^"]+)"""")
-        mp4Regex.findAll(unpackedScript).forEach { match ->
-            val fileUrl = match.groupValues[1]
-            val qualityLabel = match.groupValues[2]
-            links.add(
+        // Step 4: Use Regex to find all video links within the deobfuscated script
+
+        // This regex captures the HLS (m3u8) master file
+        val m3u8Regex = Regex("""file:\s*"([^"]+master\.m3u8)"""")
+        m3u8Regex.find(unpackedScript)?.let {
+            val m3u8Url = it.groupValues[1]
+            callback.invoke(
                 ExtractorLink(
-                    source = this.name,
-                    name = "${this.name} MP4",
-                    url = fileUrl,
-                    referer = url,
-                    quality = when {
-                        qualityLabel.contains("720") -> Qualities.P720.value
-                        qualityLabel.contains("360") -> Qualities.P360.value
-                        else -> Qualities.Unknown.value
-                    },
-                    isM3u8 = false
+                    this.name,
+                    "HLS (Auto)", // Name for the link
+                    m3u8Url,
+                    referer = refererUrl, // This referer is crucial for m3u8 to work
+                    quality = Qualities.Unknown.value,
+                    isM3u8 = true,
                 )
             )
         }
 
-        // Extract m3u8 link and generate qualities from it
-        val m3u8Url = Regex("""file:"(.*?(?:\.m3u8))"""").find(unpackedScript)?.groupValues?.get(1)
-        if (m3u8Url != null) {
-            val m3u8Headers = mapOf(
-                "Origin" to this.mainUrl,
-                "Referer" to this.mainUrl + "/"
+        // This regex captures the direct MP4 files with their corresponding labels (e.g., 720p)
+        val mp4Regex = Regex("""file:\s*"([^"]+v\.mp4)",\s*label:\s*"([^"]+)"""")
+        mp4Regex.findAll(unpackedScript).forEach { match ->
+            val videoUrl = match.groupValues[1]
+            val qualityLabel = match.groupValues[2] // e.g., "720p"
+            callback.invoke(
+                ExtractorLink(
+                    this.name,
+                    qualityLabel, // Use the label as the link name
+                    videoUrl,
+                    referer = refererUrl, // Add referer for safety, though MP4 might not need it
+                    quality = getQualityFromName(qualityLabel),
+                    isM3u8 = false,
+                )
             )
-            // M3u8Helper will return a list of ExtractorLinks
-            M3u8Helper.generateM3u8(
-                name = this.name,
-                streamUrl = m3u8Url,
-                referer = this.mainUrl + "/",
-                headers = m3u8Headers
-            ).forEach { link ->
-                links.add(link)
-            }
         }
-        
-        return links
     }
-                            }
+                             }
