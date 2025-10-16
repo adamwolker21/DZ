@@ -1,11 +1,12 @@
 package com.asiatv.one
 
 import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.extractors.Extractor
-import com.lagradost.cloudstream3.extractors.JsUnpacker
-import com.lagradost.cloudstream3.Qualities
+import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.extractor.Extractor
+import com.lagradost.cloudstream3.utils.unpacker.JsUnpacker
+import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.newExtractorLink
+import com.lagradost.cloudstream3.getQualityFromName
 
 // Define the extractor class for AsiaTvPlayer
 open class AsiaTvPlayer : Extractor() {
@@ -20,12 +21,11 @@ open class AsiaTvPlayer : Extractor() {
     override suspend fun getUrl(
         url: String, // The embed URL e.g., https://www.asiatvplayer.com/embed-xxxx.html
         referer: String?, // The page that contains the embed URL
-    ): List<ExtractorLink>? { // Return a list of links, no more callbacks
+    ): List<ExtractorLink>? { // Return a list of links
         // Step 1: Get the HTML content of the embed page, using the provided referer
         val document = app.get(url, referer = referer).document
 
         // Step 2: Find the script tag containing the packed/obfuscated code
-        // We look for a script that contains "eval(function(p,a,c,k,e,d))"
         val script = document.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
             ?: return null // Exit if the script is not found
 
@@ -42,12 +42,13 @@ open class AsiaTvPlayer : Extractor() {
             sources.add(
                 newExtractorLink(
                     source = this.name,
-                    name = "HLS (Auto)", // Name for the link
+                    name = "HLS (Auto)",
                     url = m3u8Url,
-                    referer = refererUrl, // This referer is crucial for m3u8 to work
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = true,
-                )
+                    isM3u8 = true
+                ) {
+                    this.referer = refererUrl
+                    this.quality = Qualities.Unknown.value
+                }
             )
         }
 
@@ -59,12 +60,13 @@ open class AsiaTvPlayer : Extractor() {
             sources.add(
                 newExtractorLink(
                     source = this.name,
-                    name = qualityLabel, // Use the label as the link name
+                    name = qualityLabel,
                     url = videoUrl,
-                    referer = refererUrl, // Add referer for safety, though MP4 might not need it
-                    quality = getQualityFromName(qualityLabel),
-                    isM3u8 = false,
-                )
+                    isM3u8 = false
+                ) {
+                    this.referer = refererUrl
+                    this.quality = getQualityFromName(qualityLabel)
+                }
             )
         }
         
