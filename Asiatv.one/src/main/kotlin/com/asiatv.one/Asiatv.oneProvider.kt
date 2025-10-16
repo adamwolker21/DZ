@@ -176,31 +176,30 @@ class AsiatvoneProvider : MainAPI() {
         }
         Log.d(logTag, "Found 'epwatch' value: $epwatch")
 
-        // Corrected headers to match the successful cURL request
         val postHeaders = mapOf(
             "authority" to "asiawiki.me",
             "Content-Type" to "application/x-www-form-urlencoded",
             "Origin" to mainUrl,
-            "Referer" to "$mainUrl/", // Using base domain as referer
+            "Referer" to "$mainUrl/",
             "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36"
         )
-
+        
+        // Let the client handle redirects automatically to preserve cookies
         val watchPageResponse = app.post(
             "https://asiawiki.me/",
             data = mapOf("epwatch" to epwatch),
-            allowRedirects = false,
             headers = postHeaders
         )
-        
-        val watchPageUrl = watchPageResponse.headers["Location"]
-        if (watchPageUrl.isNullOrBlank()) {
-            Log.e(logTag, "Failed to get redirect URL (Location header). Status: ${watchPageResponse.code}")
+
+        // Check if the POST request was successful
+        if(watchPageResponse.code != 200) {
+            Log.e(logTag, "POST request failed with status: ${watchPageResponse.code}")
             return false
         }
-        Log.d(logTag, "Got redirect URL: $watchPageUrl")
 
-        val watchPageDocument = app.get(watchPageUrl, headers = commonHeaders).document
-        Log.d(logTag, "Successfully fetched watch page content.")
+        val watchPageUrl = watchPageResponse.url
+        val watchPageDocument = watchPageResponse.document
+        Log.d(logTag, "Successfully landed on watch page: $watchPageUrl")
         
         var linksLoaded = false
         watchPageDocument.select("ul.ServerNames li").apmap { serverElement ->
