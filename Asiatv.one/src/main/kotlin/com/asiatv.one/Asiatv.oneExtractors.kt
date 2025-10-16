@@ -1,22 +1,23 @@
 package com.asiatv.one
 
-// Corrected and finalized imports for the latest CloudStream API
+// Corrected imports for the latest CloudStream API structure
 import com.lagradost.cloudstream3.app
+import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.Extractor
 import com.lagradost.cloudstream3.utils.JsUnpacker
-import com.lagradost.cloudstream3.Qualities
-import com.lagradost.cloudstream3.newExtractorLink
-import com.lagradost.cloudstream3.getQualityFromName
+import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.getQualityFromName
 
-// Define the extractor class for AsiaTvPlayer
-open class AsiaTvPlayer : Extractor() {
+// The base class is now ExtractorApi
+open class AsiaTvPlayer : ExtractorApi() {
     // Set the name for the extractor, which will be displayed in the UI
     override var name = "AsiaTvPlayer"
     // The main URL of the extractor service
     override var mainUrl = "https://www.asiatvplayer.com"
     // The URL that will be used as a referer for video requests
     private val refererUrl = "$mainUrl/"
+    override val requiresReferer = true
+
 
     // This function is called to extract video links from a given URL
     override suspend fun getUrl(
@@ -30,7 +31,7 @@ open class AsiaTvPlayer : Extractor() {
         val script = document.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
             ?: return null // Exit if the script is not found
 
-        // Step 3: Use the new JsUnpacker utility to deobfuscate the script
+        // Step 3: Use the JsUnpacker utility to deobfuscate the script
         val unpackedScript = JsUnpacker(script).unpack() ?: return null
 
         // Step 4: Use Regex to find all video links within the deobfuscated script
@@ -40,16 +41,16 @@ open class AsiaTvPlayer : Extractor() {
         val m3u8Regex = Regex("""file:\s*"([^"]+master\.m3u8)"""")
         m3u8Regex.find(unpackedScript)?.let {
             val m3u8Url = it.groupValues[1]
+            // Use the direct ExtractorLink constructor - this is the new method
             sources.add(
-                newExtractorLink(
+                ExtractorLink(
                     source = this.name,
                     name = "HLS (Auto)",
                     url = m3u8Url,
-                    isM3u8 = true
-                ) {
-                    this.referer = refererUrl
-                    this.quality = Qualities.Unknown.value
-                }
+                    referer = refererUrl,
+                    quality = Qualities.Unknown.value,
+                    isM3u8 = true,
+                )
             )
         }
 
@@ -59,15 +60,14 @@ open class AsiaTvPlayer : Extractor() {
             val videoUrl = match.groupValues[1]
             val qualityLabel = match.groupValues[2] // e.g., "720p"
             sources.add(
-                newExtractorLink(
+                ExtractorLink(
                     source = this.name,
                     name = qualityLabel,
                     url = videoUrl,
-                    isM3u8 = false
-                ) {
-                    this.referer = refererUrl
-                    this.quality = getQualityFromName(qualityLabel)
-                }
+                    referer = refererUrl,
+                    quality = getQualityFromName(qualityLabel),
+                    isM3u8 = false,
+                )
             )
         }
         
