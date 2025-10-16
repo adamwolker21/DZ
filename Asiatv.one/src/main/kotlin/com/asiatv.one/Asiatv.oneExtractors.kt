@@ -1,10 +1,11 @@
 package com.asiatv.one
 
+// Corrected and finalized imports for the latest CloudStream API
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.extractor.Extractor
-import com.lagradost.cloudstream3.utils.unpacker.JsUnpacker
-import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.Extractor
+import com.lagradost.cloudstream3.utils.JsUnpacker
+import com.lagradost.cloudstream3.Qualities
 import com.lagradost.cloudstream3.newExtractorLink
 import com.lagradost.cloudstream3.getQualityFromName
 
