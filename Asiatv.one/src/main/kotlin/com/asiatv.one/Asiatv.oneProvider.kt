@@ -5,7 +5,7 @@ import com.lagradost.cloudstream3.utils.*
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.util.regex.Pattern
-import android.util.Log 
+import android.util.Log
 
 class AsiatvoneProvider : MainAPI() {
     override var mainUrl = "https://asiatv.one"
@@ -184,22 +184,32 @@ class AsiatvoneProvider : MainAPI() {
             "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36"
         )
         
-        // Let the client handle redirects automatically to preserve cookies
-        val watchPageResponse = app.post(
+        // Step 1: POST request without redirects to capture headers
+        val initialResponse = app.post(
             "https://asiawiki.me/",
             data = mapOf("epwatch" to epwatch),
+            allowRedirects = false,
             headers = postHeaders
         )
 
-        // Check if the POST request was successful
-        if(watchPageResponse.code != 200) {
-            Log.e(logTag, "POST request failed with status: ${watchPageResponse.code}")
+        val watchPageUrl = initialResponse.headers["Location"]
+        val cookies = initialResponse.headers["Set-Cookie"]
+
+        if (watchPageUrl.isNullOrBlank() || cookies.isNullOrBlank()) {
+            Log.e(logTag, "Failed to get redirect URL or Cookies. Status: ${initialResponse.code}")
             return false
         }
+        Log.d(logTag, "Got redirect URL: $watchPageUrl")
+        Log.d(logTag, "Got Cookies: $cookies")
 
-        val watchPageUrl = watchPageResponse.url
-        val watchPageDocument = watchPageResponse.document
-        Log.d(logTag, "Successfully landed on watch page: $watchPageUrl")
+        // Step 2: GET the redirected page with the captured cookies
+        val finalHeaders = mapOf(
+            "Referer" to "$mainUrl/",
+            "Cookie" to cookies,
+            "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36"
+        )
+        val watchPageDocument = app.get(watchPageUrl, headers = finalHeaders).document
+        Log.d(logTag, "Successfully fetched watch page content.")
         
         var linksLoaded = false
         watchPageDocument.select("ul.ServerNames li").apmap { serverElement ->
