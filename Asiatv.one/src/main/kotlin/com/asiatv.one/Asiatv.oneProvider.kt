@@ -75,33 +75,23 @@ class AsiatvoneProvider : MainAPI() {
         return if (isSeries) {
             val episodes = document.select("ul.episodes-list > li").mapNotNull {
                 val epUrl = it.selectFirst("a")?.attr("href") ?: return@mapNotNull null
-                // Using the new 'newEpisode' builder
+                // Using the correct newEpisode builder
                 newEpisode(epUrl) {
                     this.name = it.selectFirst("a")?.text()?.trim()
                 }
             }.reversed()
 
-            // Using the new TvSeriesLoadResponse constructor
-            TvSeriesLoadResponse(
-                name = title,
-                url = url,
-                apiName = this.name,
-                type = TvType.TvSeries,
-                episodes = episodes,
-                posterUrl = poster,
-                plot = plot
-            )
+            // Reverting to the newTvSeriesLoadResponse helper method as requested by the new error log
+            newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+                this.posterUrl = poster
+                this.plot = plot
+            }
         } else {
-            // Using the new MovieLoadResponse constructor
-            MovieLoadResponse(
-                name = title,
-                url = url,
-                apiName = this.name,
-                type = TvType.Movie,
-                dataUrl = url, // The movie page url is the data for loadLinks
-                posterUrl = poster,
-                plot = plot
-            )
+            // Reverting to the newMovieLoadResponse helper method
+            newMovieLoadResponse(title, url, TvType.Movie, url) {
+                this.posterUrl = poster
+                this.plot = plot
+            }
         }
     }
 
