@@ -6,12 +6,15 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.getAndUnpack
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.M3u8Helper
-import com.lagradost.cloudstream3.Qualities
+//
+import com.lagradost.cloudstream3.Qualities // Import statement for Qualities
+import com.lagradost.cloudstream3.newExtractorLink // Import statement for newExtractorLink
+import com.lagradost.cloudstream3.ExtractorLinkType // Import statement for ExtractorLinkType
 
 // Base class for custom extractors
 abstract class AsiaTvExtractor : ExtractorApi() {
     override val name = "AsiaTvCustom"
-    override var mainUrl = "" // Use var instead of val
+    override var mainUrl = "" 
     override val requiresReferer = true
 
     // getUrl will be implemented by specific extractor classes
@@ -26,7 +29,7 @@ abstract class AsiaTvExtractor : ExtractorApi() {
 // Extractor for AsiaTvPlayer
 class AsiaTvPlayer : AsiaTvExtractor() {
     override val name = "AsiaTvPlayer"
-    override var mainUrl = "asiatvplayer.com" // Use var
+    override var mainUrl = "asiatvplayer.com"
 
     override suspend fun getUrl(
         url: String,
@@ -40,28 +43,29 @@ class AsiaTvPlayer : AsiaTvExtractor() {
         val script = document.selectFirst("script:containsData(eval)")?.data() ?: return
         val unpackedScript = getAndUnpack(script)
         
-        // Extract direct MP4 links using the correct ExtractorLink constructor
+        // Extract direct MP4 links using the correct newExtractorLink function
         val mp4Regex = Regex("""file:"([^"]+\.mp4)"\s*,\s*label:"([^"]+)"""")
         mp4Regex.findAll(unpackedScript).forEach { match ->
             val fileUrl = match.groupValues[1]
             val qualityLabel = match.groupValues[2]
             callback(
-                ExtractorLink(
+                newExtractorLink(
                     source = this.name,
                     name = "${this.name} MP4",
                     url = fileUrl,
-                    referer = url,
-                    quality = when {
+                    type = ExtractorLinkType.FILE
+                ) {
+                    this.referer = url
+                    this.quality = when {
                         qualityLabel.contains("720") -> Qualities.P720.value
                         qualityLabel.contains("360") -> Qualities.P360.value
                         else -> Qualities.Unknown.value
-                    },
-                    isM3u8 = false,
-                )
+                    }
+                }
             )
         }
 
-        // Extract the m3u8 link using the correct approach
+        // Extract the m3u8 link using the correct newExtractorLink function
         val m3u8Url = Regex("""file:"(.*?(?:\.m3u8))"""").find(unpackedScript)?.groupValues?.get(1)
         if (m3u8Url != null) {
             val m3u8Headers = mapOf(
