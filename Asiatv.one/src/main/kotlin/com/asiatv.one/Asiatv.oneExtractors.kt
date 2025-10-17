@@ -40,12 +40,9 @@ open class AsiaTvPlayer : ExtractorApi() {
                 return null
             }
             Log.d(TAG, "Script unpacked successfully.")
-            
-            // v9 Change: Print the entire unpacked script to the log for analysis.
-            Log.d(TAG, "Unpacked Script Content: $unpackedScript")
 
-            // Regex from v8 (will likely be adjusted after analyzing the new log)
-            val m3u8Regex = Regex("""file\s*:\s*['"]([^'"]+master\.m3u8)['"]""")
+            // v10 Regex: Precisely targets the structure revealed in the Log9 output.
+            val m3u8Regex = Regex("""file:"([^"]+master\.m3u8)"""")
             m3u8Regex.find(unpackedScript)?.let {
                 val m3u8Url = it.groupValues[1]
                 Log.d(TAG, "Found M3U8 URL: $m3u8Url")
@@ -61,7 +58,8 @@ open class AsiaTvPlayer : ExtractorApi() {
                 )
             }
 
-            val mp4Regex = Regex("""file\s*:\s*['"]([^'"]+v\.mp4)['"],\s*label\s*:\s*['"]([^'"]+)['"]""")
+            // v10 Regex: Precisely targets the structure for MP4 files.
+            val mp4Regex = Regex("""file:"([^"]+v\.mp4)",label:"([^"]+)"""")
             mp4Regex.findAll(unpackedScript).forEach { match ->
                 val videoUrl = match.groupValues[1]
                 val qualityLabel = match.groupValues[2]
@@ -86,4 +84,4 @@ open class AsiaTvPlayer : ExtractorApi() {
         Log.d(TAG, "Returning ${sources.size} sources.")
         return sources
     }
-}
+                                 }
