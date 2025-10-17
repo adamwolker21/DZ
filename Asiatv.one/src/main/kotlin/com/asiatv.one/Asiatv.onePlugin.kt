@@ -10,6 +10,7 @@ class AsiatvonePlugin: Plugin() {
         // All providers should be added here
         registerMainAPI(AsiatvoneProvider())
         // Register custom extractors
-        registerExtractorAPI(AsiaTvPlayer())
+        extractorList.forEach { extractor ->
+            registerExtractorAPI(extractor)
     }
 }
