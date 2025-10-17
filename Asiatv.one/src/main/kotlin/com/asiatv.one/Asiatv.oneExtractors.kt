@@ -44,7 +44,7 @@ open class AsiaTvPlayer : ExtractorApi() {
                     source = this.name,
                     name = "HLS (Auto)",
                     url = m3u8Url,
-                    isM3u8 = true
+                    type = ExtractorLinkType.M3U8
                 ) {
                     this.referer = refererUrl
                     this.quality = Qualities.Unknown.value
@@ -62,7 +62,7 @@ open class AsiaTvPlayer : ExtractorApi() {
                     source = this.name,
                     name = qualityLabel,
                     url = videoUrl,
-                    isM3u8 = false
+                    type = ExtractorLinkType.VIDEO
                 ) {
                     this.referer = refererUrl
                     this.quality = getQualityFromName(qualityLabel)
