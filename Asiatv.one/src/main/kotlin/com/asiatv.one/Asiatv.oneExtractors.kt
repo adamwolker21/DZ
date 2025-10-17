@@ -40,8 +40,11 @@ open class AsiaTvPlayer : ExtractorApi() {
                 return null
             }
             Log.d(TAG, "Script unpacked successfully.")
+            
+            // v9 Change: Print the entire unpacked script to the log for analysis.
+            Log.d(TAG, "Unpacked Script Content: $unpackedScript")
 
-            // v8 Regex: Made more flexible to handle single or double quotes and varying whitespace.
+            // Regex from v8 (will likely be adjusted after analyzing the new log)
             val m3u8Regex = Regex("""file\s*:\s*['"]([^'"]+master\.m3u8)['"]""")
             m3u8Regex.find(unpackedScript)?.let {
                 val m3u8Url = it.groupValues[1]
@@ -58,7 +61,6 @@ open class AsiaTvPlayer : ExtractorApi() {
                 )
             }
 
-            // v8 Regex: Made more flexible for the same reasons.
             val mp4Regex = Regex("""file\s*:\s*['"]([^'"]+v\.mp4)['"],\s*label\s*:\s*['"]([^'"]+)['"]""")
             mp4Regex.findAll(unpackedScript).forEach { match ->
                 val videoUrl = match.groupValues[1]
