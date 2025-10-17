@@ -9,8 +9,11 @@ class AsiatvonePlugin: Plugin() {
     override fun load(context: Context) {
         // All providers should be added here
         registerMainAPI(AsiatvoneProvider())
+        
         // Register custom extractors
-        extractorList.forEach { extractor ->
-            registerExtractorAPI(extractor)
+        // Assuming AsiaTvPlayer will be defined later
+        // registerExtractorAPI(AsiaTvPlayer()) 
+        registerExtractorAPI(StreamHG())
+        registerExtractorAPI(Earnvids())
     }
 }
