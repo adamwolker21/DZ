@@ -34,16 +34,18 @@ open class AsiaTvPlayer : ExtractorApi() {
             }
             Log.d(TAG, "Found packed script.")
 
+            // v13: Printing the raw packed script before unpacking
+            Log.d(TAG, "Found Packed Script Content: $script")
+
+
             val unpackedScript = JsUnpacker(script).unpack()
-            
-            // v12: Using a much more robust check for both null and blank strings.
+
             if (unpackedScript.isNullOrBlank()) {
-                Log.e(TAG, "Failed to unpack the script or script is empty.")
+                Log.e(TAG, "Failed to unpack the script or script is empty. (Unpacked length: ${unpackedScript?.length ?: 0})")
                 return null
             }
             Log.d(TAG, "Script unpacked successfully (length ${unpackedScript.length}).")
 
-            // v12: Final regex, designed to be simple and effective based on the known unpacked script.
             val fileRegex = Regex("""file:\s*"([^"]+)"""")
             fileRegex.findAll(unpackedScript).forEach { match ->
                 val videoUrl = match.groupValues[1]
@@ -61,7 +63,6 @@ open class AsiaTvPlayer : ExtractorApi() {
                         }
                     )
                 } else if (videoUrl.contains("v.mp4")) {
-                    // Extract label for mp4 files
                     val labelRegex = Regex("""file:\s*"$videoUrl",\s*label:\s*"([^"]+)"""")
                     val labelMatch = labelRegex.find(unpackedScript)
                     val qualityLabel = labelMatch?.groupValues?.get(1) ?: "SD"
