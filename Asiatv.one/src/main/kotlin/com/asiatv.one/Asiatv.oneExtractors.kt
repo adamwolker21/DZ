@@ -41,39 +41,43 @@ open class AsiaTvPlayer : ExtractorApi() {
             }
             Log.d(TAG, "Script unpacked successfully.")
 
-            // v10 Regex: Precisely targets the structure revealed in the Log9 output.
-            val m3u8Regex = Regex("""file:"([^"]+master\.m3u8)"""")
-            m3u8Regex.find(unpackedScript)?.let {
-                val m3u8Url = it.groupValues[1]
-                Log.d(TAG, "Found M3U8 URL: $m3u8Url")
-                sources.add(
-                    newExtractorLink(
-                        source = this.name,
-                        name = "HLS (Auto)",
-                        url = m3u8Url,
-                    ) {
-                        this.referer = refererUrl
-                        this.quality = Qualities.Unknown.value
-                    }
-                )
-            }
+            // v11: Re-adding full script logging and adding diagnostic checks
+            Log.d(TAG, "Unpacked Script (length ${unpackedScript.length}): $unpackedScript")
+            Log.d(TAG, "Diagnostic check for 'master.m3u8': ${unpackedScript.contains("master.m3u8")}")
+            Log.d(TAG, "Diagnostic check for 'v.mp4': ${unpackedScript.contains("v.mp4")}")
 
-            // v10 Regex: Precisely targets the structure for MP4 files.
-            val mp4Regex = Regex("""file:"([^"]+v\.mp4)",label:"([^"]+)"""")
-            mp4Regex.findAll(unpackedScript).forEach { match ->
+
+            // v11: Using a more robust and flexible Regex
+            val sourceRegex = Regex("""file\s*:\s*["']([^"']+)["'](?:,\s*label\s*:\s*["']([^"']+)["'])?""")
+            sourceRegex.findAll(unpackedScript).forEach { match ->
                 val videoUrl = match.groupValues[1]
-                val qualityLabel = match.groupValues[2]
-                Log.d(TAG, "Found MP4 URL: $videoUrl with label: $qualityLabel")
-                sources.add(
-                    newExtractorLink(
-                        source = this.name,
-                        name = qualityLabel,
-                        url = videoUrl,
-                    ) {
-                        this.referer = refererUrl
-                        this.quality = getQualityFromName(qualityLabel)
-                    }
-                )
+                val qualityLabel = match.groupValues[2].ifEmpty { null }
+
+                if (videoUrl.contains("master.m3u8")) {
+                    Log.d(TAG, "Found M3U8 URL: $videoUrl")
+                    sources.add(
+                        newExtractorLink(
+                            source = this.name,
+                            name = "HLS (Auto)",
+                            url = videoUrl,
+                        ) {
+                            this.referer = refererUrl
+                            this.quality = Qualities.Unknown.value
+                        }
+                    )
+                } else if (videoUrl.contains("v.mp4")) {
+                    Log.d(TAG, "Found MP4 URL: $videoUrl with label: $qualityLabel")
+                    sources.add(
+                        newExtractorLink(
+                            source = this.name,
+                            name = qualityLabel ?: "SD",
+                            url = videoUrl,
+                        ) {
+                            this.referer = refererUrl
+                            this.quality = getQualityFromName(qualityLabel)
+                        }
+                    )
+                }
             }
 
         } catch (e: Exception) {
@@ -84,4 +88,4 @@ open class AsiaTvPlayer : ExtractorApi() {
         Log.d(TAG, "Returning ${sources.size} sources.")
         return sources
     }
-                                 }
+}
