@@ -24,11 +24,9 @@ open class AsiaTvPlayer : ExtractorApi() {
         val sources = mutableListOf<ExtractorLink>()
 
         try {
-            // Step 1: Get the HTML content
             val document = app.get(url, referer = referer).document
             Log.d(TAG, "Successfully fetched embed page content.")
 
-            // Step 2: Find the packed script
             val script = document.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
             if (script == null) {
                 Log.e(TAG, "Could not find the packed script tag.")
@@ -36,7 +34,6 @@ open class AsiaTvPlayer : ExtractorApi() {
             }
             Log.d(TAG, "Found packed script.")
 
-            // Step 3: Unpack the script
             val unpackedScript = JsUnpacker(script).unpack()
             if (unpackedScript == null) {
                 Log.e(TAG, "Failed to unpack the script.")
@@ -44,9 +41,8 @@ open class AsiaTvPlayer : ExtractorApi() {
             }
             Log.d(TAG, "Script unpacked successfully.")
 
-            // Step 4: Extract links using Regex
-            Log.d(TAG, "Searching for M3U8 links...")
-            val m3u8Regex = Regex("""file:\s*"([^"]+master\.m3u8)"""")
+            // v8 Regex: Made more flexible to handle single or double quotes and varying whitespace.
+            val m3u8Regex = Regex("""file\s*:\s*['"]([^'"]+master\.m3u8)['"]""")
             m3u8Regex.find(unpackedScript)?.let {
                 val m3u8Url = it.groupValues[1]
                 Log.d(TAG, "Found M3U8 URL: $m3u8Url")
@@ -62,8 +58,8 @@ open class AsiaTvPlayer : ExtractorApi() {
                 )
             }
 
-            Log.d(TAG, "Searching for MP4 links...")
-            val mp4Regex = Regex("""file:\s*"([^"]+v\.mp4)",\s*label:\s*"([^"]+)"""")
+            // v8 Regex: Made more flexible for the same reasons.
+            val mp4Regex = Regex("""file\s*:\s*['"]([^'"]+v\.mp4)['"],\s*label\s*:\s*['"]([^'"]+)['"]""")
             mp4Regex.findAll(unpackedScript).forEach { match ->
                 val videoUrl = match.groupValues[1]
                 val qualityLabel = match.groupValues[2]
@@ -88,4 +84,4 @@ open class AsiaTvPlayer : ExtractorApi() {
         Log.d(TAG, "Returning ${sources.size} sources.")
         return sources
     }
-                                 }
+}
