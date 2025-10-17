@@ -1,30 +1,27 @@
 package com.asiatv.one
 
-// Corrected imports for the latest CloudStream API structure
+// Corrected and verified imports for the latest CloudStream API
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.JsUnpacker
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.getQualityFromName
+import com.lagradost.cloudstream3.utils.newExtractorLink // This is the correct function to use
 
-// The base class is now ExtractorApi
+// The base class must be ExtractorApi
 open class AsiaTvPlayer : ExtractorApi() {
-    // Set the name for the extractor, which will be displayed in the UI
     override var name = "AsiaTvPlayer"
-    // The main URL of the extractor service
     override var mainUrl = "https://www.asiatvplayer.com"
-    // The URL that will be used as a referer for video requests
     private val refererUrl = "$mainUrl/"
     override val requiresReferer = true
-
 
     // This function is called to extract video links from a given URL
     override suspend fun getUrl(
         url: String, // The embed URL e.g., https://www.asiatvplayer.com/embed-xxxx.html
         referer: String?, // The page that contains the embed URL
     ): List<ExtractorLink>? { // Return a list of links
-        // Step 1: Get the HTML content of the embed page, using the provided referer
+        // Step 1: Get the HTML content of the embed page
         val document = app.get(url, referer = referer).document
 
         // Step 2: Find the script tag containing the packed/obfuscated code
@@ -41,16 +38,17 @@ open class AsiaTvPlayer : ExtractorApi() {
         val m3u8Regex = Regex("""file:\s*"([^"]+master\.m3u8)"""")
         m3u8Regex.find(unpackedScript)?.let {
             val m3u8Url = it.groupValues[1]
-            // Use the direct ExtractorLink constructor - this is the new method
+            // Use newExtractorLink with a lambda block as required by the new API
             sources.add(
-                ExtractorLink(
+                newExtractorLink(
                     source = this.name,
                     name = "HLS (Auto)",
                     url = m3u8Url,
-                    referer = refererUrl,
-                    quality = Qualities.Unknown.value,
-                    isM3u8 = true,
-                )
+                    isM3u8 = true
+                ) {
+                    this.referer = refererUrl
+                    this.quality = Qualities.Unknown.value
+                }
             )
         }
 
@@ -60,14 +58,15 @@ open class AsiaTvPlayer : ExtractorApi() {
             val videoUrl = match.groupValues[1]
             val qualityLabel = match.groupValues[2] // e.g., "720p"
             sources.add(
-                ExtractorLink(
+                newExtractorLink(
                     source = this.name,
                     name = qualityLabel,
                     url = videoUrl,
-                    referer = refererUrl,
-                    quality = getQualityFromName(qualityLabel),
-                    isM3u8 = false,
-                )
+                    isM3u8 = false
+                ) {
+                    this.referer = refererUrl
+                    this.quality = getQualityFromName(qualityLabel)
+                }
             )
         }
         
