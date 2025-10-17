@@ -1,92 +1,97 @@
 package com.asiatv.one
 
-import android.util.Log
+import com.lagradost.cloudstream3.USER_AGENT
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.JsUnpacker
-import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.getQualityFromName
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.newExtractorLink
+import com.lagradost.cloudstream3.network.CloudflareKiller
+import com.lagradost.cloudstream3.utils.JsUnpacker
+import android.util.Log
+import org.json.JSONObject
 
-open class AsiaTvPlayer : ExtractorApi() {
-    override var name = "AsiaTvPlayer"
-    override var mainUrl = "https://www.asiatvplayer.com"
-    private val refererUrl = "$mainUrl/"
+// Helper object for Cloudflare
+private val cloudflareKiller by lazy { CloudflareKiller() }
+
+/**
+ * Searches for video links (m3u8, mp4) within unpacked JavaScript code.
+ */
+private fun findUrlInUnpackedJs(unpackedJs: String): String? {
+    Regex(""""hls2"\s*:\s*"([^"]+)"""").find(unpackedJs)?.groupValues?.get(1)?.let { return it }
+    Regex("""(https?://[^\s'"]+\.(?:m3u8|mp4)[^\s'"]*)""").find(unpackedJs)?.groupValues?.get(1)?.let { return it }
+    Regex("""file\s*:\s*["'](http[^"']+)""").find(unpackedJs)?.groupValues?.get(1)?.let { return it }
+    return null
+}
+
+class Earnvids : ExtractorApi() {
+    override var name = "Earnvids"
+    override var mainUrl = "dingtezuni.com"
     override val requiresReferer = true
-    private val TAG = "AsiaTvPlayer"
+    private val logTag = "EarnvidsExtractor"
 
-    override suspend fun getUrl(
-        url: String,
-        referer: String?,
-    ): List<ExtractorLink>? {
-        Log.d(TAG, "Extractor invoked for URL: $url")
-        val sources = mutableListOf<ExtractorLink>()
-
+    override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
         try {
-            val document = app.get(url, referer = referer).document
-            Log.d(TAG, "Successfully fetched embed page content.")
+            val playerPageContent = app.get(url, referer = referer, interceptor = cloudflareKiller).text
+            if (playerPageContent.isBlank()) return null
 
-            val script = document.selectFirst("script:containsData(eval(function(p,a,c,k,e,d))")?.data()
-            if (script == null) {
-                Log.e(TAG, "Could not find the packed script tag.")
-                return null
-            }
-            Log.d(TAG, "Found packed script.")
-
-            // v13: Printing the raw packed script before unpacking
-            Log.d(TAG, "Found Packed Script Content: $script")
-
-
-            val unpackedScript = JsUnpacker(script).unpack()
-
-            if (unpackedScript.isNullOrBlank()) {
-                Log.e(TAG, "Failed to unpack the script or script is empty. (Unpacked length: ${unpackedScript?.length ?: 0})")
-                return null
-            }
-            Log.d(TAG, "Script unpacked successfully (length ${unpackedScript.length}).")
-
-            val fileRegex = Regex("""file:\s*"([^"]+)"""")
-            fileRegex.findAll(unpackedScript).forEach { match ->
-                val videoUrl = match.groupValues[1]
-
-                if (videoUrl.contains("master.m3u8")) {
-                    Log.d(TAG, "Found M3U8 URL: $videoUrl")
-                    sources.add(
-                        newExtractorLink(
-                            source = this.name,
-                            name = "HLS (Auto)",
-                            url = videoUrl,
-                        ) {
-                            this.referer = refererUrl
-                            this.quality = Qualities.Unknown.value
-                        }
-                    )
-                } else if (videoUrl.contains("v.mp4")) {
-                    val labelRegex = Regex("""file:\s*"$videoUrl",\s*label:\s*"([^"]+)"""")
-                    val labelMatch = labelRegex.find(unpackedScript)
-                    val qualityLabel = labelMatch?.groupValues?.get(1) ?: "SD"
-                    
-                    Log.d(TAG, "Found MP4 URL: $videoUrl with label: $qualityLabel")
-                    sources.add(
-                        newExtractorLink(
-                            source = this.name,
-                            name = qualityLabel,
-                            url = videoUrl,
-                        ) {
-                            this.referer = refererUrl
-                            this.quality = getQualityFromName(qualityLabel)
-                        }
-                    )
+            val unpackedJs = JsUnpacker(playerPageContent).unpack() ?: return null
+            val videoLink = findUrlInUnpackedJs(unpackedJs) ?: return null
+            
+            val headers = mapOf("Referer" to url, "User-Agent" to USER_AGENT)
+            val finalUrlWithHeaders = "$videoLink#headers=${JSONObject(headers)}"
+            
+            return listOf(
+                newExtractorLink(source = this.name, name = this.name, url = finalUrlWithHeaders, type = ExtractorLinkType.M3U8) {
+                    this.referer = url
                 }
-            }
-
+            )
         } catch (e: Exception) {
-            Log.e(TAG, "An exception occurred: ${e.message}")
-            e.printStackTrace()
+            Log.e(logTag, "An error occurred: ${e.message}", e)
+            return null
+        }
+    }
+}
+
+class StreamHG : ExtractorApi() {
+    override var name = "StreamHG"
+    override var mainUrl = "hglink.to"
+    override val requiresReferer = true
+    private val logTag = "StreamHGExtractor"
+    private val potentialHosts = listOf("https://davioad.com", "https://kravaxxa.com")
+
+    override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
+        val videoId = url.substringAfterLast("/")
+        if (videoId.isBlank()) {
+            Log.e(logTag, "Failed to extract video ID from $url")
+            return null
+        }
+
+        for (host in potentialHosts) {
+            try {
+                val finalPageUrl = "$host/e/$videoId"
+                Log.d(logTag, "Attempting to extract from host: $finalPageUrl")
+
+                val playerPageContent = app.get(finalPageUrl, referer = url, interceptor = cloudflareKiller).text
+                if (playerPageContent.isBlank()) continue
+
+                val unpackedJs = JsUnpacker(playerPageContent).unpack() ?: continue
+                val videoLink = findUrlInUnpackedJs(unpackedJs) ?: continue
+
+                val headers = mapOf("Referer" to finalPageUrl, "User-Agent" to USER_AGENT)
+                val finalUrlWithHeaders = "$videoLink#headers=${JSONObject(headers)}"
+
+                return listOf(
+                    newExtractorLink(source = this.name, name = this.name, url = finalUrlWithHeaders, type = ExtractorLinkType.M3U8) {
+                        this.referer = finalPageUrl
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(logTag, "Failed to extract from host $host. Error: ${e.message}")
+            }
         }
         
-        Log.d(TAG, "Returning ${sources.size} sources.")
-        return sources
+        Log.e(logTag, "Failed to extract link from any of the potential hosts for URL: $url")
+        return null
     }
-                                           }
+}
