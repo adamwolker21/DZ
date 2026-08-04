@@ -212,7 +212,7 @@ class AsiatvoneProvider : MainAPI() {
         Log.d(logTag, "Successfully fetched watch page content.")
         
         var linksLoaded = false
-        watchPageDocument.select("ul.ServerNames li").apmap { serverElement ->
+        watchPageDocument.select("ul.ServerNames li").amap { serverElement ->
             val iframeHtml = serverElement.attr("data-server")
             val embedUrl = Jsoup.parse(iframeHtml).selectFirst("iframe")?.attr("src")
             
