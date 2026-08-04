@@ -4,7 +4,6 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
-import org.json.JSONObject
 import java.util.regex.Pattern
 import android.util.Log
 
@@ -177,7 +176,7 @@ class AsiatvoneProvider : MainAPI() {
             Log.e(logTag, "Failed to find 'epwatch' value.")
             return false
         }
-        Log.d(logTag, "Found epwatch: $epwatch, initiating session...")
+        Log.d(logTag, "Found epwatch: $epwatch")
 
         val postHeaders = mapOf(
             "authority" to "asiawiki.me",
@@ -187,18 +186,18 @@ class AsiatvoneProvider : MainAPI() {
             "User-Agent" to USER_AGENT
         )
         
-        // 1. الطلب الأول لجلب الكوكيز وتهيئة الجلسة (Session)
+        // 1. الطلب الأول لجلب الكوكيز وتهيئة الجلسة
         val initialResponse = app.post(
             "https://asiawiki.me/",
             data = mapOf("epwatch" to epwatch),
             headers = postHeaders
         )
 
-        // التقاط جميع الكوكيز المرجعة من السيرفر
-        val cookies = initialResponse.okhttpResponse.headers("set-cookie").joinToString("; ")
-        Log.d(logTag, "Session Cookies Grabbed: $cookies")
+        // الطريقة الرسمية والآمنة 100% لجلب الكوكيز في Cloudstream
+        val cookies = initialResponse.cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
+        Log.d(logTag, "Cookies Grabbed safely.")
 
-        // 2. إرسال طلب AJAX مع الكوكيز التي التقطناها
+        // 2. إرسال طلب AJAX 
         val ajaxUrl = "https://asiawiki.me/wp-admin/admin-ajax.php"
         val ajaxHeaders = mutableMapOf(
             "X-Requested-With" to "XMLHttpRequest",
@@ -207,22 +206,17 @@ class AsiatvoneProvider : MainAPI() {
             "Accept" to "*/*"
         )
         
-        // إضافة الكوكيز للهيدر لإثبات هويتنا للسيرفر
         if (cookies.isNotBlank()) {
             ajaxHeaders["Cookie"] = cookies
         }
 
-        Log.d(logTag, "Sending AJAX Request to: $ajaxUrl?action=fetch_episode&id=$epwatch")
-        
-        // المحاولة الأولى: طلب GET (كما ظهر معك في الرابط)
         var ajaxResponseText = app.get(
             "$ajaxUrl?action=fetch_episode&id=$epwatch",
             headers = ajaxHeaders
         ).text
 
-        // المحاولة الثانية: في حال كان الموقع يرفض GET ويرد بقيمة "0" (رد WordPress الافتراضي)، ننتقل لـ POST
         if (ajaxResponseText.isBlank() || ajaxResponseText.trim() == "0") {
-            Log.d(logTag, "GET request returned 0, falling back to POST...")
+            Log.d(logTag, "Falling back to POST for AJAX...")
             ajaxResponseText = app.post(
                 ajaxUrl,
                 headers = ajaxHeaders,
@@ -230,34 +224,26 @@ class AsiatvoneProvider : MainAPI() {
             ).text
         }
 
-        var htmlContent = ajaxResponseText
-
-        // معالجة البيانات إذا كانت مغلفة داخل كائن JSON
-        try {
-            if (ajaxResponseText.trim().startsWith("{")) {
-                val json = JSONObject(ajaxResponseText)
-                htmlContent = json.optString("data", ajaxResponseText) 
-            }
-        } catch (e: Exception) {
-            Log.d(logTag, "Response is not JSON, treating as raw HTML.")
-        }
+        // تنظيف النص من علامات الـ JSON ليكون HTML صافي ومقروء لمكتبة Jsoup بدون استدعاء JSONObject
+        val cleanHtmlContent = ajaxResponseText
+            .replace("\\\"", "\"")
+            .replace("\\/", "/")
+            .replace("\\n", "")
 
         var linksLoaded = false
-        val serversDocument = Jsoup.parse(htmlContent)
+        val serversDocument = Jsoup.parse(cleanHtmlContent)
         
-        // 3. استخراج الروابط من HTML كما شرحت لي
-        serversDocument.select("ul.ServerNames li").amap { serverElement ->
+        // 3. استخراج الروابط
+        serversDocument.select("ul.ServerNames li, li").amap { serverElement ->
             try {
                 val rawDataServer = serverElement.attr("data-server")
                 if (rawDataServer.isBlank()) return@amap
                 
-                // فك التشفير
                 val iframeHtml = rawDataServer
                     .replace("&quot;", "\"")
                     .replace("&lt;", "<")
                     .replace("&gt;", ">")
                     .replace("&amp;", "&")
-                    .replace("\\\"", "\"")
                 
                 val srcRegex = """src=["'](.*?)["']""".toRegex(RegexOption.IGNORE_CASE)
                 var embedUrlRaw = srcRegex.find(iframeHtml)?.groupValues?.get(1) 
@@ -266,7 +252,6 @@ class AsiatvoneProvider : MainAPI() {
                 if (!embedUrlRaw.isNullOrBlank()) {
                     var embedUrl = if (embedUrlRaw.startsWith("//")) "https:$embedUrlRaw" else embedUrlRaw
                     
-                    // خدع الدومينات
                     when {
                         embedUrl.contains("playmogo.com") -> embedUrl = embedUrl.replace("playmogo.com", "dood.to")
                         embedUrl.contains("vidmoly.biz") -> embedUrl = embedUrl.replace("vidmoly.biz", "vidmoly.to")
