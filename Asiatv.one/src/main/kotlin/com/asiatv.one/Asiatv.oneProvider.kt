@@ -8,7 +8,7 @@ import java.util.regex.Pattern
 import android.util.Log
 
 class AsiatvoneProvider : MainAPI() {
-    override var mainUrl = "https://asiatv.one"
+    override var mainUrl = "https://asiatvdrama.com/"
     override var name = "AsiaTV"
     override val hasMainPage = true
     override var lang = "ar"
