@@ -4,7 +4,6 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
-import org.jsoup.parser.Parser
 import java.util.regex.Pattern
 import android.util.Log
 
@@ -23,11 +22,12 @@ class AsiatvoneProvider : MainAPI() {
         "Referer" to "$mainUrl/"
     )
 
+    // تم وضع الأقسام بالعربية الصريحة لتجنب أخطاء التهيئة، التطبيق سيقوم بتشفيرها تلقائياً عند جلبها
     override val mainPage = mainPageOf(
-        "$mainUrl/%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a7%d8%aa-%d8%a7%d9%84%d8%ac%d8%af%d9%8a%d8%af%d8%a9/" to "الحلقات الجديدة",
-        "$mainUrl/%d8%af%d8%b1%d8%a7%d9%85%d8%a7-%d8%aa%d8%a8%d8%ab-%d8%ad%d8%a7%d9%84%d9%8a%d8%a7/" to "دراما تبث حاليا",
-        "$mainUrl/%d8%af%d8%b1%d8%a7%d9%85%d8%a7-%d9%85%d9%83%d8%aa%d9%85%d9%84%d8%a9/" to "دراما مكتملة",
-        "$mainUrl/types/%d8%a7%d9%84%d8%af%d8%b1%d8%a7%d9%85%d8%a7-%d8%a7%d9%84%d9%83%d9%88%d8%b1%d9%8a%d8%a9/" to "الدراما الكورية",
+        "$mainUrl/الحلقات-الجديدة/" to "الحلقات الجديدة",
+        "$mainUrl/دراما-تبث-حاليا/" to "دراما تبث حاليا",
+        "$mainUrl/دراما-مكتملة/" to "دراما مكتملة",
+        "$mainUrl/types/الدراما-الكورية/" to "الدراما الكورية",
         "$mainUrl/types/الدراما-الصينية/" to "الدراما الصينية",
         "$mainUrl/types/الدراما-اليابانية/" to "الدراما اليابانية",
         "$mainUrl/types/افلام-اسيوية/" to "افلام اسيوية"
@@ -186,7 +186,7 @@ class AsiatvoneProvider : MainAPI() {
             "User-Agent" to USER_AGENT
         )
         
-        // إرسال POST
+        // إرسال POST بدون توجيه
         val initialResponse = app.post(
             "https://asiawiki.me/",
             data = mapOf("epwatch" to epwatch),
@@ -202,30 +202,33 @@ class AsiatvoneProvider : MainAPI() {
             return false
         }
         
-        // إصلاح مسار الرابط إذا كان نسبياً
         if (watchPageUrl.startsWith("/")) {
             watchPageUrl = "https://asiawiki.me$watchPageUrl"
         }
         
-        val finalHeaders = mapOf(
+        // تجهيز الـ Headers بشكل آمن لمنع الـ NullPointerException
+        val finalHeaders = mutableMapOf(
             "Referer" to data,
-            "Cookie" to (cookies ?: ""),
             "User-Agent" to USER_AGENT
         )
+        if (!cookies.isNullOrBlank()) {
+            finalHeaders["Cookie"] = cookies
+        }
         
-        // جلب صفحة السيرفرات
         val watchPageDocument = app.get(watchPageUrl, headers = finalHeaders).document
         var linksLoaded = false
         
         watchPageDocument.select("ul.ServerNames li").amap { serverElement ->
             try {
-                // 1. استخراج الكود الخام
                 val rawDataServer = serverElement.attr("data-server")
                 
-                // 2. فك التشفير: تحويل &quot; إلى " و &lt; إلى <
-                val iframeHtml = Parser.unescapeEntities(rawDataServer, true)
+                // فك التشفير بالطريقة الآمنة تماماً بدون استخدام مكتبات خارجية
+                val iframeHtml = rawDataServer
+                    .replace("&quot;", "\"")
+                    .replace("&lt;", "<")
+                    .replace("&gt;", ">")
+                    .replace("&amp;", "&")
                 
-                // 3. استخراج الرابط
                 val srcRegex = """src=["'](.*?)["']""".toRegex(RegexOption.IGNORE_CASE)
                 var embedUrlRaw = srcRegex.find(iframeHtml)?.groupValues?.get(1) 
                     ?: Jsoup.parse(iframeHtml).selectFirst("iframe")?.attr("src")
@@ -233,13 +236,13 @@ class AsiatvoneProvider : MainAPI() {
                 if (!embedUrlRaw.isNullOrBlank()) {
                     var embedUrl = if (embedUrlRaw.startsWith("//")) "https:$embedUrlRaw" else embedUrlRaw
                     
-                    // 4. خدع الدومينات
+                    // خدع الدومينات للسيرفرات العالمية
                     when {
                         embedUrl.contains("playmogo.com") -> embedUrl = embedUrl.replace("playmogo.com", "dood.to")
                         embedUrl.contains("vidmoly.biz") -> embedUrl = embedUrl.replace("vidmoly.biz", "vidmoly.to")
                         embedUrl.contains("voe.sx") -> embedUrl = embedUrl.replace("voe.sx", "voe.unblocked.lol")
                         embedUrl.contains("bysefujedu.com") -> embedUrl = embedUrl.replace("bysefujedu.com", "filemoon.sx")
-                        embedUrl.contains("vinovo.to") -> embedUrl = embedUrl.replace("vinovo.to", "vidmoly.to") // Vinovo غالباً هو Vidmoly
+                        embedUrl.contains("vinovo.to") -> embedUrl = embedUrl.replace("vinovo.to", "vidmoly.to")
                     }
                     
                     Log.d(logTag, "Found embed URL: $embedUrl")
