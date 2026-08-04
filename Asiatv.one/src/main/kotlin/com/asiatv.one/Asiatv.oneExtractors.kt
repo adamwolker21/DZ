@@ -11,12 +11,8 @@ import com.lagradost.cloudstream3.utils.JsUnpacker
 import android.util.Log
 import org.json.JSONObject
 
-// Helper object for Cloudflare
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
-/**
- * Searches for video links (m3u8, mp4) within unpacked JavaScript code.
- */
 private fun findUrlInUnpackedJs(unpackedJs: String): String? {
     Regex(""""hls2"\s*:\s*"([^"]+)"""").find(unpackedJs)?.groupValues?.get(1)?.let { return it }
     Regex("""(https?://[^\s'"]+\.(?:m3u8|mp4)[^\s'"]*)""").find(unpackedJs)?.groupValues?.get(1)?.let { return it }
@@ -26,7 +22,8 @@ private fun findUrlInUnpackedJs(unpackedJs: String): String? {
 
 class Earnvids : ExtractorApi() {
     override var name = "Earnvids"
-    override var mainUrl = "dingtezuni.com"
+    // تم تحديث الدومين الخاص بالسيرفر
+    override var mainUrl = "morencius.com" 
     override val requiresReferer = true
     private val logTag = "EarnvidsExtractor"
 
@@ -55,7 +52,8 @@ class Earnvids : ExtractorApi() {
 
 class StreamHG : ExtractorApi() {
     override var name = "StreamHG"
-    override var mainUrl = "hglink.to"
+    // تم تحديث الدومين الخاص بالسيرفر
+    override var mainUrl = "hgcloud.to"
     override val requiresReferer = true
     private val logTag = "StreamHGExtractor"
     private val potentialHosts = listOf("https://davioad.com", "https://kravaxxa.com")
