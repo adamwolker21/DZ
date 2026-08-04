@@ -183,8 +183,8 @@ class AsiatvoneProvider : MainAPI() {
 
             val watchUrl = "https://asiawiki.me/"
             
-            // 1. الطلب الأول لتهيئة الجلسة
-            val watchResponseText = app.post(
+            // 1. الطلب الأول لتهيئة الجلسة (حفظ الكوكيز تلقائياً في التطبيق)
+            app.post(
                 watchUrl,
                 data = mapOf("epwatch" to epwatch),
                 headers = mapOf(
@@ -192,7 +192,7 @@ class AsiatvoneProvider : MainAPI() {
                     "Referer" to data,
                     "User-Agent" to USER_AGENT
                 )
-            ).text
+            )
 
             // 2. طلب الـ AJAX
             val ajaxUrl = "https://asiawiki.me/wp-admin/admin-ajax.php"
@@ -201,72 +201,64 @@ class AsiatvoneProvider : MainAPI() {
                 headers = mapOf(
                     "X-Requested-With" to "XMLHttpRequest",
                     "Content-Type" to "application/x-www-form-urlencoded; charset=UTF-8",
-                    "Origin" to "https://asiawiki.me",
+                    "Origin" to watchUrl,
                     "Referer" to watchUrl,
-                    "User-Agent" to USER_AGENT,
-                    "Accept" to "application/json, text/javascript, */*; q=0.01"
+                    "User-Agent" to USER_AGENT
                 ),
                 data = mapOf("action" to "fetch_episode", "id" to epwatch)
             ).text
 
-            // دمج النصين معاً لضمان عدم تفويت أي سيرفر في حال ظهر في الطلب الأول أو الثاني
-            val combinedRawText = watchResponseText + ajaxResponseText
-            
-            // 3. صائد الروابط (Universal Regex)
-            // هذه الخوارزمية تبحث عن data-server="..." حتى لو كانت داخل JSON مشفر
-            val dataServerRegex = """data-server=\\?["'](.*?)\\?["']""".toRegex(RegexOption.IGNORE_CASE)
-            val matches = dataServerRegex.findAll(combinedRawText)
+            // 3. فك التشفير الشامل (Brute-force Unescape)
+            val cleanText = ajaxResponseText
+                .replace("\\\"", "\"")
+                .replace("\\/", "/")
+                .replace("&quot;", "\"")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&#038;", "&")
+                .replace("&amp;", "&")
 
-            matches.forEach { match ->
+            // 4. استخراج جميع الروابط الموجودة في src="..." وتخزينها في قائمة صريحة (List)
+            val rawUrlsList = mutableListOf<String>()
+            val srcRegex = """src=["'](.*?)["']""".toRegex(RegexOption.IGNORE_CASE)
+            
+            srcRegex.findAll(cleanText).forEach { match ->
+                rawUrlsList.add(match.groupValues[1])
+            }
+
+            Log.d(logTag, "Found ${rawUrlsList.size} potential URLs in HTML.")
+
+            // 5. استخدام amap (الطريقة الآمنة لمعالجة الروابط في كوتلن بدون Crash)
+            rawUrlsList.distinct().amap { rawUrl ->
                 try {
-                    // استخراج محتوى السيرفر الخام
-                    var rawIframe = match.groupValues[1]
+                    // تجاهل الروابط التي لا تشبه سيرفرات الفيديو (مثل الصور والسكريبتات)
+                    if (rawUrl.contains(".jpg") || rawUrl.contains(".png") || rawUrl.contains(".js")) return@amap
                     
-                    // تنظيف التشفير سواء كان JSON أو HTML
-                    rawIframe = rawIframe.replace("\\\"", "\"")
-                        .replace("\\/", "/")
-                        .replace("\\n", "")
-                        .replace("\\r", "")
-                        .replace("&quot;", "\"")
-                        .replace("&lt;", "<")
-                        .replace("&gt;", ">")
-                        .replace("&amp;", "&")
+                    var embedUrl = if (rawUrl.startsWith("//")) "https:$rawUrl" else rawUrl
                     
-                    // استخراج الرابط المباشر من الـ iframe النظيف
-                    val srcRegex = """src=["'](.*?)["']""".toRegex(RegexOption.IGNORE_CASE)
-                    val srcMatch = srcRegex.find(rawIframe)
-                    var embedUrl = srcMatch?.groupValues?.get(1)
+                    // خدع الدومينات للسيرفرات التي لا يتعرف عليها التطبيق
+                    when {
+                        embedUrl.contains("playmogo.com") -> embedUrl = embedUrl.replace("playmogo.com", "dood.to")
+                        embedUrl.contains("vidmoly.biz") -> embedUrl = embedUrl.replace("vidmoly.biz", "vidmoly.to")
+                        embedUrl.contains("voe.sx") -> embedUrl = embedUrl.replace("voe.sx", "voe.unblocked.lol")
+                        embedUrl.contains("bysefujedu.com") -> embedUrl = embedUrl.replace("bysefujedu.com", "filemoon.sx")
+                        embedUrl.contains("vinovo.to") -> embedUrl = embedUrl.replace("vinovo.to", "vidmoly.to")
+                        embedUrl.contains("luluvdo.com") -> embedUrl = embedUrl.replace("luluvdo.com", "lulustream.com")
+                    }
                     
-                    if (!embedUrl.isNullOrBlank()) {
-                        embedUrl = if (embedUrl.startsWith("//")) "https:$embedUrl" else embedUrl
-                        
-                        // خدع الدومينات
-                        when {
-                            embedUrl.contains("playmogo.com") -> embedUrl = embedUrl.replace("playmogo.com", "dood.to")
-                            embedUrl.contains("vidmoly.biz") -> embedUrl = embedUrl.replace("vidmoly.biz", "vidmoly.to")
-                            embedUrl.contains("voe.sx") -> embedUrl = embedUrl.replace("voe.sx", "voe.unblocked.lol")
-                            embedUrl.contains("bysefujedu.com") -> embedUrl = embedUrl.replace("bysefujedu.com", "filemoon.sx")
-                            embedUrl.contains("vinovo.to") -> embedUrl = embedUrl.replace("vinovo.to", "vidmoly.to")
-                            embedUrl.contains("luluvdo.com") -> embedUrl = embedUrl.replace("luluvdo.com", "lulustream.com")
-                        }
-                        
-                        Log.d(logTag, "Successfully Extracted URL: $embedUrl")
-                        
-                        loadExtractor(embedUrl, watchUrl, subtitleCallback, callback)?.let {
-                            linksLoaded = true
-                        }
+                    Log.d(logTag, "Attempting to load extractor for: $embedUrl")
+                    
+                    loadExtractor(embedUrl, watchUrl, subtitleCallback, callback)?.let {
+                        linksLoaded = true
                     }
                 } catch (e: Exception) {
-                    Log.e(logTag, "Error processing iframe: ${e.message}")
+                    Log.e(logTag, "Extractor error for $rawUrl : ${e.message}")
                 }
             }
 
-            if (!linksLoaded) {
-                Log.e(logTag, "Regex found matches but no valid links could be extracted.")
-            }
-
-        } catch (e: Exception) {
-            Log.e(logTag, "Critical crash prevented: ${e.message}")
+        } catch (e: Throwable) { // استخدام Throwable يمنع أي Crash نهائياً
+            Log.e(logTag, "Critical crash prevented in loadLinks: ${e.message}")
+            e.printStackTrace()
         }
 
         return linksLoaded
