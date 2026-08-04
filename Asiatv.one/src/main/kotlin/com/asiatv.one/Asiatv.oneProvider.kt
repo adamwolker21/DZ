@@ -6,6 +6,7 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.util.regex.Pattern
 import android.util.Log
+import kotlin.math.min
 
 class AsiatvoneProvider : MainAPI() {
     override var mainUrl = "https://asiatvdrama.com"
@@ -186,18 +187,19 @@ class AsiatvoneProvider : MainAPI() {
             "User-Agent" to USER_AGENT
         )
         
-        // 1. الطلب الأول لجلب الكوكيز وتهيئة الجلسة
+        // 1. إرسال الطلب الأول
         val initialResponse = app.post(
             "https://asiawiki.me/",
             data = mapOf("epwatch" to epwatch),
             headers = postHeaders
         )
 
-        // الطريقة الرسمية والآمنة 100% لجلب الكوكيز في Cloudstream
-        val cookies = initialResponse.cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
-        Log.d(logTag, "Cookies Grabbed safely.")
+        // 2. استخراج الكوكيز بالطريقة اليدوية الصريحة لضمان عدم ضياعها
+        val rawCookies = initialResponse.headers.values("Set-Cookie") + initialResponse.headers.values("set-cookie")
+        val cookies = rawCookies.joinToString("; ") { it.substringBefore(";") }
+        Log.d(logTag, "Extracted Cookies: $cookies")
 
-        // 2. إرسال طلب AJAX 
+        // 3. إعداد طلب الـ AJAX
         val ajaxUrl = "https://asiawiki.me/wp-admin/admin-ajax.php"
         val ajaxHeaders = mutableMapOf(
             "X-Requested-With" to "XMLHttpRequest",
@@ -210,21 +212,36 @@ class AsiatvoneProvider : MainAPI() {
             ajaxHeaders["Cookie"] = cookies
         }
 
-        var ajaxResponseText = app.get(
-            "$ajaxUrl?action=fetch_episode&id=$epwatch",
-            headers = ajaxHeaders
+        Log.d(logTag, "Sending AJAX Request...")
+        
+        // جربنا الـ POST فوراً لأن أغلب طلبات AJAX في ووردبريس تتطلب POST
+        var ajaxResponseText = app.post(
+            ajaxUrl,
+            headers = ajaxHeaders,
+            data = mapOf("action" to "fetch_episode", "id" to epwatch)
         ).text
-
+        
+        // إذا كان الرد 0، نجرب GET (لتغطية كل الاحتمالات)
         if (ajaxResponseText.isBlank() || ajaxResponseText.trim() == "0") {
-            Log.d(logTag, "Falling back to POST for AJAX...")
-            ajaxResponseText = app.post(
-                ajaxUrl,
-                headers = ajaxHeaders,
-                data = mapOf("action" to "fetch_episode", "id" to epwatch)
+            Log.d(logTag, "POST returned 0, trying GET...")
+            ajaxResponseText = app.get(
+                "$ajaxUrl?action=fetch_episode&id=$epwatch",
+                headers = ajaxHeaders
             ).text
         }
 
-        // تنظيف النص من علامات الـ JSON ليكون HTML صافي ومقروء لمكتبة Jsoup بدون استدعاء JSONObject
+        // ==========================================
+        // منطقة الـ Debugging: طباعة الرد كاملًا
+        // ==========================================
+        Log.d(logTag, "AJAX Response Length: ${ajaxResponseText.length}")
+        val maxLogSize = 3000
+        for (i in 0..ajaxResponseText.length / maxLogSize) {
+            val start = i * maxLogSize
+            val end = min((i + 1) * maxLogSize, ajaxResponseText.length)
+            Log.d("AsiaTVAjaxLog", ajaxResponseText.substring(start, end))
+        }
+        // ==========================================
+
         val cleanHtmlContent = ajaxResponseText
             .replace("\\\"", "\"")
             .replace("\\/", "/")
@@ -233,7 +250,6 @@ class AsiatvoneProvider : MainAPI() {
         var linksLoaded = false
         val serversDocument = Jsoup.parse(cleanHtmlContent)
         
-        // 3. استخراج الروابط
         serversDocument.select("ul.ServerNames li, li").amap { serverElement ->
             try {
                 val rawDataServer = serverElement.attr("data-server")
