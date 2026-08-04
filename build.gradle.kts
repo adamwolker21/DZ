@@ -12,7 +12,8 @@ buildscript {
     dependencies {
         classpath("com.android.tools.build:gradle:8.7.3")
         classpath("com.github.recloudstream:gradle:master-SNAPSHOT")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.0")
+        // تم تحديث إصدار كوتلن هنا لحل مشكلة الـ metadata
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.0") 
     }
 }
 
@@ -48,14 +49,16 @@ subprojects {
         }
 
         compileOptions {
-            sourceCompatibility = JavaVersion.VERSION_1_8
-            targetCompatibility = JavaVersion.VERSION_1_8
+            // تم التحديث إلى Java 17 ليتوافق مع التحديثات الجديدة
+            sourceCompatibility = JavaVersion.VERSION_17
+            targetCompatibility = JavaVersion.VERSION_17
         }
     }
 
     tasks.withType<KotlinCompile>().configureEach {
         kotlinOptions {
-            jvmTarget = "1.8"
+            // تم التحديث إلى Java 17
+            jvmTarget = "17"
             allWarningsAsErrors = false // هذا السطر مهم
             freeCompilerArgs = freeCompilerArgs + listOf(
                 // إزالة الflags غير المدعومة
