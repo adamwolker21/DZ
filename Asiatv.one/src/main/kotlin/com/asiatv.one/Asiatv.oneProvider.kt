@@ -160,7 +160,7 @@ class AsiatvoneProvider : MainAPI() {
     }
 
     override suspend fun loadLinks(
-        data: String, // Episode page URL
+        data: String, 
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
@@ -168,56 +168,49 @@ class AsiatvoneProvider : MainAPI() {
         val logTag = "AsiaTVLogs"
         Log.d(logTag, "loadLinks started for: $data")
 
+        // 1. جلب صفحة الحلقة للبحث عن قيمة epwatch
         val episodePage = app.get(data, headers = commonHeaders).document
         val epwatch = episodePage.selectFirst("input[name=epwatch]")?.attr("value")
+        
         if (epwatch.isNullOrBlank()) {
             Log.e(logTag, "Failed to find 'epwatch' value.")
             return false
         }
         Log.d(logTag, "Found 'epwatch' value: $epwatch")
 
-        val postHeaders = mapOf(
-            "authority" to "asiawiki.me",
-            "Content-Type" to "application/x-www-form-urlencoded",
-            "Origin" to mainUrl,
-            "Referer" to "$mainUrl/",
-            "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36"
-        )
-        
-        // Step 1: POST request without redirects to capture headers
-        val initialResponse = app.post(
-            "https://asiawiki.me/",
+        // 2. إرسال طلب POST لموقع asiawiki وترك التطبيق يتعامل مع التوجيه (Redirect) تلقائياً
+        val response = app.post(
+            "https://asiawiki.me", // بدون سلاش في النهاية ليتوافق مع الـ action في الفورم
             data = mapOf("epwatch" to epwatch),
-            allowRedirects = false,
-            headers = postHeaders
+            headers = mapOf(
+                "Referer" to data,
+                "Origin" to mainUrl,
+                "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36"
+            )
         )
 
-        val watchPageUrl = initialResponse.headers["Location"]
-        val cookies = initialResponse.headers["Set-Cookie"]
-
-        if (watchPageUrl.isNullOrBlank() || cookies.isNullOrBlank()) {
-            Log.e(logTag, "Failed to get redirect URL or Cookies. Status: ${initialResponse.code}")
-            return false
-        }
-        Log.d(logTag, "Got redirect URL: $watchPageUrl")
-        Log.d(logTag, "Got Cookies: $cookies")
-
-        // Step 2: GET the redirected page with the captured cookies
-        val finalHeaders = mapOf(
-            "Referer" to "$mainUrl/",
-            "Cookie" to cookies,
-            "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36"
-        )
-        val watchPageDocument = app.get(watchPageUrl, headers = finalHeaders).document
-        Log.d(logTag, "Successfully fetched watch page content.")
+        // 3. التطبيق قام بالتوجيه آلياً وحفظ الكوكيز، الآن لدينا صفحة المشاهدة النهائية
+        val watchPageDocument = response.document
+        val watchPageUrl = response.url // الرابط النهائي الذي تم التوجيه إليه
+        Log.d(logTag, "Successfully fetched watch page content from: $watchPageUrl")
         
         var linksLoaded = false
+        
+        // 4. استخراج السيرفرات
         watchPageDocument.select("ul.ServerNames li").amap { serverElement ->
             val iframeHtml = serverElement.attr("data-server")
-            val embedUrl = Jsoup.parse(iframeHtml).selectFirst("iframe")?.attr("src")
             
-            if (!embedUrl.isNullOrBlank()) {
+            // استخدام Regex كطريقة أضمن وأقوى لاستخراج رابط الـ src من كود الـ iframe المدمج
+            val srcRegex = """src=["'](.*?)["']""".toRegex(RegexOption.IGNORE_CASE)
+            val embedUrlRaw = srcRegex.find(iframeHtml)?.groupValues?.get(1) 
+                ?: Jsoup.parse(iframeHtml).selectFirst("iframe")?.attr("src")
+            
+            if (!embedUrlRaw.isNullOrBlank()) {
+                // إصلاح الروابط التي تبدأ بـ // مثل سيرفر ok.ru
+                val embedUrl = if (embedUrlRaw.startsWith("//")) "https:$embedUrlRaw" else embedUrlRaw
+                
                 Log.d(logTag, "Found embed URL: $embedUrl")
+                
                 loadExtractor(embedUrl, watchPageUrl, subtitleCallback, callback)?.let {
                     linksLoaded = true
                     Log.d(logTag, "Successfully loaded links from: $embedUrl")
