@@ -6,6 +6,7 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.util.regex.Pattern
 import android.util.Log
+import kotlin.math.min
 
 class AsiatvoneProvider : MainAPI() {
     override var mainUrl = "https://asiatvdrama.com"
@@ -169,7 +170,6 @@ class AsiatvoneProvider : MainAPI() {
         val logTag = "AsiaTVLogs"
         Log.d(logTag, "loadLinks started for: $data")
 
-        // 1. جلب رمز الحلقة epwatch
         val episodePage = app.get(data, headers = commonHeaders).document
         val epwatch = episodePage.selectFirst("input[name=epwatch]")?.attr("value")
         
@@ -177,6 +177,7 @@ class AsiatvoneProvider : MainAPI() {
             Log.e(logTag, "Failed to find 'epwatch' value.")
             return false
         }
+        Log.d(logTag, "Found epwatch: $epwatch, sending POST request...")
 
         val postHeaders = mapOf(
             "authority" to "asiawiki.me",
@@ -186,23 +187,37 @@ class AsiatvoneProvider : MainAPI() {
             "User-Agent" to USER_AGENT
         )
         
-        // 2. إرسال POST وقراءة الصفحة الناتجة مباشرة (هنا كان الخلل في الكود السابق)
-        val watchResponse = app.post(
+        // إرسال الطلب وحفظ الاستجابة كاملة
+        val response = app.post(
             "https://asiawiki.me",
             data = mapOf("epwatch" to epwatch),
             headers = postHeaders
         )
 
-        // أخذنا صفحة الـ HTML مباشرة من الاستجابة دون البحث عن توجيه
-        val watchPageDocument = watchResponse.document
+        Log.d(logTag, "Response Code: ${response.code}")
+        Log.d(logTag, "Response URL: ${response.url}")
+
+        val htmlText = response.text
+        Log.d(logTag, "Response HTML Length: ${htmlText.length}")
+
+        // ----------------------------------------------------
+        // خدعة تقسيم النص لطباعة الـ HTML كاملاً في Logcat
+        // ----------------------------------------------------
+        val maxLogSize = 3000
+        for (i in 0..htmlText.length / maxLogSize) {
+            val start = i * maxLogSize
+            val end = min((i + 1) * maxLogSize, htmlText.length)
+            Log.d("AsiaTVLogsHTML", htmlText.substring(start, end))
+        }
+        // ----------------------------------------------------
+
         var linksLoaded = false
+        val watchPageDocument = Jsoup.parse(htmlText)
         
-        // 3. البحث عن السيرفرات المخفية
+        // محاولة استخراج السيرفرات في حال كانت موجودة كما نتوقع
         watchPageDocument.select("ul.ServerNames li").amap { serverElement ->
             try {
                 val rawDataServer = serverElement.attr("data-server")
-                
-                // فك التشفير الآمن للرموز
                 val iframeHtml = rawDataServer
                     .replace("&quot;", "\"")
                     .replace("&lt;", "<")
@@ -216,7 +231,6 @@ class AsiatvoneProvider : MainAPI() {
                 if (!embedUrlRaw.isNullOrBlank()) {
                     var embedUrl = if (embedUrlRaw.startsWith("//")) "https:$embedUrlRaw" else embedUrlRaw
                     
-                    // 4. خدع الدومينات للتعرف على السيرفرات
                     when {
                         embedUrl.contains("playmogo.com") -> embedUrl = embedUrl.replace("playmogo.com", "dood.to")
                         embedUrl.contains("vidmoly.biz") -> embedUrl = embedUrl.replace("vidmoly.biz", "vidmoly.to")
@@ -227,8 +241,7 @@ class AsiatvoneProvider : MainAPI() {
                     }
                     
                     Log.d(logTag, "Found embed URL: $embedUrl")
-                    // استخراج الروابط
-                    loadExtractor(embedUrl, watchResponse.url, subtitleCallback, callback)?.let {
+                    loadExtractor(embedUrl, response.url, subtitleCallback, callback)?.let {
                         linksLoaded = true
                     }
                 }
