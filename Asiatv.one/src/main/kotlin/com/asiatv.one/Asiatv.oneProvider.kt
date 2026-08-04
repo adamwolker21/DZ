@@ -6,7 +6,6 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.util.regex.Pattern
 import android.util.Log
-import kotlin.math.min
 
 class AsiatvoneProvider : MainAPI() {
     override var mainUrl = "https://asiatvdrama.com"
@@ -168,123 +167,102 @@ class AsiatvoneProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val logTag = "AsiaTVLogs"
-        Log.d(logTag, "loadLinks started for: $data")
-
-        val episodePage = app.get(data, headers = commonHeaders).document
-        val epwatch = episodePage.selectFirst("input[name=epwatch]")?.attr("value")
-        
-        if (epwatch.isNullOrBlank()) {
-            Log.e(logTag, "Failed to find 'epwatch' value.")
-            return false
-        }
-        Log.d(logTag, "Found epwatch: $epwatch")
-
-        val postHeaders = mapOf(
-            "authority" to "asiawiki.me",
-            "Content-Type" to "application/x-www-form-urlencoded",
-            "Origin" to mainUrl,
-            "Referer" to data,
-            "User-Agent" to USER_AGENT
-        )
-        
-        // 1. إرسال الطلب الأول
-        val initialResponse = app.post(
-            "https://asiawiki.me/",
-            data = mapOf("epwatch" to epwatch),
-            headers = postHeaders
-        )
-
-        // 2. استخراج الكوكيز بالطريقة اليدوية الصريحة لضمان عدم ضياعها
-        val rawCookies = initialResponse.headers.values("Set-Cookie") + initialResponse.headers.values("set-cookie")
-        val cookies = rawCookies.joinToString("; ") { it.substringBefore(";") }
-        Log.d(logTag, "Extracted Cookies: $cookies")
-
-        // 3. إعداد طلب الـ AJAX
-        val ajaxUrl = "https://asiawiki.me/wp-admin/admin-ajax.php"
-        val ajaxHeaders = mutableMapOf(
-            "X-Requested-With" to "XMLHttpRequest",
-            "Referer" to initialResponse.url,
-            "User-Agent" to USER_AGENT,
-            "Accept" to "*/*"
-        )
-        
-        if (cookies.isNotBlank()) {
-            ajaxHeaders["Cookie"] = cookies
-        }
-
-        Log.d(logTag, "Sending AJAX Request...")
-        
-        // جربنا الـ POST فوراً لأن أغلب طلبات AJAX في ووردبريس تتطلب POST
-        var ajaxResponseText = app.post(
-            ajaxUrl,
-            headers = ajaxHeaders,
-            data = mapOf("action" to "fetch_episode", "id" to epwatch)
-        ).text
-        
-        // إذا كان الرد 0، نجرب GET (لتغطية كل الاحتمالات)
-        if (ajaxResponseText.isBlank() || ajaxResponseText.trim() == "0") {
-            Log.d(logTag, "POST returned 0, trying GET...")
-            ajaxResponseText = app.get(
-                "$ajaxUrl?action=fetch_episode&id=$epwatch",
-                headers = ajaxHeaders
-            ).text
-        }
-
-        // ==========================================
-        // منطقة الـ Debugging: طباعة الرد كاملًا
-        // ==========================================
-        Log.d(logTag, "AJAX Response Length: ${ajaxResponseText.length}")
-        val maxLogSize = 3000
-        for (i in 0..ajaxResponseText.length / maxLogSize) {
-            val start = i * maxLogSize
-            val end = min((i + 1) * maxLogSize, ajaxResponseText.length)
-            Log.d("AsiaTVAjaxLog", ajaxResponseText.substring(start, end))
-        }
-        // ==========================================
-
-        val cleanHtmlContent = ajaxResponseText
-            .replace("\\\"", "\"")
-            .replace("\\/", "/")
-            .replace("\\n", "")
-
         var linksLoaded = false
-        val serversDocument = Jsoup.parse(cleanHtmlContent)
-        
-        serversDocument.select("ul.ServerNames li, li").amap { serverElement ->
-            try {
-                val rawDataServer = serverElement.attr("data-server")
-                if (rawDataServer.isBlank()) return@amap
-                
-                val iframeHtml = rawDataServer
-                    .replace("&quot;", "\"")
-                    .replace("&lt;", "<")
-                    .replace("&gt;", ">")
-                    .replace("&amp;", "&")
-                
-                val srcRegex = """src=["'](.*?)["']""".toRegex(RegexOption.IGNORE_CASE)
-                var embedUrlRaw = srcRegex.find(iframeHtml)?.groupValues?.get(1) 
-                    ?: Jsoup.parse(iframeHtml).selectFirst("iframe")?.attr("src")
-                
-                if (!embedUrlRaw.isNullOrBlank()) {
-                    var embedUrl = if (embedUrlRaw.startsWith("//")) "https:$embedUrlRaw" else embedUrlRaw
-                    
-                    when {
-                        embedUrl.contains("playmogo.com") -> embedUrl = embedUrl.replace("playmogo.com", "dood.to")
-                        embedUrl.contains("vidmoly.biz") -> embedUrl = embedUrl.replace("vidmoly.biz", "vidmoly.to")
-                        embedUrl.contains("voe.sx") -> embedUrl = embedUrl.replace("voe.sx", "voe.unblocked.lol")
-                        embedUrl.contains("bysefujedu.com") -> embedUrl = embedUrl.replace("bysefujedu.com", "filemoon.sx")
-                        embedUrl.contains("vinovo.to") -> embedUrl = embedUrl.replace("vinovo.to", "vidmoly.to")
-                        embedUrl.contains("luluvdo.com") -> embedUrl = embedUrl.replace("luluvdo.com", "lulustream.com")
-                    }
-                    
-                    Log.d(logTag, "Found embed URL: $embedUrl")
-                    loadExtractor(embedUrl, initialResponse.url, subtitleCallback, callback)?.let {
-                        linksLoaded = true
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(logTag, "Error parsing server: ${e.message}")
+
+        // حماية الدالة بالكامل بـ Try-Catch لمنع أي انهيار (Error) في التطبيق
+        try {
+            Log.d(logTag, "loadLinks started for: $data")
+
+            val episodePage = app.get(data, headers = commonHeaders).document
+            val epwatch = episodePage.selectFirst("input[name=epwatch]")?.attr("value")
+            
+            if (epwatch.isNullOrBlank()) {
+                Log.e(logTag, "Failed to find 'epwatch' value.")
+                return false
             }
+            Log.d(logTag, "Found epwatch: $epwatch")
+
+            // 1. استدعاء الصفحة الرئيسية لـ asiawiki أولاً لكي يحفظ التطبيق الكوكيز تلقائياً
+            app.post(
+                "https://asiawiki.me/",
+                data = mapOf("epwatch" to epwatch),
+                headers = mapOf(
+                    "Origin" to mainUrl,
+                    "Referer" to data,
+                    "User-Agent" to USER_AGENT
+                )
+            )
+
+            // 2. محاكاة طلب الـ AJAX المطابق تماماً لصورة أدوات المطور (Developer Tools)
+            val ajaxUrl = "https://asiawiki.me/wp-admin/admin-ajax.php"
+            val ajaxResponse = app.post(
+                ajaxUrl,
+                headers = mapOf(
+                    "X-Requested-With" to "XMLHttpRequest",
+                    "Content-Type" to "application/x-www-form-urlencoded; charset=UTF-8",
+                    "Origin" to "https://asiawiki.me",
+                    "Referer" to "https://asiawiki.me/",
+                    "User-Agent" to USER_AGENT,
+                    "Accept" to "*/*"
+                ),
+                data = mapOf("action" to "fetch_episode", "id" to epwatch)
+            ).text
+
+            Log.d(logTag, "AJAX Response length: ${ajaxResponse.length}")
+
+            // تنظيف النص بشكل قاطع من أي تشفير JSON ليصبح HTML نقي
+            val cleanHtmlContent = ajaxResponse
+                .replace("\\\"", "\"")
+                .replace("\\/", "/")
+                .replace("\\n", "")
+                .replace("\\u003c", "<")
+                .replace("\\u003e", ">")
+
+            val serversDocument = Jsoup.parse(cleanHtmlContent)
+            
+            // 3. البحث عن الروابط
+            serversDocument.select("li[data-server]").amap { serverElement ->
+                try {
+                    val rawDataServer = serverElement.attr("data-server")
+                    if (rawDataServer.isBlank()) return@amap
+                    
+                    val iframeHtml = rawDataServer
+                        .replace("&quot;", "\"")
+                        .replace("&lt;", "<")
+                        .replace("&gt;", ">")
+                        .replace("&amp;", "&")
+                    
+                    val srcRegex = """src=["'](.*?)["']""".toRegex(RegexOption.IGNORE_CASE)
+                    var embedUrlRaw = srcRegex.find(iframeHtml)?.groupValues?.get(1) 
+                        ?: Jsoup.parse(iframeHtml).selectFirst("iframe")?.attr("src")
+                    
+                    if (!embedUrlRaw.isNullOrBlank()) {
+                        var embedUrl = if (embedUrlRaw.startsWith("//")) "https:$embedUrlRaw" else embedUrlRaw
+                        
+                        // خدع الدومينات للسيرفرات العالمية
+                        when {
+                            embedUrl.contains("playmogo.com") -> embedUrl = embedUrl.replace("playmogo.com", "dood.to")
+                            embedUrl.contains("vidmoly.biz") -> embedUrl = embedUrl.replace("vidmoly.biz", "vidmoly.to")
+                            embedUrl.contains("voe.sx") -> embedUrl = embedUrl.replace("voe.sx", "voe.unblocked.lol")
+                            embedUrl.contains("bysefujedu.com") -> embedUrl = embedUrl.replace("bysefujedu.com", "filemoon.sx")
+                            embedUrl.contains("vinovo.to") -> embedUrl = embedUrl.replace("vinovo.to", "vidmoly.to")
+                            embedUrl.contains("luluvdo.com") -> embedUrl = embedUrl.replace("luluvdo.com", "lulustream.com")
+                        }
+                        
+                        Log.d(logTag, "Found embed URL: $embedUrl")
+                        loadExtractor(embedUrl, "https://asiawiki.me/", subtitleCallback, callback)?.let {
+                            linksLoaded = true
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(logTag, "Error parsing individual server: ${e.message}")
+                }
+            }
+
+        } catch (e: Exception) {
+            // هنا يكمن السر: إذا حدث أي خطأ برمجي أو شبكي، سيتم طباعته ولن تنهار الإضافة!
+            Log.e(logTag, "Critical crash prevented in loadLinks: ${e.message}")
+            e.printStackTrace()
         }
 
         return linksLoaded
