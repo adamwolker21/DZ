@@ -145,7 +145,7 @@ class EgyDeadProvider : MainAPI() {
     ): Boolean {
         val watchPageDoc = getWatchPage(data) ?: return false
         val servers = watchPageDoc.select("div.mob-servers li")
-        servers.apmap { server ->
+        servers.amap { server ->
             try {
                 val link = server.attr("data-link")
                 if (link.isNotBlank()) {
