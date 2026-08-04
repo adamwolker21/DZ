@@ -22,7 +22,6 @@ class AsiatvoneProvider : MainAPI() {
         "Referer" to "$mainUrl/"
     )
 
-    // تم وضع الأقسام بالعربية الصريحة لتجنب أخطاء التهيئة، التطبيق سيقوم بتشفيرها تلقائياً عند جلبها
     override val mainPage = mainPageOf(
         "$mainUrl/الحلقات-الجديدة/" to "الحلقات الجديدة",
         "$mainUrl/دراما-تبث-حاليا/" to "دراما تبث حاليا",
@@ -170,6 +169,7 @@ class AsiatvoneProvider : MainAPI() {
         val logTag = "AsiaTVLogs"
         Log.d(logTag, "loadLinks started for: $data")
 
+        // 1. جلب رمز الحلقة epwatch
         val episodePage = app.get(data, headers = commonHeaders).document
         val epwatch = episodePage.selectFirst("input[name=epwatch]")?.attr("value")
         
@@ -186,43 +186,23 @@ class AsiatvoneProvider : MainAPI() {
             "User-Agent" to USER_AGENT
         )
         
-        // إرسال POST بدون توجيه
-        val initialResponse = app.post(
-            "https://asiawiki.me/",
+        // 2. إرسال POST وقراءة الصفحة الناتجة مباشرة (هنا كان الخلل في الكود السابق)
+        val watchResponse = app.post(
+            "https://asiawiki.me",
             data = mapOf("epwatch" to epwatch),
-            allowRedirects = false,
             headers = postHeaders
         )
 
-        var watchPageUrl = initialResponse.headers["location"] ?: initialResponse.headers["Location"]
-        val cookies = initialResponse.headers["set-cookie"] ?: initialResponse.headers["Set-Cookie"]
-
-        if (watchPageUrl.isNullOrBlank()) {
-            Log.e(logTag, "Failed to get redirect URL.")
-            return false
-        }
-        
-        if (watchPageUrl.startsWith("/")) {
-            watchPageUrl = "https://asiawiki.me$watchPageUrl"
-        }
-        
-        // تجهيز الـ Headers بشكل آمن لمنع الـ NullPointerException
-        val finalHeaders = mutableMapOf(
-            "Referer" to data,
-            "User-Agent" to USER_AGENT
-        )
-        if (!cookies.isNullOrBlank()) {
-            finalHeaders["Cookie"] = cookies
-        }
-        
-        val watchPageDocument = app.get(watchPageUrl, headers = finalHeaders).document
+        // أخذنا صفحة الـ HTML مباشرة من الاستجابة دون البحث عن توجيه
+        val watchPageDocument = watchResponse.document
         var linksLoaded = false
         
+        // 3. البحث عن السيرفرات المخفية
         watchPageDocument.select("ul.ServerNames li").amap { serverElement ->
             try {
                 val rawDataServer = serverElement.attr("data-server")
                 
-                // فك التشفير بالطريقة الآمنة تماماً بدون استخدام مكتبات خارجية
+                // فك التشفير الآمن للرموز
                 val iframeHtml = rawDataServer
                     .replace("&quot;", "\"")
                     .replace("&lt;", "<")
@@ -236,17 +216,19 @@ class AsiatvoneProvider : MainAPI() {
                 if (!embedUrlRaw.isNullOrBlank()) {
                     var embedUrl = if (embedUrlRaw.startsWith("//")) "https:$embedUrlRaw" else embedUrlRaw
                     
-                    // خدع الدومينات للسيرفرات العالمية
+                    // 4. خدع الدومينات للتعرف على السيرفرات
                     when {
                         embedUrl.contains("playmogo.com") -> embedUrl = embedUrl.replace("playmogo.com", "dood.to")
                         embedUrl.contains("vidmoly.biz") -> embedUrl = embedUrl.replace("vidmoly.biz", "vidmoly.to")
                         embedUrl.contains("voe.sx") -> embedUrl = embedUrl.replace("voe.sx", "voe.unblocked.lol")
                         embedUrl.contains("bysefujedu.com") -> embedUrl = embedUrl.replace("bysefujedu.com", "filemoon.sx")
                         embedUrl.contains("vinovo.to") -> embedUrl = embedUrl.replace("vinovo.to", "vidmoly.to")
+                        embedUrl.contains("luluvdo.com") -> embedUrl = embedUrl.replace("luluvdo.com", "lulustream.com")
                     }
                     
                     Log.d(logTag, "Found embed URL: $embedUrl")
-                    loadExtractor(embedUrl, watchPageUrl, subtitleCallback, callback)?.let {
+                    // استخراج الروابط
+                    loadExtractor(embedUrl, watchResponse.url, subtitleCallback, callback)?.let {
                         linksLoaded = true
                     }
                 }
