@@ -169,7 +169,6 @@ class AsiatvoneProvider : MainAPI() {
         val logTag = "AsiaTVLogs"
         var linksLoaded = false
 
-        // حماية الدالة بالكامل بـ Try-Catch لمنع أي انهيار (Error) في التطبيق
         try {
             Log.d(logTag, "loadLinks started for: $data")
 
@@ -182,64 +181,66 @@ class AsiatvoneProvider : MainAPI() {
             }
             Log.d(logTag, "Found epwatch: $epwatch")
 
-            // 1. استدعاء الصفحة الرئيسية لـ asiawiki أولاً لكي يحفظ التطبيق الكوكيز تلقائياً
-            app.post(
-                "https://asiawiki.me/",
+            val watchUrl = "https://asiawiki.me/"
+            
+            // 1. الطلب الأول لتهيئة الجلسة
+            val watchResponseText = app.post(
+                watchUrl,
                 data = mapOf("epwatch" to epwatch),
                 headers = mapOf(
                     "Origin" to mainUrl,
                     "Referer" to data,
                     "User-Agent" to USER_AGENT
                 )
-            )
+            ).text
 
-            // 2. محاكاة طلب الـ AJAX المطابق تماماً لصورة أدوات المطور (Developer Tools)
+            // 2. طلب الـ AJAX
             val ajaxUrl = "https://asiawiki.me/wp-admin/admin-ajax.php"
-            val ajaxResponse = app.post(
+            val ajaxResponseText = app.post(
                 ajaxUrl,
                 headers = mapOf(
                     "X-Requested-With" to "XMLHttpRequest",
                     "Content-Type" to "application/x-www-form-urlencoded; charset=UTF-8",
                     "Origin" to "https://asiawiki.me",
-                    "Referer" to "https://asiawiki.me/",
+                    "Referer" to watchUrl,
                     "User-Agent" to USER_AGENT,
-                    "Accept" to "*/*"
+                    "Accept" to "application/json, text/javascript, */*; q=0.01"
                 ),
                 data = mapOf("action" to "fetch_episode", "id" to epwatch)
             ).text
 
-            Log.d(logTag, "AJAX Response length: ${ajaxResponse.length}")
-
-            // تنظيف النص بشكل قاطع من أي تشفير JSON ليصبح HTML نقي
-            val cleanHtmlContent = ajaxResponse
-                .replace("\\\"", "\"")
-                .replace("\\/", "/")
-                .replace("\\n", "")
-                .replace("\\u003c", "<")
-                .replace("\\u003e", ">")
-
-            val serversDocument = Jsoup.parse(cleanHtmlContent)
+            // دمج النصين معاً لضمان عدم تفويت أي سيرفر في حال ظهر في الطلب الأول أو الثاني
+            val combinedRawText = watchResponseText + ajaxResponseText
             
-            // 3. البحث عن الروابط
-            serversDocument.select("li[data-server]").amap { serverElement ->
+            // 3. صائد الروابط (Universal Regex)
+            // هذه الخوارزمية تبحث عن data-server="..." حتى لو كانت داخل JSON مشفر
+            val dataServerRegex = """data-server=\\?["'](.*?)\\?["']""".toRegex(RegexOption.IGNORE_CASE)
+            val matches = dataServerRegex.findAll(combinedRawText)
+
+            matches.forEach { match ->
                 try {
-                    val rawDataServer = serverElement.attr("data-server")
-                    if (rawDataServer.isBlank()) return@amap
+                    // استخراج محتوى السيرفر الخام
+                    var rawIframe = match.groupValues[1]
                     
-                    val iframeHtml = rawDataServer
+                    // تنظيف التشفير سواء كان JSON أو HTML
+                    rawIframe = rawIframe.replace("\\\"", "\"")
+                        .replace("\\/", "/")
+                        .replace("\\n", "")
+                        .replace("\\r", "")
                         .replace("&quot;", "\"")
                         .replace("&lt;", "<")
                         .replace("&gt;", ">")
                         .replace("&amp;", "&")
                     
+                    // استخراج الرابط المباشر من الـ iframe النظيف
                     val srcRegex = """src=["'](.*?)["']""".toRegex(RegexOption.IGNORE_CASE)
-                    var embedUrlRaw = srcRegex.find(iframeHtml)?.groupValues?.get(1) 
-                        ?: Jsoup.parse(iframeHtml).selectFirst("iframe")?.attr("src")
+                    val srcMatch = srcRegex.find(rawIframe)
+                    var embedUrl = srcMatch?.groupValues?.get(1)
                     
-                    if (!embedUrlRaw.isNullOrBlank()) {
-                        var embedUrl = if (embedUrlRaw.startsWith("//")) "https:$embedUrlRaw" else embedUrlRaw
+                    if (!embedUrl.isNullOrBlank()) {
+                        embedUrl = if (embedUrl.startsWith("//")) "https:$embedUrl" else embedUrl
                         
-                        // خدع الدومينات للسيرفرات العالمية
+                        // خدع الدومينات
                         when {
                             embedUrl.contains("playmogo.com") -> embedUrl = embedUrl.replace("playmogo.com", "dood.to")
                             embedUrl.contains("vidmoly.biz") -> embedUrl = embedUrl.replace("vidmoly.biz", "vidmoly.to")
@@ -249,20 +250,23 @@ class AsiatvoneProvider : MainAPI() {
                             embedUrl.contains("luluvdo.com") -> embedUrl = embedUrl.replace("luluvdo.com", "lulustream.com")
                         }
                         
-                        Log.d(logTag, "Found embed URL: $embedUrl")
-                        loadExtractor(embedUrl, "https://asiawiki.me/", subtitleCallback, callback)?.let {
+                        Log.d(logTag, "Successfully Extracted URL: $embedUrl")
+                        
+                        loadExtractor(embedUrl, watchUrl, subtitleCallback, callback)?.let {
                             linksLoaded = true
                         }
                     }
                 } catch (e: Exception) {
-                    Log.e(logTag, "Error parsing individual server: ${e.message}")
+                    Log.e(logTag, "Error processing iframe: ${e.message}")
                 }
             }
 
+            if (!linksLoaded) {
+                Log.e(logTag, "Regex found matches but no valid links could be extracted.")
+            }
+
         } catch (e: Exception) {
-            // هنا يكمن السر: إذا حدث أي خطأ برمجي أو شبكي، سيتم طباعته ولن تنهار الإضافة!
-            Log.e(logTag, "Critical crash prevented in loadLinks: ${e.message}")
-            e.printStackTrace()
+            Log.e(logTag, "Critical crash prevented: ${e.message}")
         }
 
         return linksLoaded
