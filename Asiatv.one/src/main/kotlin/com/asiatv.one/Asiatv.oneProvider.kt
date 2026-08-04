@@ -177,30 +177,65 @@ class AsiatvoneProvider : MainAPI() {
             Log.e(logTag, "Failed to find 'epwatch' value.")
             return false
         }
-        Log.d(logTag, "Found epwatch: $epwatch, sending AJAX request...")
+        Log.d(logTag, "Found epwatch: $epwatch, initiating session...")
 
-        // استخدام الرابط المباشر الذي اكتشفته للـ AJAX
-        val ajaxUrl = "https://asiawiki.me/wp-admin/admin-ajax.php?action=fetch_episode&id=$epwatch"
+        val postHeaders = mapOf(
+            "authority" to "asiawiki.me",
+            "Content-Type" to "application/x-www-form-urlencoded",
+            "Origin" to mainUrl,
+            "Referer" to data,
+            "User-Agent" to USER_AGENT
+        )
         
-        // إرسال الطلب مع هيدر X-Requested-With لإقناع السيرفر بأنه طلب AJAX حقيقي
-        val ajaxResponseText = app.get(
-            ajaxUrl,
-            headers = mapOf(
-                "X-Requested-With" to "XMLHttpRequest",
-                "Referer" to data,
-                "User-Agent" to USER_AGENT
-            )
+        // 1. الطلب الأول لجلب الكوكيز وتهيئة الجلسة (Session)
+        val initialResponse = app.post(
+            "https://asiawiki.me/",
+            data = mapOf("epwatch" to epwatch),
+            headers = postHeaders
+        )
+
+        // التقاط جميع الكوكيز المرجعة من السيرفر
+        val cookies = initialResponse.okhttpResponse.headers("set-cookie").joinToString("; ")
+        Log.d(logTag, "Session Cookies Grabbed: $cookies")
+
+        // 2. إرسال طلب AJAX مع الكوكيز التي التقطناها
+        val ajaxUrl = "https://asiawiki.me/wp-admin/admin-ajax.php"
+        val ajaxHeaders = mutableMapOf(
+            "X-Requested-With" to "XMLHttpRequest",
+            "Referer" to initialResponse.url,
+            "User-Agent" to USER_AGENT,
+            "Accept" to "*/*"
+        )
+        
+        // إضافة الكوكيز للهيدر لإثبات هويتنا للسيرفر
+        if (cookies.isNotBlank()) {
+            ajaxHeaders["Cookie"] = cookies
+        }
+
+        Log.d(logTag, "Sending AJAX Request to: $ajaxUrl?action=fetch_episode&id=$epwatch")
+        
+        // المحاولة الأولى: طلب GET (كما ظهر معك في الرابط)
+        var ajaxResponseText = app.get(
+            "$ajaxUrl?action=fetch_episode&id=$epwatch",
+            headers = ajaxHeaders
         ).text
 
-        Log.d(logTag, "AJAX Response Length: ${ajaxResponseText.length}")
+        // المحاولة الثانية: في حال كان الموقع يرفض GET ويرد بقيمة "0" (رد WordPress الافتراضي)، ننتقل لـ POST
+        if (ajaxResponseText.isBlank() || ajaxResponseText.trim() == "0") {
+            Log.d(logTag, "GET request returned 0, falling back to POST...")
+            ajaxResponseText = app.post(
+                ajaxUrl,
+                headers = ajaxHeaders,
+                data = mapOf("action" to "fetch_episode", "id" to epwatch)
+            ).text
+        }
 
         var htmlContent = ajaxResponseText
 
-        // معالجة الرد في حال كان مبرمجاً كـ JSON
+        // معالجة البيانات إذا كانت مغلفة داخل كائن JSON
         try {
             if (ajaxResponseText.trim().startsWith("{")) {
                 val json = JSONObject(ajaxResponseText)
-                // ብዙውን ما يضع الووردبريس الأكواد في مفتاح "data"
                 htmlContent = json.optString("data", ajaxResponseText) 
             }
         } catch (e: Exception) {
@@ -210,13 +245,13 @@ class AsiatvoneProvider : MainAPI() {
         var linksLoaded = false
         val serversDocument = Jsoup.parse(htmlContent)
         
-        // البحث عن الـ li التي تحتوي على data-server
-        serversDocument.select("li").amap { serverElement ->
+        // 3. استخراج الروابط من HTML كما شرحت لي
+        serversDocument.select("ul.ServerNames li").amap { serverElement ->
             try {
                 val rawDataServer = serverElement.attr("data-server")
                 if (rawDataServer.isBlank()) return@amap
                 
-                // فك التشفير الآمن (وإصلاح شرطات الـ JSON في حال وجدت)
+                // فك التشفير
                 val iframeHtml = rawDataServer
                     .replace("&quot;", "\"")
                     .replace("&lt;", "<")
@@ -242,7 +277,7 @@ class AsiatvoneProvider : MainAPI() {
                     }
                     
                     Log.d(logTag, "Found embed URL: $embedUrl")
-                    loadExtractor(embedUrl, data, subtitleCallback, callback)?.let {
+                    loadExtractor(embedUrl, initialResponse.url, subtitleCallback, callback)?.let {
                         linksLoaded = true
                     }
                 }
