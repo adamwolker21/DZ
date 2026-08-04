@@ -4,9 +4,9 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
+import org.json.JSONObject
 import java.util.regex.Pattern
 import android.util.Log
-import kotlin.math.min
 
 class AsiatvoneProvider : MainAPI() {
     override var mainUrl = "https://asiatvdrama.com"
@@ -177,52 +177,52 @@ class AsiatvoneProvider : MainAPI() {
             Log.e(logTag, "Failed to find 'epwatch' value.")
             return false
         }
-        Log.d(logTag, "Found epwatch: $epwatch, sending POST request...")
+        Log.d(logTag, "Found epwatch: $epwatch, sending AJAX request...")
 
-        val postHeaders = mapOf(
-            "authority" to "asiawiki.me",
-            "Content-Type" to "application/x-www-form-urlencoded",
-            "Origin" to mainUrl,
-            "Referer" to data,
-            "User-Agent" to USER_AGENT
-        )
+        // استخدام الرابط المباشر الذي اكتشفته للـ AJAX
+        val ajaxUrl = "https://asiawiki.me/wp-admin/admin-ajax.php?action=fetch_episode&id=$epwatch"
         
-        // إرسال الطلب وحفظ الاستجابة كاملة
-        val response = app.post(
-            "https://asiawiki.me",
-            data = mapOf("epwatch" to epwatch),
-            headers = postHeaders
-        )
+        // إرسال الطلب مع هيدر X-Requested-With لإقناع السيرفر بأنه طلب AJAX حقيقي
+        val ajaxResponseText = app.get(
+            ajaxUrl,
+            headers = mapOf(
+                "X-Requested-With" to "XMLHttpRequest",
+                "Referer" to data,
+                "User-Agent" to USER_AGENT
+            )
+        ).text
 
-        Log.d(logTag, "Response Code: ${response.code}")
-        Log.d(logTag, "Response URL: ${response.url}")
+        Log.d(logTag, "AJAX Response Length: ${ajaxResponseText.length}")
 
-        val htmlText = response.text
-        Log.d(logTag, "Response HTML Length: ${htmlText.length}")
+        var htmlContent = ajaxResponseText
 
-        // ----------------------------------------------------
-        // خدعة تقسيم النص لطباعة الـ HTML كاملاً في Logcat
-        // ----------------------------------------------------
-        val maxLogSize = 3000
-        for (i in 0..htmlText.length / maxLogSize) {
-            val start = i * maxLogSize
-            val end = min((i + 1) * maxLogSize, htmlText.length)
-            Log.d("AsiaTVLogsHTML", htmlText.substring(start, end))
+        // معالجة الرد في حال كان مبرمجاً كـ JSON
+        try {
+            if (ajaxResponseText.trim().startsWith("{")) {
+                val json = JSONObject(ajaxResponseText)
+                // ብዙውን ما يضع الووردبريس الأكواد في مفتاح "data"
+                htmlContent = json.optString("data", ajaxResponseText) 
+            }
+        } catch (e: Exception) {
+            Log.d(logTag, "Response is not JSON, treating as raw HTML.")
         }
-        // ----------------------------------------------------
 
         var linksLoaded = false
-        val watchPageDocument = Jsoup.parse(htmlText)
+        val serversDocument = Jsoup.parse(htmlContent)
         
-        // محاولة استخراج السيرفرات في حال كانت موجودة كما نتوقع
-        watchPageDocument.select("ul.ServerNames li").amap { serverElement ->
+        // البحث عن الـ li التي تحتوي على data-server
+        serversDocument.select("li").amap { serverElement ->
             try {
                 val rawDataServer = serverElement.attr("data-server")
+                if (rawDataServer.isBlank()) return@amap
+                
+                // فك التشفير الآمن (وإصلاح شرطات الـ JSON في حال وجدت)
                 val iframeHtml = rawDataServer
                     .replace("&quot;", "\"")
                     .replace("&lt;", "<")
                     .replace("&gt;", ">")
                     .replace("&amp;", "&")
+                    .replace("\\\"", "\"")
                 
                 val srcRegex = """src=["'](.*?)["']""".toRegex(RegexOption.IGNORE_CASE)
                 var embedUrlRaw = srcRegex.find(iframeHtml)?.groupValues?.get(1) 
@@ -231,6 +231,7 @@ class AsiatvoneProvider : MainAPI() {
                 if (!embedUrlRaw.isNullOrBlank()) {
                     var embedUrl = if (embedUrlRaw.startsWith("//")) "https:$embedUrlRaw" else embedUrlRaw
                     
+                    // خدع الدومينات
                     when {
                         embedUrl.contains("playmogo.com") -> embedUrl = embedUrl.replace("playmogo.com", "dood.to")
                         embedUrl.contains("vidmoly.biz") -> embedUrl = embedUrl.replace("vidmoly.biz", "vidmoly.to")
@@ -241,7 +242,7 @@ class AsiatvoneProvider : MainAPI() {
                     }
                     
                     Log.d(logTag, "Found embed URL: $embedUrl")
-                    loadExtractor(embedUrl, response.url, subtitleCallback, callback)?.let {
+                    loadExtractor(embedUrl, data, subtitleCallback, callback)?.let {
                         linksLoaded = true
                     }
                 }
