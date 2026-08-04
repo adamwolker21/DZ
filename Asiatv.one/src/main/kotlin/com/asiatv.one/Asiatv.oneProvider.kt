@@ -2,9 +2,9 @@ package com.asiatv.one
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.network.CloudflareKiller
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
+import org.jsoup.parser.Parser
 import java.util.regex.Pattern
 import android.util.Log
 
@@ -22,9 +22,6 @@ class AsiatvoneProvider : MainAPI() {
         "User-Agent" to USER_AGENT,
         "Referer" to "$mainUrl/"
     )
-    
-    // أداة تخطي حماية كلاودفلير
-    private val cloudflareKiller by lazy { CloudflareKiller() }
 
     override val mainPage = mainPageOf(
         "$mainUrl/%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a7%d8%aa-%d8%a7%d9%84%d8%ac%d8%af%d9%8a%d8%af%d8%a9/" to "الحلقات الجديدة",
@@ -41,7 +38,7 @@ class AsiatvoneProvider : MainAPI() {
         request: MainPageRequest
     ): HomePageResponse {
         val url = if (page > 1) "${request.data}page/$page/" else request.data
-        val document = app.get(url, headers = commonHeaders, interceptor = cloudflareKiller).document
+        val document = app.get(url, headers = commonHeaders).document
         
         val home = document.select("article.post, article.postEp").mapNotNull {
             it.toSearchResult()
@@ -78,14 +75,14 @@ class AsiatvoneProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val searchUrl = "$mainUrl/?s=${query}"
-        val document = app.get(searchUrl, headers = commonHeaders, interceptor = cloudflareKiller).document
+        val document = app.get(searchUrl, headers = commonHeaders).document
         return document.select("article.post, article.postEp").mapNotNull {
             it.toSearchResult()
         }
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url, headers = commonHeaders, interceptor = cloudflareKiller).document
+        val document = app.get(url, headers = commonHeaders).document
 
         val title = document.selectFirst("h1.title")?.text()?.trim() ?: return null
         
@@ -165,7 +162,7 @@ class AsiatvoneProvider : MainAPI() {
     }
 
     override suspend fun loadLinks(
-        data: String,
+        data: String, 
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
@@ -173,14 +170,13 @@ class AsiatvoneProvider : MainAPI() {
         val logTag = "AsiaTVLogs"
         Log.d(logTag, "loadLinks started for: $data")
 
-        val episodePage = app.get(data, headers = commonHeaders, interceptor = cloudflareKiller).document
+        val episodePage = app.get(data, headers = commonHeaders).document
         val epwatch = episodePage.selectFirst("input[name=epwatch]")?.attr("value")
         
         if (epwatch.isNullOrBlank()) {
             Log.e(logTag, "Failed to find 'epwatch' value.")
             return false
         }
-        Log.d(logTag, "Found 'epwatch' value: $epwatch")
 
         val postHeaders = mapOf(
             "authority" to "asiawiki.me",
@@ -190,62 +186,46 @@ class AsiatvoneProvider : MainAPI() {
             "User-Agent" to USER_AGENT
         )
         
-        // إرسال POST مع تفعيل CloudflareKiller لتخطي الحماية
+        // إرسال POST
         val initialResponse = app.post(
             "https://asiawiki.me/",
             data = mapOf("epwatch" to epwatch),
             allowRedirects = false,
-            headers = postHeaders,
-            interceptor = cloudflareKiller
+            headers = postHeaders
         )
 
         var watchPageUrl = initialResponse.headers["location"] ?: initialResponse.headers["Location"]
-        
-        // التقاط جميع الكوكيز المتاحة بدلاً من التقاط واحد فقط
-        val cookiesList = initialResponse.okhttpResponse.headers("set-cookie")
-        val cookies = cookiesList.joinToString("; ")
+        val cookies = initialResponse.headers["set-cookie"] ?: initialResponse.headers["Set-Cookie"]
 
         if (watchPageUrl.isNullOrBlank()) {
-            Log.e(logTag, "Failed to get redirect URL. Status: ${initialResponse.code}")
+            Log.e(logTag, "Failed to get redirect URL.")
             return false
         }
         
-        // إصلاح الرابط في حال قام الموقع بإرجاع مسار نسبي (مثلاً: /watch-xyz)
+        // إصلاح مسار الرابط إذا كان نسبياً
         if (watchPageUrl.startsWith("/")) {
             watchPageUrl = "https://asiawiki.me$watchPageUrl"
         }
         
-        Log.d(logTag, "Got redirect URL: $watchPageUrl")
-        
         val finalHeaders = mapOf(
             "Referer" to data,
-            "Cookie" to cookies,
+            "Cookie" to (cookies ?: ""),
             "User-Agent" to USER_AGENT
         )
         
-        // التوجه للرابط النهائي لسحب السيرفرات (مع تفعيل CloudflareKiller)
-        val watchPageDocument = app.get(
-            watchPageUrl, 
-            headers = finalHeaders,
-            interceptor = cloudflareKiller
-        ).document
-        
+        // جلب صفحة السيرفرات
+        val watchPageDocument = app.get(watchPageUrl, headers = finalHeaders).document
         var linksLoaded = false
-        val servers = watchPageDocument.select("ul.ServerNames li")
         
-        if (servers.isEmpty()) {
-            Log.e(logTag, "No servers found in HTML. Check if Cloudflare blocked the GET request.")
-        }
-        
-        servers.amap { serverElement ->
+        watchPageDocument.select("ul.ServerNames li").amap { serverElement ->
             try {
-                // فك التشفير الإجباري للرموز (Entities) مثل &quot; لكي يتمكن الـ Regex من قراءتها
-                val iframeHtml = serverElement.attr("data-server")
-                    .replace("&quot;", "\"")
-                    .replace("&lt;", "<")
-                    .replace("&gt;", ">")
-                    .replace("&amp;", "&")
-                    
+                // 1. استخراج الكود الخام
+                val rawDataServer = serverElement.attr("data-server")
+                
+                // 2. فك التشفير: تحويل &quot; إلى " و &lt; إلى <
+                val iframeHtml = Parser.unescapeEntities(rawDataServer, true)
+                
+                // 3. استخراج الرابط
                 val srcRegex = """src=["'](.*?)["']""".toRegex(RegexOption.IGNORE_CASE)
                 var embedUrlRaw = srcRegex.find(iframeHtml)?.groupValues?.get(1) 
                     ?: Jsoup.parse(iframeHtml).selectFirst("iframe")?.attr("src")
@@ -253,12 +233,13 @@ class AsiatvoneProvider : MainAPI() {
                 if (!embedUrlRaw.isNullOrBlank()) {
                     var embedUrl = if (embedUrlRaw.startsWith("//")) "https:$embedUrlRaw" else embedUrlRaw
                     
-                    // خدعة الدومينات المتطورة للتعرف على السيرفرات العالمية 
+                    // 4. خدع الدومينات
                     when {
                         embedUrl.contains("playmogo.com") -> embedUrl = embedUrl.replace("playmogo.com", "dood.to")
                         embedUrl.contains("vidmoly.biz") -> embedUrl = embedUrl.replace("vidmoly.biz", "vidmoly.to")
                         embedUrl.contains("voe.sx") -> embedUrl = embedUrl.replace("voe.sx", "voe.unblocked.lol")
                         embedUrl.contains("bysefujedu.com") -> embedUrl = embedUrl.replace("bysefujedu.com", "filemoon.sx")
+                        embedUrl.contains("vinovo.to") -> embedUrl = embedUrl.replace("vinovo.to", "vidmoly.to") // Vinovo غالباً هو Vidmoly
                     }
                     
                     Log.d(logTag, "Found embed URL: $embedUrl")
@@ -271,10 +252,6 @@ class AsiatvoneProvider : MainAPI() {
             }
         }
 
-        if (!linksLoaded) {
-            Log.e(logTag, "No links were loaded from any server.")
-        }
-        
         return linksLoaded
     }
 }
