@@ -170,22 +170,21 @@ class AsiatvoneProvider : MainAPI() {
         var linksLoaded = false
 
         try {
-            Log.d(logTag, "loadLinks started for: $data")
+            Log.d(logTag, "Starting loadLinks for: $data")
 
+            // 1. استخراج epwatch
             val episodePage = app.get(data, headers = commonHeaders).document
             val epwatch = episodePage.selectFirst("input[name=epwatch]")?.attr("value")
             
             if (epwatch.isNullOrBlank()) {
-                Log.e(logTag, "Failed to find 'epwatch' value.")
+                Log.e(logTag, "Could not find 'epwatch' ID.")
                 return false
             }
-            Log.d(logTag, "Found epwatch: $epwatch")
+            Log.d(logTag, "Target epwatch: $epwatch")
 
-            val watchUrl = "https://asiawiki.me/"
-            
-            // 1. الطلب الأول لتهيئة الجلسة (حفظ الكوكيز تلقائياً في التطبيق)
-            app.post(
-                watchUrl,
+            // 2. إرسال الطلب للموقع الوسيط للتهيئة والحصول على رابط المشاهدة (Watch URL)
+            val watchResponse = app.post(
+                "https://asiawiki.me/",
                 data = mapOf("epwatch" to epwatch),
                 headers = mapOf(
                     "Origin" to mainUrl,
@@ -193,50 +192,55 @@ class AsiatvoneProvider : MainAPI() {
                     "User-Agent" to USER_AGENT
                 )
             )
+            
+            // هذا هو الرابط السري الذي نحتاجه كـ Referer لكي يقبل السيرفر طلب الـ AJAX
+            val watchUrl = watchResponse.url 
+            Log.d(logTag, "Navigated to Watch URL: $watchUrl")
 
-            // 2. طلب الـ AJAX
+            // 3. إرسال طلب AJAX مع الهيدرز المطابقة 100% للمتصفح
             val ajaxUrl = "https://asiawiki.me/wp-admin/admin-ajax.php"
             val ajaxResponseText = app.post(
                 ajaxUrl,
                 headers = mapOf(
                     "X-Requested-With" to "XMLHttpRequest",
                     "Content-Type" to "application/x-www-form-urlencoded; charset=UTF-8",
-                    "Origin" to watchUrl,
-                    "Referer" to watchUrl,
-                    "User-Agent" to USER_AGENT
+                    "Origin" to "https://asiawiki.me",
+                    "Referer" to watchUrl, // أهم خطوة!
+                    "User-Agent" to USER_AGENT,
+                    "Accept" to "*/*"
                 ),
                 data = mapOf("action" to "fetch_episode", "id" to epwatch)
             ).text
+            
+            Log.d(logTag, "AJAX Response Length: ${ajaxResponseText.length}")
 
-            // 3. فك التشفير الشامل (Brute-force Unescape)
-            val cleanText = ajaxResponseText
+            // 4. التنظيف الشامل لأي نوع من أنواع التشفير (JSON أو HTML)
+            val cleanHtml = ajaxResponseText
                 .replace("\\\"", "\"")
                 .replace("\\/", "/")
+                .replace("\\n", "")
+                .replace("\\r", "")
                 .replace("&quot;", "\"")
                 .replace("&lt;", "<")
                 .replace("&gt;", ">")
                 .replace("&#038;", "&")
                 .replace("&amp;", "&")
 
-            // 4. استخراج جميع الروابط الموجودة في src="..." وتخزينها في قائمة صريحة (List)
-            val rawUrlsList = mutableListOf<String>()
+            // 5. استخراج كل الروابط الموجودة داخل src="..." بغض النظر عن بنية الصفحة
             val srcRegex = """src=["'](.*?)["']""".toRegex(RegexOption.IGNORE_CASE)
-            
-            srcRegex.findAll(cleanText).forEach { match ->
-                rawUrlsList.add(match.groupValues[1])
-            }
+            val extractedUrls = srcRegex.findAll(cleanHtml).map { it.groupValues[1] }.toList()
 
-            Log.d(logTag, "Found ${rawUrlsList.size} potential URLs in HTML.")
+            Log.d(logTag, "Found ${extractedUrls.size} potential links.")
 
-            // 5. استخدام amap (الطريقة الآمنة لمعالجة الروابط في كوتلن بدون Crash)
-            rawUrlsList.distinct().amap { rawUrl ->
+            // 6. تصفية وتشغيل الروابط
+            extractedUrls.distinct().amap { rawUrl ->
                 try {
-                    // تجاهل الروابط التي لا تشبه سيرفرات الفيديو (مثل الصور والسكريبتات)
-                    if (rawUrl.contains(".jpg") || rawUrl.contains(".png") || rawUrl.contains(".js")) return@amap
+                    // استبعاد الروابط التي لا تمثل فيديو
+                    if (rawUrl.endsWith(".jpg") || rawUrl.endsWith(".png") || rawUrl.contains("google.com")) return@amap
                     
                     var embedUrl = if (rawUrl.startsWith("//")) "https:$rawUrl" else rawUrl
                     
-                    // خدع الدومينات للسيرفرات التي لا يتعرف عليها التطبيق
+                    // خدع الدومينات
                     when {
                         embedUrl.contains("playmogo.com") -> embedUrl = embedUrl.replace("playmogo.com", "dood.to")
                         embedUrl.contains("vidmoly.biz") -> embedUrl = embedUrl.replace("vidmoly.biz", "vidmoly.to")
@@ -246,18 +250,18 @@ class AsiatvoneProvider : MainAPI() {
                         embedUrl.contains("luluvdo.com") -> embedUrl = embedUrl.replace("luluvdo.com", "lulustream.com")
                     }
                     
-                    Log.d(logTag, "Attempting to load extractor for: $embedUrl")
+                    Log.d(logTag, "Loading extractor for: $embedUrl")
                     
                     loadExtractor(embedUrl, watchUrl, subtitleCallback, callback)?.let {
                         linksLoaded = true
                     }
                 } catch (e: Exception) {
-                    Log.e(logTag, "Extractor error for $rawUrl : ${e.message}")
+                    Log.e(logTag, "Error processing URL ($rawUrl): ${e.message}")
                 }
             }
 
-        } catch (e: Throwable) { // استخدام Throwable يمنع أي Crash نهائياً
-            Log.e(logTag, "Critical crash prevented in loadLinks: ${e.message}")
+        } catch (e: Throwable) {
+            Log.e(logTag, "Crash Prevented: ${e.message}")
             e.printStackTrace()
         }
 
