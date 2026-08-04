@@ -8,8 +8,7 @@ import java.util.regex.Pattern
 import android.util.Log
 
 class AsiatvoneProvider : MainAPI() {
-    // إزالة السلاش من النهاية لمنع مشكلة // في الروابط
-    override var mainUrl = "https://asiatvdrama.com" 
+    override var mainUrl = "https://asiatvdrama.com"
     override var name = "AsiaTV"
     override val hasMainPage = true
     override var lang = "ar"
@@ -162,7 +161,7 @@ class AsiatvoneProvider : MainAPI() {
     }
 
     override suspend fun loadLinks(
-        data: String, // Episode page URL
+        data: String, 
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
@@ -170,7 +169,6 @@ class AsiatvoneProvider : MainAPI() {
         val logTag = "AsiaTVLogs"
         Log.d(logTag, "loadLinks started for: $data")
 
-        // 1. جلب رقم الحلقة (epwatch)
         val episodePage = app.get(data, headers = commonHeaders).document
         val epwatch = episodePage.selectFirst("input[name=epwatch]")?.attr("value")
         if (epwatch.isNullOrBlank()) {
@@ -187,9 +185,9 @@ class AsiatvoneProvider : MainAPI() {
             "User-Agent" to USER_AGENT
         )
         
-        // 2. إرسال طلب POST بدون توجيه تلقائي لالتقاط الرابط الجديد والكوكيز (الطريقة المعقدة والمضمونة)
+        // إرسال POST إلى الرابط بدون Slash في النهاية ليتوافق مع الـ action في الفورم
         val initialResponse = app.post(
-            "https://asiawiki.me/",
+            "https://asiawiki.me",
             data = mapOf("epwatch" to epwatch),
             allowRedirects = false,
             headers = postHeaders
@@ -203,9 +201,7 @@ class AsiatvoneProvider : MainAPI() {
             return false
         }
         Log.d(logTag, "Got redirect URL: $watchPageUrl")
-        Log.d(logTag, "Got Cookies: $cookies")
-
-        // 3. الذهاب للرابط الجديد مع إرفاق الكوكيز
+        
         val finalHeaders = mapOf(
             "Referer" to data,
             "Cookie" to cookies,
@@ -216,19 +212,22 @@ class AsiatvoneProvider : MainAPI() {
         
         var linksLoaded = false
         
-        // 4. استخراج السيرفرات باستخدام Regex لضمان الدقة
         watchPageDocument.select("ul.ServerNames li").amap { serverElement ->
             try {
                 val iframeHtml = serverElement.attr("data-server")
-                
-                // استخراج رابط src من كود الإطار المدمج
                 val srcRegex = """src=["'](.*?)["']""".toRegex(RegexOption.IGNORE_CASE)
-                val embedUrlRaw = srcRegex.find(iframeHtml)?.groupValues?.get(1) 
+                var embedUrlRaw = srcRegex.find(iframeHtml)?.groupValues?.get(1) 
                     ?: Jsoup.parse(iframeHtml).selectFirst("iframe")?.attr("src")
                 
                 if (!embedUrlRaw.isNullOrBlank()) {
-                    // إصلاح الروابط التي تبدأ بـ // لتجنب الأخطاء
-                    val embedUrl = if (embedUrlRaw.startsWith("//")) "https:$embedUrlRaw" else embedUrlRaw
+                    var embedUrl = if (embedUrlRaw.startsWith("//")) "https:$embedUrlRaw" else embedUrlRaw
+                    
+                    // خدعة الدومينات: نخدع التطبيق بأن السيرفرات الوهمية هي السيرفرات الأصلية ليتمكن من سحب الروابط
+                    when {
+                        embedUrl.contains("playmogo.com") -> embedUrl = embedUrl.replace("playmogo.com", "dood.to")
+                        embedUrl.contains("vidmoly.biz") -> embedUrl = embedUrl.replace("vidmoly.biz", "vidmoly.to")
+                        embedUrl.contains("voe.sx") -> embedUrl = embedUrl.replace("voe.sx", "voe.unblocked.lol")
+                    }
                     
                     Log.d(logTag, "Found embed URL: $embedUrl")
                     loadExtractor(embedUrl, watchPageUrl, subtitleCallback, callback)?.let {
@@ -247,5 +246,3 @@ class AsiatvoneProvider : MainAPI() {
         return linksLoaded
     }
 }
-
-
