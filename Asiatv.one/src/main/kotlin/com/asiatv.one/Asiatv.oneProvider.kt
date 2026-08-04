@@ -8,7 +8,8 @@ import java.util.regex.Pattern
 import android.util.Log
 
 class AsiatvoneProvider : MainAPI() {
-    override var mainUrl = "https://asiatvdrama.com/"
+    // إزالة السلاش من النهاية لمنع مشكلة // في الروابط
+    override var mainUrl = "https://asiatvdrama.com" 
     override var name = "AsiaTV"
     override val hasMainPage = true
     override var lang = "ar"
@@ -18,17 +19,18 @@ class AsiatvoneProvider : MainAPI() {
     )
 
     private val commonHeaders = mapOf(
-        "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
+        "User-Agent" to USER_AGENT,
         "Referer" to "$mainUrl/"
     )
 
     override val mainPage = mainPageOf(
-        "$mainUrl/دراما-تبث-حاليا/" to "دراما تبث حاليا",
-        "$mainUrl/types/الدراما-الكورية/" to "الدراما الكورية",
+        "$mainUrl/%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a7%d8%aa-%d8%a7%d9%84%d8%ac%d8%af%d9%8a%d8%af%d8%a9/" to "الحلقات الجديدة",
+        "$mainUrl/%d8%af%d8%b1%d8%a7%d9%85%d8%a7-%d8%aa%d8%a8%d8%ab-%d8%ad%d8%a7%d9%84%d9%8a%d8%a7/" to "دراما تبث حاليا",
+        "$mainUrl/%d8%af%d8%b1%d8%a7%d9%85%d8%a7-%d9%85%d9%83%d8%aa%d9%85%d9%84%d8%a9/" to "دراما مكتملة",
+        "$mainUrl/types/%d8%a7%d9%84%d8%af%d8%b1%d8%a7%d9%85%d8%a7-%d8%a7%d9%84%d9%83%d9%88%d8%b1%d9%8a%d8%a9/" to "الدراما الكورية",
         "$mainUrl/types/الدراما-الصينية/" to "الدراما الصينية",
         "$mainUrl/types/الدراما-اليابانية/" to "الدراما اليابانية",
-        "$mainUrl/دراما-مكتملة/" to "دراما مكتملة",
-        "$mainUrl/types/افلام-اسيوية/" to "افلام اسيوية",
+        "$mainUrl/types/افلام-اسيوية/" to "افلام اسيوية"
     )
 
     override suspend fun getMainPage(
@@ -160,7 +162,7 @@ class AsiatvoneProvider : MainAPI() {
     }
 
     override suspend fun loadLinks(
-        data: String, 
+        data: String, // Episode page URL
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
@@ -168,53 +170,73 @@ class AsiatvoneProvider : MainAPI() {
         val logTag = "AsiaTVLogs"
         Log.d(logTag, "loadLinks started for: $data")
 
-        // 1. جلب صفحة الحلقة للبحث عن قيمة epwatch
+        // 1. جلب رقم الحلقة (epwatch)
         val episodePage = app.get(data, headers = commonHeaders).document
         val epwatch = episodePage.selectFirst("input[name=epwatch]")?.attr("value")
-        
         if (epwatch.isNullOrBlank()) {
             Log.e(logTag, "Failed to find 'epwatch' value.")
             return false
         }
         Log.d(logTag, "Found 'epwatch' value: $epwatch")
 
-        // 2. إرسال طلب POST لموقع asiawiki وترك التطبيق يتعامل مع التوجيه (Redirect) تلقائياً
-        val response = app.post(
-            "https://asiawiki.me", // بدون سلاش في النهاية ليتوافق مع الـ action في الفورم
+        val postHeaders = mapOf(
+            "authority" to "asiawiki.me",
+            "Content-Type" to "application/x-www-form-urlencoded",
+            "Origin" to mainUrl,
+            "Referer" to data,
+            "User-Agent" to USER_AGENT
+        )
+        
+        // 2. إرسال طلب POST بدون توجيه تلقائي لالتقاط الرابط الجديد والكوكيز (الطريقة المعقدة والمضمونة)
+        val initialResponse = app.post(
+            "https://asiawiki.me/",
             data = mapOf("epwatch" to epwatch),
-            headers = mapOf(
-                "Referer" to data,
-                "Origin" to mainUrl,
-                "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36"
-            )
+            allowRedirects = false,
+            headers = postHeaders
         )
 
-        // 3. التطبيق قام بالتوجيه آلياً وحفظ الكوكيز، الآن لدينا صفحة المشاهدة النهائية
-        val watchPageDocument = response.document
-        val watchPageUrl = response.url // الرابط النهائي الذي تم التوجيه إليه
-        Log.d(logTag, "Successfully fetched watch page content from: $watchPageUrl")
+        val watchPageUrl = initialResponse.headers["location"] ?: initialResponse.headers["Location"]
+        val cookies = initialResponse.headers["set-cookie"] ?: initialResponse.headers["Set-Cookie"]
+
+        if (watchPageUrl.isNullOrBlank() || cookies.isNullOrBlank()) {
+            Log.e(logTag, "Failed to get redirect URL or Cookies. Status: ${initialResponse.code}")
+            return false
+        }
+        Log.d(logTag, "Got redirect URL: $watchPageUrl")
+        Log.d(logTag, "Got Cookies: $cookies")
+
+        // 3. الذهاب للرابط الجديد مع إرفاق الكوكيز
+        val finalHeaders = mapOf(
+            "Referer" to data,
+            "Cookie" to cookies,
+            "User-Agent" to USER_AGENT
+        )
+        val watchPageDocument = app.get(watchPageUrl, headers = finalHeaders).document
+        Log.d(logTag, "Successfully fetched watch page content.")
         
         var linksLoaded = false
         
-        // 4. استخراج السيرفرات
+        // 4. استخراج السيرفرات باستخدام Regex لضمان الدقة
         watchPageDocument.select("ul.ServerNames li").amap { serverElement ->
-            val iframeHtml = serverElement.attr("data-server")
-            
-            // استخدام Regex كطريقة أضمن وأقوى لاستخراج رابط الـ src من كود الـ iframe المدمج
-            val srcRegex = """src=["'](.*?)["']""".toRegex(RegexOption.IGNORE_CASE)
-            val embedUrlRaw = srcRegex.find(iframeHtml)?.groupValues?.get(1) 
-                ?: Jsoup.parse(iframeHtml).selectFirst("iframe")?.attr("src")
-            
-            if (!embedUrlRaw.isNullOrBlank()) {
-                // إصلاح الروابط التي تبدأ بـ // مثل سيرفر ok.ru
-                val embedUrl = if (embedUrlRaw.startsWith("//")) "https:$embedUrlRaw" else embedUrlRaw
+            try {
+                val iframeHtml = serverElement.attr("data-server")
                 
-                Log.d(logTag, "Found embed URL: $embedUrl")
+                // استخراج رابط src من كود الإطار المدمج
+                val srcRegex = """src=["'](.*?)["']""".toRegex(RegexOption.IGNORE_CASE)
+                val embedUrlRaw = srcRegex.find(iframeHtml)?.groupValues?.get(1) 
+                    ?: Jsoup.parse(iframeHtml).selectFirst("iframe")?.attr("src")
                 
-                loadExtractor(embedUrl, watchPageUrl, subtitleCallback, callback)?.let {
-                    linksLoaded = true
-                    Log.d(logTag, "Successfully loaded links from: $embedUrl")
+                if (!embedUrlRaw.isNullOrBlank()) {
+                    // إصلاح الروابط التي تبدأ بـ // لتجنب الأخطاء
+                    val embedUrl = if (embedUrlRaw.startsWith("//")) "https:$embedUrlRaw" else embedUrlRaw
+                    
+                    Log.d(logTag, "Found embed URL: $embedUrl")
+                    loadExtractor(embedUrl, watchPageUrl, subtitleCallback, callback)?.let {
+                        linksLoaded = true
+                    }
                 }
+            } catch (e: Exception) {
+                Log.e(logTag, "Error parsing server: ${e.message}")
             }
         }
 
@@ -225,3 +247,5 @@ class AsiatvoneProvider : MainAPI() {
         return linksLoaded
     }
 }
+
+
