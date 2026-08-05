@@ -5,6 +5,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.newExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import org.jsoup.nodes.Element
 import java.net.URI
 
@@ -224,10 +225,11 @@ class FaselHDSProvider : MainAPI() {
                                     source = name,
                                     name = "$name - $qualityName",
                                     url = link,
-                                    referer = "$playerOrigin/",
-                                    quality = qualityNum,
-                                    isM3u8 = true
-                                )
+                                    type = ExtractorLinkType.M3U8
+                                ) {
+                                    this.referer = "$playerOrigin/"
+                                    this.quality = qualityNum
+                                }
                             )
                         }
                     }
@@ -274,10 +276,11 @@ class FaselHDSProvider : MainAPI() {
                                             source = "$name Server ${index + 1}",
                                             name = "$name - $qualityName",
                                             url = link,
-                                            referer = "$playerOrigin/",
-                                            quality = qualityNum,
-                                            isM3u8 = true
-                                        )
+                                            type = ExtractorLinkType.M3U8
+                                        ) {
+                                            this.referer = "$playerOrigin/"
+                                            this.quality = qualityNum
+                                        }
                                     )
                                 }
                             }
