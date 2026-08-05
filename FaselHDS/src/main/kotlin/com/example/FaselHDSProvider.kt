@@ -26,6 +26,8 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
+import okhttp3.CookieJar
+import okhttp3.Request
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import kotlin.coroutines.resume
@@ -104,7 +106,14 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         val hasNext = document.select("a[href*='/page/${page + 1}']").isNotEmpty() || 
                       document.select("ul.pagination a, .pagination a, .page-link").any { it.text().contains("التالي") || it.text().contains("Next") }
 
-        return newHomePageResponse(request.name, home, hasNext)
+        return newHomePageResponse(
+            list = HomePageList(
+                name = request.name,
+                list = home,
+                hasNext = hasNext
+            ),
+            hasNext = hasNext
+        )
     }
 
     private fun Element.toSearchResult(baseUrl: String): SearchResponse? {
@@ -376,7 +385,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
             val client = app.baseClient.newBuilder()
                 .followRedirects(true)
                 .followSslRedirects(true)
-                .cookieJar(okhttp3.CookieJar.NO_COOKIES)
+                .cookieJar(CookieJar.NO_COOKIES)
                 .build()
 
             val foundM3u8 = linkedSetOf<String>()
@@ -537,7 +546,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
                     if (request.method.equals("GET", ignoreCase = true) && lower.contains(".m3u8")) {
                         handleFoundLink(url)
                         try {
-                            val reqBuilder = okhttp3.Request.Builder().url(url)
+                            val reqBuilder = Request.Builder().url(url)
                                 .header("User-Agent", lastValidUserAgent)
                                 .header("Referer", referer)
                             try { cookieManager.getCookie(url)?.let { ck -> reqBuilder.header("Cookie", ck) } } catch (_: Exception) {}
