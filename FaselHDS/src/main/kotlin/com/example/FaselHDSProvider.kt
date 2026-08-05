@@ -26,7 +26,6 @@ import android.widget.FrameLayout
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import kotlinx.coroutines.delay
@@ -109,7 +108,6 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
             it.toSearchResult(base)
         }
 
-        // تحسين شامل لاكتشاف الصفحات الإضافية (Pagination)
         val hasNext = document.select("a[href*='/page/${page + 1}']").isNotEmpty() || 
                       document.select("ul.pagination a, .pagination a, .page-link").any { it.text().contains("التالي") || it.text().contains("Next") }
 
@@ -121,7 +119,6 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         val href = anchor.attr("href").ifBlank { return null }
         val finalHref = if (href.startsWith("http")) href else "$baseUrl$href"
         
-        // دعم شامل لكل فئات العناوين الممكنة
         val title = anchor.selectFirst("div.h1, .h1, h1, .post-title, h4, h5")?.text()?.trim() ?: "No Title"
         
         val posterElement = this.selectFirst("div.imgdiv-class img, a > img.img-fluid, img.poster")
@@ -137,8 +134,6 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
             newMovieSearchResponse(title, finalHref, TvType.Movie) { this.posterUrl = finalPoster }
         }
     }
-
-    override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query, 1).items
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
         val base = getBaseUrl()
@@ -170,13 +165,11 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         val base = getBaseUrl()
         val document = app.get(url, headers = getDynamicHeaders()).document
         
-        // دعم شامل لكل فئات العناوين الممكنة داخل صفحة الفيلم/المسلسل
         val titleElement = document.selectFirst("div.h1.title, h1.title, div.title h1, .singleInfo .title, h1, .post-title")
         val title = titleElement?.text()?.trim() 
             ?: document.selectFirst("title")?.text()?.substringBefore("-")?.trim() 
             ?: "No Title"
         
-        // استخراج الصورة مع ضمان جميع التنسيقات
         val posterUrl = document.selectFirst("div.posterImg img, img.poster, .imgdiv-class img, meta[itemprop=image], .singlePage img")?.let {
             it.attr("data-src").ifBlank { it.attr("src") }.ifBlank { it.attr("content") }
         }
@@ -212,7 +205,6 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
             val episodeSelector = "div#epAll a, div.epAll a, div#episodes a, div.ep-item a, .epAll a"
 
             if (seasonElements.isNotEmpty()) {
-                // تم استبدال amap بـ forEach لحل مشكلة البناء (Build Error)
                 seasonElements.forEach { seasonElement ->
                     val onclickAttr = seasonElement.attr("onclick")
                     val seasonLinkRel = Regex("""['"]([^'"]+)['"]""").find(onclickAttr ?: "")?.groupValues?.get(1)
@@ -222,11 +214,10 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
                         val absoluteSeasonLink = if (seasonLinkRel.startsWith("http")) seasonLinkRel else "$base$seasonLinkRel"
                         val seasonNum = Regex("""\d+""").find(seasonElement.selectFirst("div.title, .title")?.text() ?: "")?.value?.toIntOrNull() ?: 1
                         
-                        // إعادة استخدام المستند الحالي إذا كان الموسم هو نفس الصفحة الحالية (لتجنب الحظر)
                         val seasonDoc = if (absoluteSeasonLink.substringBefore("?") == url.substringBefore("?")) {
                             document
                         } else {
-                            delay(300) // تأخير زمني بسيط لتجنب حظر الـ DDoS
+                            delay(300) 
                             try {
                                 app.get(absoluteSeasonLink, headers = getDynamicHeaders()).document
                             } catch (e: Exception) {
@@ -252,7 +243,6 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
                 }
             } 
             
-            // في حال لم يتم العثور على أي حلقات (إما لفشل التحليل أو عدم وجود مواسم)، نبحث في الصفحة الحالية
             if (episodes.isEmpty()) {
                 document.select(episodeSelector).forEach { ep ->
                     val epText = ep.text().trim()
@@ -270,7 +260,6 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
                 }
             }
 
-            // حماية أخيرة: إذا تم تصنيفه كمسلسل ولكنه فارغ تماماً من الحلقات، نعرضه كفيلم لتجنب الشاشة السوداء
             if (episodes.isEmpty()) {
                 return newMovieLoadResponse(title, url, TvType.Movie, url) {
                     this.posterUrl = posterUrl
@@ -342,8 +331,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         }
 
         val finalUrl = iframeUrl.replace("&amp;", "&").trim()
-        val originalHost = try { Uri.parse(finalUrl).host?.replace("www.", "") ?: "" } catch (e: Exception) { "" }
-
+        
         activity.runOnUiThread {
             val dialog = Dialog(activity)
             dialog.setCancelable(false)
