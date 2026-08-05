@@ -3,6 +3,7 @@ package com.example
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.M3u8Helper
+import com.lagradost.cloudstream3.utils.Qualities
 import org.jsoup.nodes.Element
 
 class FaselHDSProvider : MainAPI() {
@@ -170,8 +171,6 @@ class FaselHDSProvider : MainAPI() {
             val year = document.selectFirst("span:contains(سنة الإنتاج) a")?.text()?.toIntOrNull()
             val duration = document.getMetaInfo("fa-clock")?.filter { it.isDigit() }?.toIntOrNull()
             
-            // تم إزالة جزء استخراج التقييم rating لتفادي خطأ الـ Deprecation في البناء.
-
             return newMovieLoadResponse(title, url, TvType.Movie, url) {
                 this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags; this.duration = duration
             }
@@ -187,36 +186,72 @@ class FaselHDSProvider : MainAPI() {
         val document = app.get(data, headers = headers).document
         
         document.select("ul.tabs-ul li").forEachIndexed { index, serverElement ->
-            val serverUrl = serverElement.attr("onclick").substringAfter("href = '").substringBefore("'")
+            val onClickAttr = serverElement.attr("onclick") ?: return@forEachIndexed
+            val serverUrl = onClickAttr.substringAfter("href = '", "").substringBefore("'", "")
+            
             if (serverUrl.isBlank()) return@forEachIndexed
 
             try {
-                val playerPageContent = app.get(serverUrl, headers = headers).text
+                // إصلاح الرابط في حال كان يبدأ بـ // بدلاً من https://
+                val fixedUrl = if (serverUrl.startsWith("//")) "https:$serverUrl" else serverUrl
                 
-                val linkRegexes = listOf(
-                    Regex("""var videoSrc = '([^']+)';"""),
-                    Regex("""(https?://.*?\.m3u8)""")
-                )
-
+                // جلب صفحة المشغل مع تمرير الرابط الأصلي كـ Referer لتخطي بعض الحمايات
+                val playerDoc = app.get(fixedUrl, headers = mapOf("Referer" to data, "User-Agent" to headers["User-Agent"]!!)).document
+                val playerHtml = playerDoc.html()
+                
                 var foundLink: String? = null
-                for (regex in linkRegexes) {
-                    val match = regex.find(playerPageContent)
-                    if (match != null) {
-                        foundLink = match.groupValues[1]
-                        break
+                
+                // 1. المحاولة الأولى: البحث عن الرابط داخل علامات <source> أو <video>
+                val sourceSrc = playerDoc.selectFirst("source")?.attr("src") ?: playerDoc.selectFirst("video")?.attr("src")
+                if (!sourceSrc.isNullOrBlank()) {
+                    foundLink = sourceSrc
+                }
+                
+                // 2. المحاولة الثانية: استخدام تعبيرات منتظمة متقدمة للبحث عن متغيرات الجافاسكريبت داخل صفحة المشغل
+                if (foundLink.isNullOrBlank()) {
+                    val linkRegexes = listOf(
+                        Regex("""file\s*:\s*["'](https?://[^"']+m3u8[^"']*)["']"""),
+                        Regex("""file\s*:\s*["'](https?://[^"']+mp4[^"']*)["']"""),
+                        Regex("""var\s+videoSrc\s*=\s*["']([^"']+)["']"""),
+                        Regex("""source\s*:\s*["']([^"']+)["']"""),
+                        Regex("""(https?://[^"']+\.m3u8[^"']*)""")
+                    )
+
+                    for (regex in linkRegexes) {
+                        val match = regex.find(playerHtml)
+                        if (match != null) {
+                            foundLink = match.groupValues[1]
+                            break
+                        }
                     }
                 }
 
-                if (foundLink != null) {
-                    M3u8Helper.generateM3u8(
-                        source = "$name Server ${index + 1}",
-                        streamUrl = foundLink,
-                        referer = serverUrl,
-                        headers = headers
-                    ).forEach(callback)
+                // 3. إذا تم العثور على الرابط، نقوم بإرجاعه بناءً على نوعه
+                if (!foundLink.isNullOrBlank()) {
+                    val isM3u8 = foundLink.contains(".m3u8", ignoreCase = true)
+                    
+                    if (isM3u8) {
+                        M3u8Helper.generateM3u8(
+                            source = "$name - Server ${index + 1}",
+                            streamUrl = foundLink,
+                            referer = fixedUrl,
+                            headers = mapOf("Referer" to fixedUrl, "Origin" to fixedUrl.substringBefore("/video_player"))
+                        ).forEach(callback)
+                    } else {
+                        callback.invoke(
+                            ExtractorLink(
+                                source = "$name - Server ${index + 1}",
+                                name = "$name - Server ${index + 1}",
+                                url = foundLink,
+                                referer = fixedUrl,
+                                quality = Qualities.Unknown.value,
+                                isM3u8 = false
+                            )
+                        )
+                    }
                 }
             } catch (e: Exception) {
-                // Ignore errors
+                // تخطي الأخطاء الخاصة بسيرفر معين لكي لا تتوقف باقي السيرفرات
             }
         }
         return true
