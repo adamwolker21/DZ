@@ -26,11 +26,8 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
-import okhttp3.CookieJar
-import okhttp3.Request as OkHttpRequest
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import java.net.URI
 import kotlin.coroutines.resume
 
 class FaselHDSProvider(private val context: Context) : MainAPI() {
@@ -91,8 +88,12 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         
         val title = anchor.selectFirst("div.h1, .h1, h1, .post-title, h4, h5")?.text()?.trim() ?: "No Title"
         
-        val posterElement = this.selectFirst("div.imgdiv-class img, a > img.img-fluid, img.poster")
-        val posterUrl = fixUrlNull(posterElement?.attr("data-src")?.ifBlank { posterElement.attr("src") })
+        val posterElements = this.select("div.imgdiv-class img, a > img.img-fluid, img.poster")
+        val rawPosterUrl = posterElements.mapNotNull {
+            it.attr("data-src").ifBlank { it.attr("src") }
+        }.firstOrNull { it.isNotBlank() }
+        
+        val posterUrl = fixUrlNull(rawPosterUrl)
         
         val isSeries = title.contains("مسلسل") || title.contains("برنامج") ||
                        this.selectFirst("span.quality:contains(حلقة), span.quality:contains(مواسم)") != null
@@ -105,25 +106,41 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        // التقاط الدومين النشط أولاً لضمان عدم ضياع كلمة البحث أثناء التحويل (Redirect)
         val initialResponse = app.get(mainUrl)
-        val uri = URI(initialResponse.url)
+        val uri = java.net.URI(initialResponse.url)
         val currentDomain = "${uri.scheme}://${uri.host}"
         
         val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
-        val searchUrl = "$currentDomain/?s=$encodedQuery"
+        val results = mutableListOf<SearchResponse>()
+
+        val url1 = "$currentDomain/?s=$encodedQuery"
+        val doc1 = app.get(url1, headers = headers).document
         
-        val document = app.get(searchUrl, headers = headers).document
-        
-        val selector = if (document.selectFirst("div.post-listing") != null) {
+        val selector = if (doc1.selectFirst("div.post-listing") != null) {
             "div.post-listing div.postDiv"
         } else {
             "div.postDiv"
         }
 
-        return document.select(selector).mapNotNull {
-            it.toSearchResult()
+        // جلب نتائج الصفحة الأولى
+        results.addAll(doc1.select(selector).mapNotNull { it.toSearchResult() })
+
+        // جلب نتائج الصفحة الثانية والثالثة (لدمجهم وعرض المزيد من النتائج دفعة واحدة)
+        try {
+            if (doc1.select("a[href*='/page/2']").isNotEmpty()) {
+                val doc2 = app.get("$currentDomain/page/2?s=$encodedQuery", headers = headers).document
+                results.addAll(doc2.select(selector).mapNotNull { it.toSearchResult() })
+                
+                if (doc2.select("a[href*='/page/3']").isNotEmpty()) {
+                    val doc3 = app.get("$currentDomain/page/3?s=$encodedQuery", headers = headers).document
+                    results.addAll(doc3.select(selector).mapNotNull { it.toSearchResult() })
+                }
+            }
+        } catch (e: Exception) {
+            // تجاهل الأخطاء لجلب ما تيسر من الصفحات
         }
+
+        return results.distinctBy { it.url }
     }
     
     private fun Element.getMetaInfo(iconClass: String): String? {
@@ -138,11 +155,13 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
             ?: document.selectFirst("title")?.text()?.substringBefore("-")?.trim() 
             ?: "No Title"
         
-        // تم إضافة مسارات البوستر الاحتياطية (div.seasonDiv img) وتغطية كل الحالات
-        val posterElement = document.selectFirst("div.posterImg img, img.poster, .imgdiv-class img, meta[itemprop=image], .singlePage img, div.seasonDiv img, div#seasonList img")
-        val posterUrl = fixUrlNull(posterElement?.let {
+        // جلب البوستر بطريقة تضمن عدم اختيار مسار فارغ والاعتماد على البوستر الاحتياطي إن لزم الأمر
+        val posterElements = document.select("div.posterImg img, img.poster, .imgdiv-class img, meta[itemprop=image], .singlePage img, div.seasonDiv img, div#seasonList img")
+        val rawPosterUrl = posterElements.mapNotNull {
             it.attr("data-src").ifBlank { it.attr("src") }.ifBlank { it.attr("content") }
-        })
+        }.firstOrNull { it.isNotBlank() }
+
+        val posterUrl = fixUrlNull(rawPosterUrl)
 
         val plot = document.selectFirst("div.singleDesc p, div.singleDesc, .story p, .story")?.text()?.trim()
 
@@ -360,7 +379,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
             val client = app.baseClient.newBuilder()
                 .followRedirects(true)
                 .followSslRedirects(true)
-                .cookieJar(CookieJar.NO_COOKIES)
+                .cookieJar(okhttp3.CookieJar.NO_COOKIES)
                 .build()
 
             val foundM3u8 = linkedSetOf<String>()
@@ -586,7 +605,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
 
             if (!m3u8.isNullOrBlank()) {
                 foundLink = true
-                val playerOrigin = try { "https://${URI(finalIframeUrl).host}" } catch(e:Exception){ mainUrl }
+                val playerOrigin = try { "https://${java.net.URI(finalIframeUrl).host}" } catch(e:Exception){ mainUrl }
 
                 M3u8Helper.generateM3u8(
                     source = name,
