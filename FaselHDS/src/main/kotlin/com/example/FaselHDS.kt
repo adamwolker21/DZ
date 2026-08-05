@@ -1,5 +1,3 @@
-
-
 package com.example
 
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
@@ -10,6 +8,7 @@ import android.content.Context
 class FaselHDS: Plugin() {
     override fun load(context: Context) {
         // All providers should be added in this manner.
-        registerMainAPI(FaselHDSProvider())
+        // قمنا بتمرير المتغير context هنا لتمكين إضافة المتصفح المخفي من العمل
+        registerMainAPI(FaselHDSProvider(context))
     }
 }
