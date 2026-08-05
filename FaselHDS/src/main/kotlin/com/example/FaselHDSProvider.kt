@@ -7,7 +7,6 @@ import org.jsoup.nodes.Element
 import java.net.URI
 
 class FaselHDSProvider : MainAPI() {
-    // تم إرجاع الرابط الأصلي لكي تعمل واجهة الموقع بشكل صحيح
     override var mainUrl = "https://www.faselhds.life"
     override var name = "FaselHDS"
     override val hasMainPage = true
@@ -83,7 +82,6 @@ class FaselHDSProvider : MainAPI() {
         return this.selectFirst("span:has(i.$iconClass)")?.ownText()?.substringAfter(":")?.trim()
     }
 
-    // تم إرجاع هذه الدالة لنسختك الأصلية التي تتعرف على المسلسلات بشكل صحيح
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url, headers = headers).document
         val title = document.selectFirst("div.h1.title")?.ownText()?.trim() ?: "No Title"
@@ -178,7 +176,6 @@ class FaselHDSProvider : MainAPI() {
         }
     }
 
-    // هذه هي الدالة الوحيدة التي تم تحديثها لجلب الروابط وتخطي الحماية
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -187,40 +184,73 @@ class FaselHDSProvider : MainAPI() {
     ): Boolean {
         val document = app.get(data, headers = headers).document
         
-        document.select("ul.tabs-ul li").forEachIndexed { index, serverElement ->
-            val serverUrl = serverElement.attr("onclick").substringAfter("href = '").substringBefore("'")
-            if (serverUrl.isBlank()) return@forEachIndexed
+        // استخراج رابط الـ iframe بشكل مباشر للتكيف مع أي تغيير في النطاق (مثال: web850x إلى web856x)
+        val iframeUrl = document.selectFirst("iframe[name=player_iframe]")?.attr("src") 
+            ?: document.selectFirst("iframe[name=player_iframe]")?.attr("data-src")
 
+        if (!iframeUrl.isNullOrBlank()) {
             try {
-                // إصلاح رابط المشغل
-                val fixedUrl = if (serverUrl.startsWith("//")) "https:$serverUrl" else serverUrl
+                // استخراج النطاق الديناميكي لاستخدامه في الـ Headers
+                val playerOrigin = "https://${URI(iframeUrl).host}"
                 
-                // جلب صفحة المشغل مع تمرير الرابط الأصلي (data) كـ Referer
-                val playerPageContent = app.get(fixedUrl, headers = mapOf("Referer" to data, "User-Agent" to headers["User-Agent"]!!)).text
+                val playerHeaders = mapOf(
+                    "User-Agent" to headers["User-Agent"]!!,
+                    "Referer" to "$playerOrigin/",
+                    "Origin" to playerOrigin,
+                    "Accept" to "*/*"
+                )
+
+                // جلب محتوى الـ iframe 
+                val playerPageContent = app.get(iframeUrl, headers = playerHeaders).text
                 
                 // البحث عن الرابط داخل صفحة المشغل
                 val regex = Regex("""(https?://[^"']+\.m3u8[^"']*)""")
                 val foundLink = regex.find(playerPageContent)?.groupValues?.get(1)
 
                 if (foundLink != null) {
-                    // استخراج نطاق المشغل (مثال: https://web850x.faselhdx.bid)
-                    val playerOrigin = "https://${URI(fixedUrl).host}"
-                    
-                    // استخدام الهيدرز المطلوبة لتشغيل الفيديو (بناءً على الـ curl الخاص بك)
                     M3u8Helper.generateM3u8(
-                        source = "$name Server ${index + 1}",
+                        source = "$name Server",
                         streamUrl = foundLink,
                         referer = "$playerOrigin/",
-                        headers = mapOf(
-                            "Origin" to playerOrigin,
-                            "Referer" to "$playerOrigin/",
-                            "User-Agent" to headers["User-Agent"]!!,
-                            "Accept" to "*/*"
-                        )
+                        headers = playerHeaders
                     ).forEach(callback)
                 }
             } catch (e: Exception) {
-                // Ignore errors to let other servers load
+                // Ignore errors
+            }
+        } else {
+             // في حال لم يتم العثور على iframe، نحاول الاعتماد على قائمة السيرفرات كخيار بديل
+             document.select("ul.tabs-ul li").forEachIndexed { index, serverElement ->
+                val serverUrl = serverElement.attr("onclick").substringAfter("href = '").substringBefore("'")
+                if (serverUrl.isBlank()) return@forEachIndexed
+
+                try {
+                    val fixedUrl = if (serverUrl.startsWith("//")) "https:$serverUrl" else serverUrl
+                    val playerOrigin = "https://${URI(fixedUrl).host}"
+                    
+                    val playerHeaders = mapOf(
+                        "User-Agent" to headers["User-Agent"]!!,
+                        "Referer" to "$playerOrigin/",
+                        "Origin" to playerOrigin,
+                        "Accept" to "*/*"
+                    )
+
+                    val playerPageContent = app.get(fixedUrl, headers = playerHeaders).text
+                    
+                    val regex = Regex("""(https?://[^"']+\.m3u8[^"']*)""")
+                    val foundLink = regex.find(playerPageContent)?.groupValues?.get(1)
+
+                    if (foundLink != null) {
+                        M3u8Helper.generateM3u8(
+                            source = "$name Server ${index + 1}",
+                            streamUrl = foundLink,
+                            referer = "$playerOrigin/",
+                            headers = playerHeaders
+                        ).forEach(callback)
+                    }
+                } catch (e: Exception) {
+                    // Ignore errors
+                }
             }
         }
         return true
