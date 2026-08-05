@@ -56,7 +56,7 @@ class StreamHG : ExtractorApi() {
     override var mainUrl = "hgcloud.to"
     override val requiresReferer = true
     private val logTag = "StreamHGExtractor"
-    private val potentialHosts = listOf("https://davioad.com", "https://kravaxxa.com")
+    private val potentialHosts = listOf("https://vibuxer.com", "https://hanerix.com")
 
     override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
         val videoId = url.substringAfterLast("/")
