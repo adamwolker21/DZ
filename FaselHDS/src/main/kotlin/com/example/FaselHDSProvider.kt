@@ -134,9 +134,9 @@ class FaselHDSProvider : MainAPI() {
             val episodeSelector = "div#epAll a, div#episodes a, div.ep-item a"
 
             if (seasonElements.isNotEmpty()) {
-                seasonElements.apmap { seasonElement ->
+                seasonElements.amap { seasonElement ->
                     val seasonLink = seasonElement.attr("onclick")?.substringAfter("'")?.substringBefore("'")
-                        ?: seasonElement.selectFirst("a")?.attr("href") ?: return@apmap
+                        ?: seasonElement.selectFirst("a")?.attr("href") ?: return@amap
                     val absoluteSeasonLink = if (seasonLink.startsWith("http")) seasonLink else "$mainUrl$seasonLink"
                     val seasonNum = Regex("""\d+""").find(seasonElement.selectFirst("div.title")?.text() ?: "")?.value?.toIntOrNull()
                     val seasonDoc = app.get(absoluteSeasonLink, headers = headers).document
