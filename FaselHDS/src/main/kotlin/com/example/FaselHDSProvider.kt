@@ -1,16 +1,42 @@
 package com.example
 
+import android.annotation.SuppressLint
+import android.app.Activity
+import android.app.Dialog
+import android.content.Context
+import android.graphics.Bitmap
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
+import android.view.Window
+import android.view.WindowManager
+import android.webkit.ConsoleMessage
+import android.webkit.CookieManager
+import android.webkit.SslErrorHandler
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.newExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import org.jsoup.Jsoup
+import kotlinx.coroutines.suspendCancellableCoroutine
+import okhttp3.CookieJar
+import okhttp3.Request
+import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import java.net.URI
+import kotlin.coroutines.resume
 
-class FaselHDSProvider : MainAPI() {
+class FaselHDSProvider(private val context: Context) : MainAPI() {
     override var mainUrl = "https://www.faselhds.life"
     override var name = "FaselHDS"
     override val hasMainPage = true
@@ -21,8 +47,10 @@ class FaselHDSProvider : MainAPI() {
         TvType.TvSeries
     )
 
+    private val lastValidUserAgent = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36"
+
     private val headers = mapOf(
-        "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
+        "User-Agent" to lastValidUserAgent,
         "Referer" to "$mainUrl/",
         "Origin" to mainUrl,
     )
@@ -180,164 +208,360 @@ class FaselHDSProvider : MainAPI() {
         }
     }
 
+    private fun extractIframeSources(doc: Document): List<String> {
+        val results = mutableSetOf<String>()
+
+        // 1. البحث الدقيق بناءً على بنية الموقع المعتادة
+        val iframeUrl = doc.selectFirst("iframe[name=player_iframe]")?.attr("src") 
+            ?: doc.selectFirst("iframe[name=player_iframe]")?.attr("data-src")
+        if (!iframeUrl.isNullOrBlank()) results.add(iframeUrl)
+
+        // 2. قائمة السيرفرات إن وجدت
+        doc.select("ul.tabs-ul li").forEach { serverElement ->
+            val serverUrl = serverElement.attr("onclick").substringAfter("href = '").substringBefore("'")
+            if (serverUrl.isNotBlank()) {
+                val fixedUrl = if (serverUrl.startsWith("//")) "https:$serverUrl" else serverUrl
+                results.add(fixedUrl)
+            }
+        }
+
+        // 3. البحث الشامل كإجراء احتياطي (Fallback)
+        val blockedKeywords = listOf("google.com", "googlesyndication.com", "googletagmanager.com")
+        doc.select("iframe[src]").forEach { el ->
+            val src = el.attr("src")
+            if (src.isNotBlank() && blockedKeywords.none { src.contains(it) }) {
+                results.add(src)
+            }
+        }
+
+        return results.toList()
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private suspend fun resolveWithWebView(
+        iframeUrl: String,
+        referer: String
+    ): String? = suspendCancellableCoroutine { cont ->
+
+        val activity = context as? Activity
+        if (activity == null || activity.isFinishing) {
+            cont.resume(null)
+            return@suspendCancellableCoroutine
+        }
+
+        val finalUrl = iframeUrl.replace("&amp;", "&").trim()
+        val originalHost = try { Uri.parse(finalUrl).host?.replace("www.", "") ?: "" } catch (e: Exception) { "" }
+
+        activity.runOnUiThread {
+            val dialog = Dialog(activity)
+            dialog.setCancelable(false)
+            dialog.setCanceledOnTouchOutside(false)
+            dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+
+            dialog.window?.apply {
+                setBackgroundDrawableResource(android.R.color.transparent)
+                setDimAmount(0f)
+                clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+                attributes = attributes?.apply {
+                    width = 1
+                    height = 1
+                    x = -10000
+                    y = -10000
+                    gravity = Gravity.START or Gravity.TOP
+                }
+            }
+
+            val webView = WebView(activity).apply {
+                layoutParams = ViewGroup.LayoutParams(1, 1)
+                visibility = View.INVISIBLE
+                isHorizontalScrollBarEnabled = false
+                isVerticalScrollBarEnabled = false
+            }
+
+            try {
+                dialog.setContentView(webView, ViewGroup.LayoutParams(1, 1))
+                dialog.show()
+            } catch (e: Exception) {
+                try {
+                    val decor = activity.window?.decorView as? ViewGroup
+                    decor?.addView(webView, FrameLayout.LayoutParams(1, 1, Gravity.START or Gravity.TOP))
+                } catch (_: Exception) {}
+            }
+
+            webView.settings.apply {
+                javaScriptEnabled = true
+                domStorageEnabled = true
+                databaseEnabled = true
+                allowContentAccess = true
+                allowFileAccess = true
+                javaScriptCanOpenWindowsAutomatically = true
+                setSupportMultipleWindows(true)
+                mediaPlaybackRequiresUserGesture = false
+                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                cacheMode = WebSettings.LOAD_DEFAULT
+                userAgentString = lastValidUserAgent
+                blockNetworkImage = true
+            }
+
+            val cookieManager = CookieManager.getInstance()
+            try {
+                cookieManager.setAcceptCookie(true)
+                cookieManager.setAcceptThirdPartyCookies(webView, true)
+            } catch (_: Exception) {}
+
+            val client = app.baseClient.newBuilder()
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .cookieJar(CookieJar.NO_COOKIES)
+                .build()
+
+            val foundM3u8 = linkedSetOf<String>()
+            var finished = false
+            val finishLock = Any()
+            val handler = Handler(Looper.getMainLooper())
+            var finishRunnable: Runnable? = null
+            var currentAttempt = 0
+            val maxAttempts = 2
+            val attemptTimeoutMs = 15_000L
+            var attemptTimeoutRunnable: Runnable? = null
+            var autoTouchRunnable: Runnable? = null
+
+            fun cleanup() {
+                try { attemptTimeoutRunnable?.let { handler.removeCallbacks(it) } } catch (_: Exception) {}
+                try { autoTouchRunnable?.let { handler.removeCallbacks(it) } } catch (_: Exception) {}
+                try { (webView.parent as? ViewGroup)?.removeView(webView) } catch (_: Exception) {}
+                try { webView.stopLoading(); webView.destroy() } catch (_: Exception) {}
+                try { if (dialog.isShowing) dialog.dismiss() } catch (_: Exception) {}
+            }
+
+            fun safeFinish(result: String?) {
+                synchronized(finishLock) {
+                    if (finished) return
+                    finished = true
+                }
+                try { if (cont.isActive) cont.resume(result) } catch (_: Exception) {}
+                cleanup()
+            }
+
+            fun chooseAndFinish() {
+                if (foundM3u8.isEmpty()) { safeFinish(null); return }
+                val strict = foundM3u8.firstOrNull {
+                    val clean = it.substringBefore("?")
+                    clean.endsWith(".m3u8") && (clean.contains("master") || clean.contains("playlist") || clean.contains("index"))
+                } ?: foundM3u8.firstOrNull { it.substringBefore("?").endsWith(".m3u8") }
+                safeFinish(strict ?: foundM3u8.first())
+            }
+
+            fun handleFoundLink(url: String) {
+                val clean = url.substringBefore("?")
+                if (!clean.endsWith(".m3u8")) return
+                synchronized(foundM3u8) {
+                    if (!foundM3u8.contains(url)) {
+                        foundM3u8.add(url)
+                        finishRunnable?.let { handler.removeCallbacks(it) }
+                        if (clean.contains("master") || clean.contains("playlist") || clean.contains("index")) {
+                            finishRunnable = Runnable { chooseAndFinish() }
+                            handler.postDelayed(finishRunnable!!, 500)
+                        } else {
+                            if (finishRunnable == null) {
+                                finishRunnable = Runnable { chooseAndFinish() }
+                                handler.postDelayed(finishRunnable!!, 2000)
+                            }
+                        }
+                    }
+                }
+            }
+
+            fun startNextAttempt() {
+                synchronized(finishLock) { if (finished) return }
+                if (currentAttempt >= maxAttempts) {
+                    chooseAndFinish()
+                    return
+                }
+
+                attemptTimeoutRunnable?.let { handler.removeCallbacks(it) }
+                attemptTimeoutRunnable = Runnable {
+                    synchronized(foundM3u8) {
+                        if (foundM3u8.isEmpty()) {
+                            currentAttempt++
+                            startNextAttempt()
+                        } else {
+                            chooseAndFinish()
+                        }
+                    }
+                }
+                handler.postDelayed(attemptTimeoutRunnable!!, attemptTimeoutMs)
+
+                activity.runOnUiThread {
+                    try { webView.loadUrl(finalUrl, mapOf("Referer" to referer)) } catch (_: Exception) {}
+                }
+            }
+
+            val strategyJs = """
+                (function() {
+                    Object.defineProperty(navigator, 'userActivation', { get: () => ({ hasBeenActive: true, isActive: true }) });
+                    try {
+                        let p = typeof window.jwplayer === 'function' ? window.jwplayer("player") : null;
+                        if (p && typeof p.play === 'function') { p.setMute(true); p.play(); }
+                        var els = document.querySelectorAll('button, a, [onclick], video, .hd_btn');
+                        els.forEach(el => { try { el.click(); } catch(e){} });
+                    } catch(e) {}
+                })();
+            """.trimIndent()
+
+            val fastSnifferJs = """
+                (function() {
+                    try {
+                        if (!window.__NET_HOOKED__) {
+                            window.__NET_HOOKED__ = true;
+                            const _fetch = window.fetch;
+                            if (_fetch) {
+                                window.fetch = function() {
+                                    return _fetch.apply(this, arguments).then(function(resp) {
+                                        try {
+                                            const u = resp && resp.url ? resp.url : '';
+                                            if (u && u.indexOf('.m3u8') !== -1) { console.log('NET_M3U8::' + u); }
+                                        } catch(e){}
+                                        return resp;
+                                    });
+                                };
+                            }
+                            const _open = XMLHttpRequest.prototype.open;
+                            XMLHttpRequest.prototype.open = function(method, u) {
+                                this.addEventListener('load', function() {
+                                    try {
+                                        if (typeof u === 'string' && u.indexOf('.m3u8') !== -1) { console.log('NET_M3U8::' + u); }
+                                    } catch(e){}
+                                });
+                                return _open.apply(this, arguments);
+                            };
+                        }
+                    } catch(err){}
+                })();
+            """.trimIndent()
+
+            lateinit var sharedWebViewClient: WebViewClient
+            sharedWebViewClient = object : WebViewClient() {
+                override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                    super.onPageStarted(view, url, favicon)
+                    view?.evaluateJavascript(fastSnifferJs, null)
+                }
+
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    view?.evaluateJavascript(fastSnifferJs, null)
+
+                    autoTouchRunnable?.let { handler.removeCallbacks(it) }
+                    autoTouchRunnable = object : Runnable {
+                        override fun run() {
+                            if (finished) return
+                            view?.evaluateJavascript(strategyJs, null)
+                            handler.postDelayed(this, 1000)
+                        }
+                    }
+                    handler.postDelayed(autoTouchRunnable!!, 500)
+                }
+
+                override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                    val url = request.url.toString()
+                    val lower = url.lowercase()
+
+                    if (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".css")) {
+                        return super.shouldInterceptRequest(view, request)
+                    }
+
+                    if (request.method.equals("GET", ignoreCase = true) && lower.contains(".m3u8")) {
+                        handleFoundLink(url)
+                        try {
+                            val reqBuilder = Request.Builder().url(url)
+                                .header("User-Agent", lastValidUserAgent)
+                                .header("Referer", referer)
+                            try { cookieManager.getCookie(url)?.let { ck -> reqBuilder.header("Cookie", ck) } } catch (_: Exception) {}
+
+                            val response = client.newCall(reqBuilder.build()).execute()
+                            if (response.isSuccessful) {
+                                val contentType = response.header("content-type")?.split(";")?.first() ?: "application/vnd.apple.mpegurl"
+                                return WebResourceResponse(contentType, "utf-8", response.body?.byteStream())
+                            }
+                        } catch (e: Exception) { return null }
+                    }
+                    return super.shouldInterceptRequest(view, request)
+                }
+
+                @SuppressLint("WebViewClientOnReceivedSslError")
+                override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: android.net.http.SslError?) {
+                    handler?.proceed()
+                }
+            }
+
+            webView.webViewClient = sharedWebViewClient
+
+            webView.webChromeClient = object : WebChromeClient() {
+                override fun onConsoleMessage(cm: ConsoleMessage?): Boolean {
+                    val msg = cm?.message() ?: ""
+                    if (msg.startsWith("NET_M3U8::")) {
+                        handleFoundLink(msg.substringAfter("::").trim())
+                    }
+                    return true
+                }
+            }
+
+            startNextAttempt()
+            cont.invokeOnCancellation { handler.post { safeFinish(null) } }
+        }
+    }
+
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // قمنا باستخلاص رابط الصفحة الحالي بعد أي Redirect لأنه ضروري لتجاوز حماية الـ iframe
+        
+        // استخراج رابط الصفحة الصحيح لتمريره كـ Referer
         val response = app.get(data, headers = headers)
         val document = response.document
         val currentPageUrl = response.url 
-        
-        val iframeUrl = document.selectFirst("iframe[name=player_iframe]")?.attr("src") 
-            ?: document.selectFirst("iframe[name=player_iframe]")?.attr("data-src")
 
-        if (!iframeUrl.isNullOrBlank()) {
-            try {
-                val fixedIframeUrl = if (iframeUrl.startsWith("//")) "https:$iframeUrl" else iframeUrl
-                val playerOrigin = "https://${URI(fixedIframeUrl).host}"
-                
-                // استدعاء المشغل باستخدام رابط الحلقة/الفيلم كـ Referer بدلاً من رابط المشغل
-                val iframeHeaders = mapOf(
-                    "User-Agent" to headers["User-Agent"]!!,
-                    "Referer" to currentPageUrl,
-                    "Accept" to "*/*"
+        // استخراج روابط سيرفرات المشاهدة من الـ iframe والأزرار
+        val iframeUrls = extractIframeSources(document)
+
+        if (iframeUrls.isEmpty()) {
+            return false
+        }
+
+        var foundLink = false
+
+        // المرور على السيرفرات وإرسالها للمتصفح المخفي لاصطياد رابط الـ m3u8 الحقيقي
+        iframeUrls.distinct().forEach { iframeUrl ->
+            if (foundLink) return@forEach // التوقف بمجرد إيجاد أول رابط صحيح
+
+            // تشغيل المتصفح المخفي
+            val m3u8 = resolveWithWebView(iframeUrl, currentPageUrl)
+
+            if (!m3u8.isNullOrBlank()) {
+                foundLink = true
+                val playerOrigin = try { "https://${Uri.parse(iframeUrl).host}" } catch(e:Exception){ mainUrl }
+
+                callback.invoke(
+                    newExtractorLink(
+                        source = name,
+                        name = "$name - Auto",
+                        url = m3u8,
+                        type = ExtractorLinkType.M3U8
+                    ) {
+                        this.referer = iframeUrl 
+                        this.headers = mapOf(
+                            "Origin" to playerOrigin,
+                            "User-Agent" to lastValidUserAgent
+                        )
+                        this.quality = Qualities.Unknown.value
+                    }
                 )
-
-                // الهيدر المطلوب لروابط الفيديو M3U8 النهائية
-                val m3u8Headers = mapOf(
-                    "User-Agent" to headers["User-Agent"]!!,
-                    "Origin" to playerOrigin,
-                    "Referer" to "$playerOrigin/"
-                )
-
-                val playerPageContent = app.get(fixedIframeUrl, headers = iframeHeaders).text
-                val playerDoc = Jsoup.parse(playerPageContent)
-                
-                val buttons = playerDoc.select("button.hd_btn")
-
-                if (buttons.isNotEmpty()) {
-                    buttons.forEach { button ->
-                        val link = button.attr("data-url")
-                        val qualityName = button.text().trim()
-
-                        if (link.isNotBlank()) {
-                            if (qualityName.equals("auto", ignoreCase = true)) {
-                                M3u8Helper.generateM3u8(
-                                    source = "$name - Auto",
-                                    streamUrl = link,
-                                    referer = "$playerOrigin/",
-                                    headers = m3u8Headers
-                                ).forEach(callback)
-                            } else {
-                                val qualityNum = Regex("""\d+""").find(qualityName)?.value?.toIntOrNull() ?: Qualities.Unknown.value
-
-                                callback.invoke(
-                                    newExtractorLink(
-                                        source = name,
-                                        name = "$name - $qualityName",
-                                        url = link,
-                                        type = ExtractorLinkType.M3U8
-                                    ) {
-                                        this.referer = "$playerOrigin/"
-                                        this.headers = m3u8Headers
-                                        this.quality = qualityNum
-                                    }
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    // Fallback 1: البحث عن وسم الفيديو
-                    val videoSrc = playerDoc.selectFirst("video#video")?.attr("src")
-                    if (!videoSrc.isNullOrBlank()) {
-                        M3u8Helper.generateM3u8(
-                            source = name,
-                            streamUrl = videoSrc,
-                            referer = "$playerOrigin/",
-                            headers = m3u8Headers
-                        ).forEach(callback)
-                    } else {
-                        // Fallback 2: البحث العشوائي عبر Regex
-                        val regex = Regex("""(https?://[^"']+\.m3u8[^"']*)""")
-                        val foundLink = regex.find(playerPageContent)?.groupValues?.get(1)
-                        if (foundLink != null) {
-                            M3u8Helper.generateM3u8(
-                                source = name,
-                                streamUrl = foundLink,
-                                referer = "$playerOrigin/",
-                                headers = m3u8Headers
-                            ).forEach(callback)
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                // Ignore errors
-            }
-        } else {
-             // قسم سيرفرات المشاهدة البديلة، تم تطبيق نفس الإصلاحات عليه أيضاً
-             document.select("ul.tabs-ul li").forEachIndexed { index, serverElement ->
-                val serverUrl = serverElement.attr("onclick").substringAfter("href = '").substringBefore("'")
-                if (serverUrl.isBlank()) return@forEachIndexed
-
-                try {
-                    val fixedUrl = if (serverUrl.startsWith("//")) "https:$serverUrl" else serverUrl
-                    val playerOrigin = "https://${URI(fixedUrl).host}"
-                    
-                    val iframeHeaders = mapOf(
-                        "User-Agent" to headers["User-Agent"]!!,
-                        "Referer" to currentPageUrl, // استخدام رابط الصفحة الصحيح
-                        "Accept" to "*/*"
-                    )
-
-                    val m3u8Headers = mapOf(
-                        "User-Agent" to headers["User-Agent"]!!,
-                        "Origin" to playerOrigin,
-                        "Referer" to "$playerOrigin/"
-                    )
-
-                    val playerPageContent = app.get(fixedUrl, headers = iframeHeaders).text
-                    val playerDoc = Jsoup.parse(playerPageContent)
-                    val buttons = playerDoc.select("button.hd_btn")
-
-                    if (buttons.isNotEmpty()) {
-                        buttons.forEach { button ->
-                            val link = button.attr("data-url")
-                            val qualityName = button.text().trim()
-                            if (link.isNotBlank()) {
-                                if (qualityName.equals("auto", ignoreCase = true)) {
-                                    M3u8Helper.generateM3u8(
-                                        source = "$name Server ${index + 1} - Auto",
-                                        streamUrl = link,
-                                        referer = "$playerOrigin/",
-                                        headers = m3u8Headers
-                                    ).forEach(callback)
-                                } else {
-                                    val qualityNum = Regex("""\d+""").find(qualityName)?.value?.toIntOrNull() ?: Qualities.Unknown.value
-                                    
-                                    callback.invoke(
-                                        newExtractorLink(
-                                            source = "$name Server ${index + 1}",
-                                            name = "$name - $qualityName",
-                                            url = link,
-                                            type = ExtractorLinkType.M3U8
-                                        ) {
-                                            this.referer = "$playerOrigin/"
-                                            this.headers = m3u8Headers
-                                            this.quality = qualityNum
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    // Ignore errors
-                }
             }
         }
-        return true
+
+        return foundLink
     }
 }
