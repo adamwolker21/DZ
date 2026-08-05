@@ -3,6 +3,7 @@ package com.example
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.M3u8Helper
+import com.lagradost.cloudstream3.utils.Qualities
 import org.jsoup.nodes.Element
 import java.net.URI
 
@@ -184,7 +185,7 @@ class FaselHDSProvider : MainAPI() {
     ): Boolean {
         val document = app.get(data, headers = headers).document
         
-        // استخراج رابط الـ iframe بشكل مباشر للتكيف مع أي تغيير في النطاق (مثال: web850x إلى web856x)
+        // استخراج رابط الـ iframe بشكل مباشر للتكيف مع أي تغيير في النطاق 
         val iframeUrl = document.selectFirst("iframe[name=player_iframe]")?.attr("src") 
             ?: document.selectFirst("iframe[name=player_iframe]")?.attr("data-src")
 
@@ -200,20 +201,42 @@ class FaselHDSProvider : MainAPI() {
                     "Accept" to "*/*"
                 )
 
-                // جلب محتوى الـ iframe 
-                val playerPageContent = app.get(iframeUrl, headers = playerHeaders).text
+                // جلب محتوى الـ iframe كـ Document لتسهيل استخراج الأزرار
+                val playerDoc = app.get(iframeUrl, headers = playerHeaders).document
                 
-                // البحث عن الرابط داخل صفحة المشغل
-                val regex = Regex("""(https?://[^"']+\.m3u8[^"']*)""")
-                val foundLink = regex.find(playerPageContent)?.groupValues?.get(1)
+                // البحث عن الأزرار التي تحتوي على الجودات والروابط
+                val buttons = playerDoc.select("button.hd_btn")
 
-                if (foundLink != null) {
-                    M3u8Helper.generateM3u8(
-                        source = "$name Server",
-                        streamUrl = foundLink,
-                        referer = "$playerOrigin/",
-                        headers = playerHeaders
-                    ).forEach(callback)
+                buttons.forEach { button ->
+                    val link = button.attr("data-url")
+                    val qualityName = button.text().trim()
+
+                    if (link.isNotBlank()) {
+                        // إذا كان الزر يحمل اسم auto فهذا يعني أنه يحوي جميع الجودات داخله
+                        if (qualityName.equals("auto", ignoreCase = true)) {
+                            M3u8Helper.generateM3u8(
+                                source = "$name - Auto",
+                                streamUrl = link,
+                                referer = "$playerOrigin/",
+                                headers = playerHeaders
+                            ).forEach(callback)
+                        } else {
+                            // استخراج رقم الجودة من النص (مثال: 1080 من 1080p)
+                            val qualityNum = Regex("""\d+""").find(qualityName)?.value?.toIntOrNull() ?: Qualities.Unknown.value
+
+                            // إضافة الرابط مباشرة كجودة محددة
+                            callback.invoke(
+                                ExtractorLink(
+                                    source = name,
+                                    name = "$name - $qualityName",
+                                    url = link,
+                                    referer = "$playerOrigin/",
+                                    quality = qualityNum,
+                                    isM3u8 = true
+                                )
+                            )
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 // Ignore errors
@@ -235,18 +258,36 @@ class FaselHDSProvider : MainAPI() {
                         "Accept" to "*/*"
                     )
 
-                    val playerPageContent = app.get(fixedUrl, headers = playerHeaders).text
-                    
-                    val regex = Regex("""(https?://[^"']+\.m3u8[^"']*)""")
-                    val foundLink = regex.find(playerPageContent)?.groupValues?.get(1)
+                    val playerDoc = app.get(fixedUrl, headers = playerHeaders).document
+                    val buttons = playerDoc.select("button.hd_btn")
 
-                    if (foundLink != null) {
-                        M3u8Helper.generateM3u8(
-                            source = "$name Server ${index + 1}",
-                            streamUrl = foundLink,
-                            referer = "$playerOrigin/",
-                            headers = playerHeaders
-                        ).forEach(callback)
+                    if (buttons.isNotEmpty()) {
+                        buttons.forEach { button ->
+                            val link = button.attr("data-url")
+                            val qualityName = button.text().trim()
+                            if (link.isNotBlank()) {
+                                if (qualityName.equals("auto", ignoreCase = true)) {
+                                    M3u8Helper.generateM3u8(
+                                        source = "$name Server ${index + 1} - Auto",
+                                        streamUrl = link,
+                                        referer = "$playerOrigin/",
+                                        headers = playerHeaders
+                                    ).forEach(callback)
+                                } else {
+                                    val qualityNum = Regex("""\d+""").find(qualityName)?.value?.toIntOrNull() ?: Qualities.Unknown.value
+                                    callback.invoke(
+                                        ExtractorLink(
+                                            source = "$name Server ${index + 1}",
+                                            name = "$name - $qualityName",
+                                            url = link,
+                                            referer = "$playerOrigin/",
+                                            quality = qualityNum,
+                                            isM3u8 = true
+                                        )
+                                    )
+                                }
+                            }
+                        }
                     }
                 } catch (e: Exception) {
                     // Ignore errors
