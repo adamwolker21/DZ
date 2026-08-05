@@ -212,6 +212,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
             val episodeSelector = "div#epAll a, div.epAll a, div#episodes a, div.ep-item a, .epAll a"
 
             if (seasonElements.isNotEmpty()) {
+                // تم استبدال amap بـ forEach لحل مشكلة البناء (Build Error)
                 seasonElements.forEach { seasonElement ->
                     val onclickAttr = seasonElement.attr("onclick")
                     val seasonLinkRel = Regex("""['"]([^'"]+)['"]""").find(onclickAttr ?: "")?.groupValues?.get(1)
