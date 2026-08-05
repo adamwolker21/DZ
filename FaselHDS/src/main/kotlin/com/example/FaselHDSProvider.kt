@@ -53,8 +53,6 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         "/asian-movies" to "أفلام آسيوي",
         "/series" to "جميع المسلسلات",
         "/recent_series" to "أحدث المسلسلات",
-        "/episodes" to "احدث الحلقات",
-        "/asian-episodes" to "أحدث الحلقات الآسيوية",
         "/recent_asian" to "المضاف حديثا آسيوي",
         "/asian-series" to "جميع المسلسلات الآسيوية",
     )
