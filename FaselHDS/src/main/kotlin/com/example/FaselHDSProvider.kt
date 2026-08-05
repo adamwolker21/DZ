@@ -3,6 +3,7 @@ package com.example
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
+import java.net.URI
 
 class FaselHDSProvider : MainAPI() {
     override var mainUrl = "https://www.faselhds.life"
@@ -15,11 +16,20 @@ class FaselHDSProvider : MainAPI() {
         TvType.TvSeries
     )
 
-    private val headers = mapOf(
-        "User-Agent" to "Mozilla/5.0 (Linux; Android 13; SM-A536B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36",
-        "Referer" to "$mainUrl/",
-        "Origin" to mainUrl,
-    )
+    // دالة ديناميكية لإنشاء الهيدرز بناءً على النطاق الفعلي بعد التوجيه
+    private fun getDynHeaders(currentUrl: String): Map<String, String> {
+        val domain = try {
+            val uri = URI(currentUrl)
+            "https://${uri.host}"
+        } catch (e: Exception) {
+            mainUrl
+        }
+        return mapOf(
+            "User-Agent" to "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
+            "Referer" to "$domain/",
+            "Origin" to domain
+        )
+    }
 
     override val mainPage = mainPageOf(
         "/movies" to "أفلام أجنبي",
@@ -37,7 +47,7 @@ class FaselHDSProvider : MainAPI() {
         request: MainPageRequest
     ): HomePageResponse {
         val url = "$mainUrl${request.data}" + (if (page > 1) "/page/$page" else "")
-        val document = app.get(url, headers = headers).document
+        val document = app.get(url, headers = getDynHeaders(url)).document
         
         val selector = if (document.selectFirst("div.post-listing") != null) {
             "div.post-listing div.postDiv"
@@ -54,14 +64,13 @@ class FaselHDSProvider : MainAPI() {
     private fun Element.toSearchResult(): SearchResponse? {
         val anchor = this.selectFirst("a") ?: return null
         val href = anchor.attr("href").ifBlank { return null }
-        val title = anchor.selectFirst("div.h1")?.text() ?: "No Title"
+        val title = anchor.selectFirst("div.h1")?.text()?.trim() ?: "No Title"
         
         val posterElement = this.selectFirst("div.imgdiv-class img, a > img.img-fluid")
-        val posterUrl = posterElement?.attr("data-src") 
-            ?: posterElement?.attr("src")
+        val posterUrl = posterElement?.attr("data-src") ?: posterElement?.attr("src")
         
-        val isSeries = title.contains("مسلسل") || title.contains("برنامج") ||
-                       this.selectFirst("span.quality:contains(حلقة), span.quality:contains(مواسم)") != null
+        // التحقق الدقيق من نوع المحتوى
+        val isSeries = href.contains("/series/") || href.contains("/asian-series/") || title.contains("مسلسل")
         
         return if (isSeries) {
             newTvSeriesSearchResponse(title, href, TvType.TvSeries) { this.posterUrl = posterUrl }
@@ -71,106 +80,90 @@ class FaselHDSProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val document = app.get("$mainUrl/?s=$query", headers = headers).document
+        val url = "$mainUrl/?s=$query"
+        val document = app.get(url, headers = getDynHeaders(url)).document
         return document.select("div.postDiv").mapNotNull {
             it.toSearchResult()
         }
     }
-    
-    private fun Element.getMetaInfo(iconClass: String): String? {
-        return this.selectFirst("span:has(i.$iconClass)")?.ownText()?.substringAfter(":")?.trim()
-    }
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url, headers = headers).document
-        val title = document.selectFirst("div.h1.title")?.ownText()?.trim() ?: "No Title"
+        val dynHeaders = getDynHeaders(url)
+        val document = app.get(url, headers = dynHeaders).document
+        val title = document.selectFirst("div.h1.title, h1.title")?.ownText()?.trim() ?: "No Title"
         
-        var posterUrl = document.selectFirst("div.posterImg img")?.attr("src")
+        var posterUrl = document.selectFirst("div.posterImg img, img.poster")?.attr("src")
         if (posterUrl.isNullOrBlank()) {
             val seasonListPoster = document.selectFirst("div#seasonList img")
             posterUrl = seasonListPoster?.attr("data-src") ?: seasonListPoster?.attr("src")
         }
-        if (posterUrl.isNullOrBlank()) {
-            posterUrl = document.selectFirst("img.poster")?.attr("src")
-        }
 
-        var plot = document.selectFirst("div.singleDesc p")?.text()?.trim()
-            ?: document.selectFirst("div.singleDesc")?.text()?.trim()
+        val plot = document.selectFirst("div.singleDesc p, div.singleDesc")?.text()?.trim()
+        val tags = document.select("div.col-xl-6:contains(تصنيف) a, div.tags a").map { it.text() }
+        val year = document.select("span:contains(سنة الإنتاج) a, span:contains(موعد الصدور)").text().let { Regex("""\d{4}""").find(it)?.value?.toIntOrNull() }
 
-        val tags = document.select("div.col-xl-6:contains(تصنيف) a").map { it.text() }
-        
-        val isTvSeries = document.select("div#seasonList, div#epAll").isNotEmpty()
+        // تحديد إذا ما كانت الصفحة هي لمسلسل يحتوي على حلقات، أم أنها حلقة/فيلم مفرد
+        val isSingleEpisode = url.contains("/episodes/") || url.contains("episode")
+        val isTvSeries = (url.contains("/series/") || url.contains("/asian-series/") || document.select("div#seasonList, div#epAll, div.seasonDiv").isNotEmpty()) && !isSingleEpisode
 
         if (isTvSeries) {
-            val year = Regex("""\d{4}""").find(document.select("span:contains(موعد الصدور)").firstOrNull()?.text() ?: "")?.value?.toIntOrNull()
-            var status: ShowStatus? = null
-            val statusText = document.selectFirst("span:contains(حالة المسلسل)")?.text() ?: ""
-            if (statusText.contains("مستمر")) {
-                status = ShowStatus.Ongoing
-            } else if (statusText.contains("مكتمل")) {
-                status = ShowStatus.Completed
-            }
-            
-            val duration = document.getMetaInfo("fa-clock")?.filter { it.isDigit() }?.toIntOrNull()
-            
-            val country = document.getMetaInfo("fa-flag")
-            val episodeCount = document.getMetaInfo("fa-film")
-
-            val infoList = mutableListOf<String>()
-            episodeCount?.let { infoList.add("<b>الحلقات:</b> $it") }
-            country?.let { infoList.add("<b>دولة المسلسل:</b> $it") }
-            
-            if (infoList.isNotEmpty()) {
-                plot += "<br><br>${infoList.joinToString(" | ")}"
-            }
-
             val episodes = mutableListOf<Episode>()
             val seasonElements = document.select("div#seasonList div.seasonDiv")
-            val episodeSelector = "div#epAll a, div#episodes a, div.ep-item a"
+            val episodeSelector = "div#epAll a, div#episodes a, div.ep-item a, div.episodes-list a"
 
             if (seasonElements.isNotEmpty()) {
-                seasonElements.amap { seasonElement ->
-                    val seasonLink = seasonElement.attr("onclick")?.substringAfter("'")?.substringBefore("'")
-                        ?: seasonElement.selectFirst("a")?.attr("href") ?: return@amap
-                    val absoluteSeasonLink = if (seasonLink.startsWith("http")) seasonLink else "$mainUrl$seasonLink"
-                    val seasonNum = Regex("""\d+""").find(seasonElement.selectFirst("div.title")?.text() ?: "")?.value?.toIntOrNull()
-                    val seasonDoc = app.get(absoluteSeasonLink, headers = headers).document
-                    
-                    seasonDoc.select(episodeSelector).forEach { ep ->
-                        episodes.add(
-                            newEpisode(ep.attr("href")) {
-                                name = ep.text().trim()
-                                season = seasonNum
-                                episode = Regex("""\d+""").find(name ?: "")?.value?.toIntOrNull()
+                seasonElements.forEach { seasonElement ->
+                    // استخراج الرابط من الخصائص المتعددة المحتملة بذكاء
+                    val onClick = seasonElement.attr("onclick")
+                    val seasonUrl = Regex("""['"](https?://[^'"]+|/[^'"]+)['"]""").find(onClick)?.groupValues?.get(1) 
+                        ?: seasonElement.selectFirst("a")?.attr("href")
+                        
+                    if (!seasonUrl.isNullOrBlank()) {
+                        val absSeasonUrl = if (seasonUrl.startsWith("http")) seasonUrl else "${dynHeaders["Origin"]}$seasonUrl"
+                        val seasonNum = Regex("""\d+""").find(seasonElement.text())?.value?.toIntOrNull() ?: 1
+                        
+                        try {
+                            val seasonDoc = app.get(absSeasonUrl, headers = getDynHeaders(absSeasonUrl)).document
+                            seasonDoc.select(episodeSelector).forEach { ep ->
+                                val epName = ep.text().trim()
+                                episodes.add(newEpisode(ep.attr("href")) {
+                                    this.name = epName
+                                    this.season = seasonNum
+                                    this.episode = Regex("""\d+""").find(epName)?.value?.toIntOrNull()
+                                })
                             }
-                        )
+                        } catch (e: Exception) {
+                            // تخطي خطأ الموسم لإكمال المواسم الأخرى
+                        }
                     }
                 }
-            } else {
+            }
+            
+            // في حال لم تكن مقسمة لمواسم بل قائمة حلقات مباشرة
+            if (episodes.isEmpty()) {
                 document.select(episodeSelector).forEach { ep ->
-                    episodes.add(
-                        newEpisode(ep.attr("href")) {
-                            name = ep.text().trim()
-                            season = 1
-                            episode = Regex("""\d+""").find(name ?: "")?.value?.toIntOrNull()
-                        }
-                    )
+                    val epName = ep.text().trim()
+                    episodes.add(newEpisode(ep.attr("href")) {
+                        this.name = epName
+                        this.season = 1
+                        this.episode = Regex("""\d+""").find(epName)?.value?.toIntOrNull()
+                    })
                 }
             }
-            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
-                this.posterUrl = posterUrl
-                this.plot = plot
-                this.year = year
-                this.tags = tags
-                this.showStatus = status
-                this.duration = duration
+
+            // إذا فشل في العثور على أي حلقة، نعيده كفيلم لكي لا تتوقف الواجهة
+            if (episodes.isEmpty()) {
+                return newMovieLoadResponse(title, url, TvType.Movie, url) {
+                    this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
+                }
             }
-        } else { // It's a Movie
-            val year = document.selectFirst("span:contains(سنة الإنتاج) a")?.text()?.toIntOrNull()
-            val duration = document.getMetaInfo("fa-clock")?.filter { it.isDigit() }?.toIntOrNull()
-            
+
+            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes.distinctBy { it.data }.sortedBy { it.episode }) {
+                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
+            }
+        } else {
             return newMovieLoadResponse(title, url, TvType.Movie, url) {
-                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags; this.duration = duration
+                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
             }
         }
     }
@@ -181,76 +174,77 @@ class FaselHDSProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val document = app.get(data, headers = headers).document
+        val dynHeaders = getDynHeaders(data)
+        val document = app.get(data, headers = dynHeaders).document
         
-        document.select("ul.tabs-ul li").forEachIndexed { index, serverElement ->
-            val onClickAttr = serverElement.attr("onclick") ?: return@forEachIndexed
-            val serverUrl = onClickAttr.substringAfter("href = '", "").substringBefore("'", "")
+        document.select("ul.tabs-ul li, div.servers-list li").forEachIndexed { index, serverElement ->
+            val serverUrl = Regex("""['"](https?://[^'"]+)['"]""").find(serverElement.attr("onclick"))?.groupValues?.get(1)
+                ?: serverElement.attr("data-url")
             
             if (serverUrl.isBlank()) return@forEachIndexed
 
             try {
-                // إصلاح الرابط في حال كان يبدأ بـ // بدلاً من https://
                 val fixedUrl = if (serverUrl.startsWith("//")) "https:$serverUrl" else serverUrl
+                val playerHeaders = getDynHeaders(fixedUrl) // استخراج دومين المشغل
                 
-                // جلب صفحة المشغل مع تمرير الرابط الأصلي كـ Referer
-                val playerDoc = app.get(fixedUrl, headers = mapOf("Referer" to data, "User-Agent" to headers["User-Agent"]!!)).document
+                val playerDoc = app.get(fixedUrl, headers = mapOf("Referer" to data, "User-Agent" to playerHeaders["User-Agent"]!!)).document
                 val playerHtml = playerDoc.html()
                 
                 var foundLink: String? = null
                 
-                // 1. المحاولة الأولى: البحث عن الرابط داخل علامات <source> أو <video>
-                val sourceSrc = playerDoc.selectFirst("source")?.attr("src") ?: playerDoc.selectFirst("video")?.attr("src")
-                if (!sourceSrc.isNullOrBlank()) {
-                    foundLink = sourceSrc
-                }
-                
-                // 2. المحاولة الثانية: استخدام تعبيرات منتظمة متقدمة للبحث عن متغيرات الجافاسكريبت داخل صفحة المشغل
-                if (foundLink.isNullOrBlank()) {
-                    val linkRegexes = listOf(
-                        Regex("""file\s*:\s*["'](https?://[^"']+m3u8[^"']*)["']"""),
-                        Regex("""file\s*:\s*["'](https?://[^"']+mp4[^"']*)["']"""),
-                        Regex("""var\s+videoSrc\s*=\s*["']([^"']+)["']"""),
-                        Regex("""source\s*:\s*["']([^"']+)["']"""),
-                        Regex("""(https?://[^"']+\.m3u8[^"']*)""")
-                    )
+                // البحث العنيف عن الروابط
+                val regexes = listOf(
+                    Regex("""(https?://[^"']+\.m3u8[^"']*)"""),
+                    Regex("""(https?://[^"']+\.mp4[^"']*)"""),
+                    Regex("""file\s*:\s*["']([^"']+)["']"""),
+                    Regex("""source\s*:\s*["']([^"']+)["']""")
+                )
 
-                    for (regex in linkRegexes) {
-                        val match = regex.find(playerHtml)
-                        if (match != null) {
-                            foundLink = match.groupValues[1]
-                            break
-                        }
+                for (regex in regexes) {
+                    val match = regex.find(playerHtml)
+                    if (match != null) {
+                        foundLink = match.groupValues[1]
+                        break
                     }
                 }
 
-                // 3. إذا تم العثور على الرابط، نقوم بإرجاعه بناءً على نوعه
                 if (!foundLink.isNullOrBlank()) {
                     val isM3u8Url = foundLink.contains(".m3u8", ignoreCase = true)
                     
                     if (isM3u8Url) {
+                        // استخدام الهيدرز المطابقة تماماً لـ curl
                         M3u8Helper.generateM3u8(
                             source = "$name - Server ${index + 1}",
                             streamUrl = foundLink,
-                            referer = fixedUrl,
-                            headers = mapOf("Referer" to fixedUrl, "Origin" to fixedUrl.substringBefore("/video_player"))
+                            referer = playerHeaders["Origin"]!! + "/",
+                            headers = mapOf(
+                                "Origin" to playerHeaders["Origin"]!!,
+                                "Referer" to playerHeaders["Origin"]!! + "/",
+                                "Accept" to "*/*",
+                                "User-Agent" to playerHeaders["User-Agent"]!!
+                            )
                         ).forEach(callback)
                     } else {
-                        // حذفنا المتغير isM3u8 لأنه لم يعد مطلوباً وهو مقروء فقط (Read-only)
                         callback.invoke(
                             newExtractorLink(
                                 source = "$name - Server ${index + 1}",
                                 name = "$name - Server ${index + 1}",
                                 url = foundLink
                             ) {
-                                this.referer = fixedUrl
+                                this.referer = playerHeaders["Origin"]!! + "/"
                                 this.quality = Qualities.Unknown.value
+                                this.headers = mapOf(
+                                    "Origin" to playerHeaders["Origin"]!!,
+                                    "Referer" to playerHeaders["Origin"]!! + "/",
+                                    "Accept" to "*/*",
+                                    "User-Agent" to playerHeaders["User-Agent"]!!
+                                )
                             }
                         )
                     }
                 }
             } catch (e: Exception) {
-                // تخطي الأخطاء الخاصة بسيرفر معين لكي لا تتوقف باقي السيرفرات
+                // تخطي خطأ السيرفر
             }
         }
         return true
