@@ -169,51 +169,41 @@ class AsiatvoneProvider : MainAPI() {
         var linksLoaded = false
 
         try {
-            // 1. جلب epwatch
             val episodePage = app.get(data, headers = commonHeaders).document
-            val epwatch = episodePage.selectFirst("input[name=epwatch]")?.attr("value") ?: return false
+            val epwatch = episodePage.selectFirst("input[name=epwatch]")?.attr("value")
+            
+            if (epwatch.isNullOrBlank()) {
+                return false
+            }
 
-            // 2. زيارة الموقع الوسيط لتفعيل الجلسة (الكوكيز تُحفظ تلقائياً)
-            val watchUrl = "https://asiawiki.me/"
+            // 1. إرسال الطلب الأولي للموقع الوسيط
             val watchResponse = app.post(
-                watchUrl,
+                "https://asiawiki.me/",
                 data = mapOf("epwatch" to epwatch),
                 headers = mapOf(
                     "Origin" to mainUrl,
                     "Referer" to data,
                     "User-Agent" to USER_AGENT
-                )
+                ),
+                allowRedirects = true
             )
+            
+            // الطريقة الآمنة 100% لجلب الرابط الفعلي بعد التحويل (يمنع الانهيار)
+            val watchUrl = watchResponse.okhttpResponse.request.url.toString()
 
-            // 3. طلب AJAX (نبدأ بـ POST كما ظهر في أدوات المطور الخاصة بك)
-            val ajaxUrl = "https://asiawiki.me/wp-admin/admin-ajax.php"
-            var ajaxResponseText = app.post(
+            // 2. طلب الـ AJAX باستخدام GET السري مع تمرير الرابط الفعلي كمرجع
+            val ajaxUrl = "https://asiawiki.me/wp-admin/admin-ajax.php?action=fetch_episode&id=$epwatch"
+            val ajaxResponseText = app.get(
                 ajaxUrl,
                 headers = mapOf(
                     "X-Requested-With" to "XMLHttpRequest",
-                    "Content-Type" to "application/x-www-form-urlencoded; charset=UTF-8",
-                    "Origin" to "https://asiawiki.me",
-                    "Referer" to watchResponse.url,
-                    "User-Agent" to USER_AGENT,
-                    "Accept" to "*/*"
-                ),
-                data = mapOf("action" to "fetch_episode", "id" to epwatch)
+                    "Accept" to "*/*",
+                    "Referer" to watchUrl,
+                    "User-Agent" to USER_AGENT
+                )
             ).text
 
-            // إذا رد الموقع بفراغ أو صفر، نرسل الطلب كـ GET كخطة بديلة
-            if (ajaxResponseText.isBlank() || ajaxResponseText.trim() == "0") {
-                ajaxResponseText = app.get(
-                    "$ajaxUrl?action=fetch_episode&id=$epwatch",
-                    headers = mapOf(
-                        "X-Requested-With" to "XMLHttpRequest",
-                        "Referer" to watchResponse.url,
-                        "User-Agent" to USER_AGENT,
-                        "Accept" to "*/*"
-                    )
-                ).text
-            }
-
-            // 4. فك تشفير الرد بالكامل
+            // 3. التنظيف العنيف لفك أي تشفير سواء كان JSON أو Unicode أو HTML Entities
             val cleanHtml = ajaxResponseText
                 .replace("\\\"", "\"")
                 .replace("\\/", "/")
@@ -228,14 +218,14 @@ class AsiatvoneProvider : MainAPI() {
                 .replace("&#038;", "&")
                 .replace("&amp;", "&")
 
-            // 5. استخراج الروابط من أي src موجود
+            // 4. استخراج كافة روابط الفيديو
             val srcRegex = """src=["'](.*?)["']""".toRegex(RegexOption.IGNORE_CASE)
             val extractedUrls = srcRegex.findAll(cleanHtml).map { it.groupValues[1] }.distinct().toList()
 
-            // 6. استخدام حلقة for آمنة جداً (لن تسبب أي Crash نهائياً)
+            // 5. استخدام حلقة for كلاسيكية بدلاً من amap (مضادة للانهيار 100%)
             for (rawUrl in extractedUrls) {
                 try {
-                    // تجاهل الملفات غير المرغوبة
+                    // استبعاد الصور أو الملفات غير المرغوبة
                     if (rawUrl.endsWith(".jpg") || rawUrl.endsWith(".png") || rawUrl.contains("google.com")) continue
                     
                     var embedUrl = if (rawUrl.startsWith("//")) "https:$rawUrl" else rawUrl
@@ -250,18 +240,17 @@ class AsiatvoneProvider : MainAPI() {
                         embedUrl.contains("luluvdo.com") -> embedUrl = embedUrl.replace("luluvdo.com", "lulustream.com")
                     }
                     
-                    // استدعاء الأداة لاستخراج الفيديو النهائي
-                    val success = loadExtractor(embedUrl, watchResponse.url, subtitleCallback, callback)
-                    if (success) {
+                    // تشغيل أداة الاستخراج
+                    if (loadExtractor(embedUrl, watchUrl, subtitleCallback, callback)) {
                         linksLoaded = true
                     }
                 } catch (e: Exception) {
-                    Log.e("AsiaTVLogs", "Extractor Error: ${e.message}")
+                    Log.e("AsiaTV", "Error processing URL ($rawUrl): ${e.message}")
                 }
             }
 
         } catch (e: Exception) {
-            Log.e("AsiaTVLogs", "Critical Error in loadLinks: ${e.message}")
+            Log.e("AsiaTV", "Crash Prevented in loadLinks: ${e.message}")
         }
 
         return linksLoaded
