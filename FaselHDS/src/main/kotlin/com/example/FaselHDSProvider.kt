@@ -27,9 +27,10 @@ import com.lagradost.cloudstream3.utils.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.CookieJar
-import okhttp3.Request
+import okhttp3.Request as OkHttpRequest
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import java.net.URI
 import kotlin.coroutines.resume
 
 class FaselHDSProvider(private val context: Context) : MainAPI() {
@@ -104,9 +105,15 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        // تم إلغاء التشفير اليدوي لتجنب خطأ Double Encoding، التطبيق يتكفل بها.
-        val url = "$mainUrl/?s=$query"
-        val document = app.get(url, headers = headers).document
+        // التقاط الدومين النشط أولاً لضمان عدم ضياع كلمة البحث أثناء التحويل (Redirect)
+        val initialResponse = app.get(mainUrl)
+        val uri = URI(initialResponse.url)
+        val currentDomain = "${uri.scheme}://${uri.host}"
+        
+        val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
+        val searchUrl = "$currentDomain/?s=$encodedQuery"
+        
+        val document = app.get(searchUrl, headers = headers).document
         
         val selector = if (document.selectFirst("div.post-listing") != null) {
             "div.post-listing div.postDiv"
@@ -131,7 +138,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
             ?: document.selectFirst("title")?.text()?.substringBefore("-")?.trim() 
             ?: "No Title"
         
-        // تم تضمين الأماكن الاحتياطية الجديدة للبوستر لتغطية جميع الاحتمالات
+        // تم إضافة مسارات البوستر الاحتياطية (div.seasonDiv img) وتغطية كل الحالات
         val posterElement = document.selectFirst("div.posterImg img, img.poster, .imgdiv-class img, meta[itemprop=image], .singlePage img, div.seasonDiv img, div#seasonList img")
         val posterUrl = fixUrlNull(posterElement?.let {
             it.attr("data-src").ifBlank { it.attr("src") }.ifBlank { it.attr("content") }
@@ -514,7 +521,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
                     if (request.method.equals("GET", ignoreCase = true) && lower.contains(".m3u8")) {
                         handleFoundLink(url)
                         try {
-                            val reqBuilder = Request.Builder().url(url)
+                            val reqBuilder = OkHttpRequest.Builder().url(url)
                                 .header("User-Agent", lastValidUserAgent)
                                 .header("Referer", referer)
                             try { cookieManager.getCookie(url)?.let { ck -> reqBuilder.header("Cookie", ck) } } catch (_: Exception) {}
@@ -579,7 +586,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
 
             if (!m3u8.isNullOrBlank()) {
                 foundLink = true
-                val playerOrigin = try { "https://${java.net.URI(finalIframeUrl).host}" } catch(e:Exception){ mainUrl }
+                val playerOrigin = try { "https://${URI(finalIframeUrl).host}" } catch(e:Exception){ mainUrl }
 
                 M3u8Helper.generateM3u8(
                     source = name,
