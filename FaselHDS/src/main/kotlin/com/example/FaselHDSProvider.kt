@@ -191,7 +191,6 @@ class FaselHDSProvider : MainAPI() {
 
         if (!iframeUrl.isNullOrBlank()) {
             try {
-                // استخراج النطاق الديناميكي لاستخدامه في الـ Headers
                 val playerOrigin = "https://${URI(iframeUrl).host}"
                 
                 val playerHeaders = mapOf(
@@ -201,10 +200,7 @@ class FaselHDSProvider : MainAPI() {
                     "Accept" to "*/*"
                 )
 
-                // جلب محتوى الـ iframe كـ Document لتسهيل استخراج الأزرار
                 val playerDoc = app.get(iframeUrl, headers = playerHeaders).document
-                
-                // البحث عن الأزرار التي تحتوي على الجودات والروابط
                 val buttons = playerDoc.select("button.hd_btn")
 
                 buttons.forEach { button ->
@@ -212,7 +208,6 @@ class FaselHDSProvider : MainAPI() {
                     val qualityName = button.text().trim()
 
                     if (link.isNotBlank()) {
-                        // إذا كان الزر يحمل اسم auto فهذا يعني أنه يحوي جميع الجودات داخله
                         if (qualityName.equals("auto", ignoreCase = true)) {
                             M3u8Helper.generateM3u8(
                                 source = "$name - Auto",
@@ -221,12 +216,11 @@ class FaselHDSProvider : MainAPI() {
                                 headers = playerHeaders
                             ).forEach(callback)
                         } else {
-                            // استخراج رقم الجودة من النص (مثال: 1080 من 1080p)
                             val qualityNum = Regex("""\d+""").find(qualityName)?.value?.toIntOrNull() ?: Qualities.Unknown.value
 
-                            // إضافة الرابط مباشرة كجودة محددة
+                            // تم استخدام newExtractorLink بدلاً من ExtractorLink لحل مشكلة التحديثات في التطبيق
                             callback.invoke(
-                                ExtractorLink(
+                                newExtractorLink(
                                     source = name,
                                     name = "$name - $qualityName",
                                     url = link,
@@ -242,7 +236,6 @@ class FaselHDSProvider : MainAPI() {
                 // Ignore errors
             }
         } else {
-             // في حال لم يتم العثور على iframe، نحاول الاعتماد على قائمة السيرفرات كخيار بديل
              document.select("ul.tabs-ul li").forEachIndexed { index, serverElement ->
                 val serverUrl = serverElement.attr("onclick").substringAfter("href = '").substringBefore("'")
                 if (serverUrl.isBlank()) return@forEachIndexed
@@ -275,8 +268,10 @@ class FaselHDSProvider : MainAPI() {
                                     ).forEach(callback)
                                 } else {
                                     val qualityNum = Regex("""\d+""").find(qualityName)?.value?.toIntOrNull() ?: Qualities.Unknown.value
+                                    
+                                    // تم استخدام newExtractorLink هنا أيضاً
                                     callback.invoke(
-                                        ExtractorLink(
+                                        newExtractorLink(
                                             source = "$name Server ${index + 1}",
                                             name = "$name - $qualityName",
                                             url = link,
