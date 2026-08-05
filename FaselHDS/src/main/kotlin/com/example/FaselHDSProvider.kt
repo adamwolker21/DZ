@@ -29,6 +29,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.newExtractorLink
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.CookieJar
 import okhttp3.Request
@@ -108,8 +109,9 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
             it.toSearchResult(base)
         }
 
-        // التحقق من وجود صفحة تالية (Pagination)
-        val hasNext = document.select("a.page-link[href*='/page/${page + 1}'], ul.pagination a[href*='/page/${page + 1}']").isNotEmpty()
+        // تحسين شامل لاكتشاف الصفحات الإضافية (Pagination)
+        val hasNext = document.select("a[href*='/page/${page + 1}']").isNotEmpty() || 
+                      document.select("ul.pagination a, .pagination a, .page-link").any { it.text().contains("التالي") || it.text().contains("Next") }
 
         return newHomePageResponse(request.name, home, hasNext)
     }
@@ -118,10 +120,12 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         val anchor = this.selectFirst("a") ?: return null
         val href = anchor.attr("href").ifBlank { return null }
         val finalHref = if (href.startsWith("http")) href else "$baseUrl$href"
-        val title = anchor.selectFirst("div.h1")?.text() ?: "No Title"
         
-        val posterElement = this.selectFirst("div.imgdiv-class img, a > img.img-fluid")
-        val posterUrl = posterElement?.attr("data-src") ?: posterElement?.attr("src")
+        // دعم شامل لكل فئات العناوين الممكنة
+        val title = anchor.selectFirst("div.h1, .h1, h1, .post-title, h4, h5")?.text()?.trim() ?: "No Title"
+        
+        val posterElement = this.selectFirst("div.imgdiv-class img, a > img.img-fluid, img.poster")
+        val posterUrl = posterElement?.attr("data-src")?.ifBlank { posterElement.attr("src") }
         val finalPoster = if (posterUrl?.startsWith("http") == false) "$baseUrl$posterUrl" else posterUrl
         
         val isSeries = title.contains("مسلسل") || title.contains("برنامج") ||
@@ -134,12 +138,10 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         }
     }
 
-    // استبدال دالة البحث السابقة بدوال تدعم التشفير (Encoding) وتعدد الصفحات (Pagination)
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query, 1).items
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
         val base = getBaseUrl()
-        // تشفير النص ليدعم اللغة العربية والمسافات
         val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
         
         val url = if (page == 1) {
@@ -154,8 +156,8 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
             it.toSearchResult(base)
         }
         
-        // التحقق من وجود صفحة نتائج تالية
-        val hasNext = document.select("a.page-link[href*='/page/${page + 1}'], ul.pagination a[href*='/page/${page + 1}']").isNotEmpty()
+        val hasNext = document.select("a[href*='/page/${page + 1}']").isNotEmpty() || 
+                      document.select("ul.pagination a, .pagination a, .page-link").any { it.text().contains("التالي") || it.text().contains("Next") }
         
         return newSearchResponseList(items, hasNext)
     }
@@ -167,26 +169,26 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val base = getBaseUrl()
         val document = app.get(url, headers = getDynamicHeaders()).document
-        val title = document.selectFirst("div.h1.title")?.ownText()?.trim() ?: "No Title"
         
-        var posterUrl = document.selectFirst("div.posterImg img")?.attr("src")
-        if (posterUrl.isNullOrBlank()) {
-            val seasonListPoster = document.selectFirst("div#seasonList img")
-            posterUrl = seasonListPoster?.attr("data-src") ?: seasonListPoster?.attr("src")
-        }
-        if (posterUrl.isNullOrBlank()) {
-            posterUrl = document.selectFirst("img.poster")?.attr("src")
+        // دعم شامل لكل فئات العناوين الممكنة داخل صفحة الفيلم/المسلسل
+        val titleElement = document.selectFirst("div.h1.title, h1.title, div.title h1, .singleInfo .title, h1, .post-title")
+        val title = titleElement?.text()?.trim() 
+            ?: document.selectFirst("title")?.text()?.substringBefore("-")?.trim() 
+            ?: "No Title"
+        
+        // استخراج الصورة مع ضمان جميع التنسيقات
+        val posterUrl = document.selectFirst("div.posterImg img, img.poster, .imgdiv-class img, meta[itemprop=image], .singlePage img")?.let {
+            it.attr("data-src").ifBlank { it.attr("src") }.ifBlank { it.attr("content") }
         }
 
-        var plot = document.selectFirst("div.singleDesc p")?.text()?.trim()
-            ?: document.selectFirst("div.singleDesc")?.text()?.trim()
+        val plot = document.selectFirst("div.singleDesc p, div.singleDesc, .story p, .story")?.text()?.trim()
 
-        val tags = document.select("div.col-xl-6:contains(تصنيف) a").map { it.text() }
+        val tags = document.select("div.col-xl-6:contains(تصنيف) a, .genres a").map { it.text().trim() }
         
-        val isTvSeries = document.select("div#seasonList, div#epAll, div.epAll, div#episodes").isNotEmpty()
+        val isTvSeries = document.select("div#seasonList, div.seasonDiv, div#epAll, div.epAll, div#episodes").isNotEmpty()
 
         if (isTvSeries) {
-            val year = Regex("""\d{4}""").find(document.select("span:contains(موعد الصدور)").firstOrNull()?.text() ?: "")?.value?.toIntOrNull()
+            val year = document.selectFirst("span:contains(موعد الصدور), span:contains(سنة الإنتاج)")?.text()?.let { Regex("""\d{4}""").find(it)?.value?.toIntOrNull() }
             var status: ShowStatus? = null
             val statusText = document.selectFirst("span:contains(حالة المسلسل)")?.text() ?: ""
             if (statusText.contains("مستمر")) status = ShowStatus.Ongoing
@@ -196,45 +198,61 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
             val country = document.getMetaInfo("fa-flag")
             val episodeCount = document.getMetaInfo("fa-film")
 
+            var finalPlot = plot ?: ""
             val infoList = mutableListOf<String>()
             episodeCount?.let { infoList.add("<b>الحلقات:</b> $it") }
             country?.let { infoList.add("<b>دولة المسلسل:</b> $it") }
             
             if (infoList.isNotEmpty()) {
-                plot += "<br><br>${infoList.joinToString(" | ")}"
+                finalPlot += "<br><br>${infoList.joinToString(" | ")}"
             }
 
             val episodes = mutableListOf<Episode>()
-            val seasonElements = document.select("div#seasonList div.seasonDiv")
-            val episodeSelector = "div#epAll a, div.epAll a, div#episodes a, div.ep-item a"
+            val seasonElements = document.select("div#seasonList div.seasonDiv, .seasonDiv")
+            val episodeSelector = "div#epAll a, div.epAll a, div#episodes a, div.ep-item a, .epAll a"
 
             if (seasonElements.isNotEmpty()) {
-                seasonElements.amap { seasonElement ->
+                seasonElements.forEach { seasonElement ->
                     val onclickAttr = seasonElement.attr("onclick")
-                    val seasonLink = Regex("""['"]([^'"]+)['"]""").find(onclickAttr ?: "")?.groupValues?.get(1)
-                        ?: seasonElement.selectFirst("a")?.attr("href") ?: return@amap
+                    val seasonLinkRel = Regex("""['"]([^'"]+)['"]""").find(onclickAttr ?: "")?.groupValues?.get(1)
+                        ?: seasonElement.selectFirst("a")?.attr("href")
                     
-                    val absoluteSeasonLink = if (seasonLink.startsWith("http")) seasonLink else "$base$seasonLink"
-                    val seasonNum = Regex("""\d+""").find(seasonElement.selectFirst("div.title")?.text() ?: "")?.value?.toIntOrNull()
-                    
-                    val seasonDoc = app.get(absoluteSeasonLink, headers = getDynamicHeaders()).document
-                    
-                    seasonDoc.select(episodeSelector).forEach { ep ->
-                        val epText = ep.text().trim()
-                        val epHref = ep.attr("href")
-                        if (epHref.isNotBlank() && !epText.contains("باقي") && !epText.contains("المزيد")) {
-                            val finalEpHref = if (epHref.startsWith("http")) epHref else "$base$epHref"
-                            episodes.add(
-                                newEpisode(finalEpHref) {
-                                    name = epText.ifBlank { "حلقة ${episodes.size + 1}" }
-                                    season = seasonNum
-                                    episode = Regex("""\d+""").find(name ?: "")?.value?.toIntOrNull()
-                                }
-                            )
+                    if (!seasonLinkRel.isNullOrBlank()) {
+                        val absoluteSeasonLink = if (seasonLinkRel.startsWith("http")) seasonLinkRel else "$base$seasonLinkRel"
+                        val seasonNum = Regex("""\d+""").find(seasonElement.selectFirst("div.title, .title")?.text() ?: "")?.value?.toIntOrNull() ?: 1
+                        
+                        // إعادة استخدام المستند الحالي إذا كان الموسم هو نفس الصفحة الحالية (لتجنب الحظر)
+                        val seasonDoc = if (absoluteSeasonLink.substringBefore("?") == url.substringBefore("?")) {
+                            document
+                        } else {
+                            delay(300) // تأخير زمني بسيط لتجنب حظر الـ DDoS
+                            try {
+                                app.get(absoluteSeasonLink, headers = getDynamicHeaders()).document
+                            } catch (e: Exception) {
+                                null
+                            }
+                        }
+                        
+                        seasonDoc?.select(episodeSelector)?.forEach { ep ->
+                            val epText = ep.text().trim()
+                            val epHref = ep.attr("href")
+                            if (epHref.isNotBlank() && !epText.contains("باقي") && !epText.contains("المزيد")) {
+                                val finalEpHref = if (epHref.startsWith("http")) epHref else "$base$epHref"
+                                episodes.add(
+                                    newEpisode(finalEpHref) {
+                                        name = epText.ifBlank { "حلقة ${episodes.size + 1}" }
+                                        season = seasonNum
+                                        episode = Regex("""\d+""").find(name ?: "")?.value?.toIntOrNull()
+                                    }
+                                )
+                            }
                         }
                     }
                 }
-            } else {
+            } 
+            
+            // في حال لم يتم العثور على أي حلقات (إما لفشل التحليل أو عدم وجود مواسم)، نبحث في الصفحة الحالية
+            if (episodes.isEmpty()) {
                 document.select(episodeSelector).forEach { ep ->
                     val epText = ep.text().trim()
                     val epHref = ep.attr("href")
@@ -250,20 +268,36 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
                     }
                 }
             }
+
+            // حماية أخيرة: إذا تم تصنيفه كمسلسل ولكنه فارغ تماماً من الحلقات، نعرضه كفيلم لتجنب الشاشة السوداء
+            if (episodes.isEmpty()) {
+                return newMovieLoadResponse(title, url, TvType.Movie, url) {
+                    this.posterUrl = posterUrl
+                    this.plot = finalPlot
+                    this.year = year
+                    this.tags = tags
+                    this.duration = duration
+                }
+            }
+
             return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes.distinctBy { it.data }.sortedBy { it.episode }) {
                 this.posterUrl = posterUrl
-                this.plot = plot
+                this.plot = finalPlot
                 this.year = year
                 this.tags = tags
                 this.showStatus = status
                 this.duration = duration
             }
         } else {
-            val year = document.selectFirst("span:contains(سنة الإنتاج) a")?.text()?.toIntOrNull()
+            val year = document.selectFirst("span:contains(سنة الإنتاج) a, span:contains(موعد الصدور)")?.text()?.let { Regex("""\d{4}""").find(it)?.value?.toIntOrNull() }
             val duration = document.getMetaInfo("fa-clock")?.filter { it.isDigit() }?.toIntOrNull()
 
             return newMovieLoadResponse(title, url, TvType.Movie, url) {
-                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags; this.duration = duration
+                this.posterUrl = posterUrl
+                this.plot = plot
+                this.year = year
+                this.tags = tags
+                this.duration = duration
             }
         }
     }
