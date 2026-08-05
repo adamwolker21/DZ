@@ -24,11 +24,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.M3u8Helper
-import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.newExtractorLink
+import com.lagradost.cloudstream3.utils.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.CookieJar
@@ -136,7 +132,6 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         }
     }
 
-    // إرجاع دالة البحث للشكل القياسي المتوافق مع التطبيق مع الاحتفاظ بتشفير اللغة العربية
     override suspend fun search(query: String): List<SearchResponse> {
         val base = getBaseUrl()
         val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
@@ -614,21 +609,16 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
                 foundLink = true
                 val playerOrigin = try { "https://${Uri.parse(finalIframeUrl).host}" } catch(e:Exception){ base }
 
-                callback.invoke(
-                    newExtractorLink(
-                        source = name,
-                        name = "$name - Auto",
-                        url = m3u8,
-                        type = ExtractorLinkType.M3U8
-                    ) {
-                        this.referer = finalIframeUrl 
-                        this.headers = mapOf(
-                            "Origin" to playerOrigin,
-                            "User-Agent" to lastValidUserAgent
-                        )
-                        this.quality = Qualities.Unknown.value
-                    }
-                )
+                M3u8Helper.generateM3u8(
+                    source = name,
+                    streamUrl = m3u8,
+                    referer = finalIframeUrl,
+                    headers = mapOf(
+                        "Origin" to playerOrigin,
+                        "User-Agent" to lastValidUserAgent,
+                        "Referer" to finalIframeUrl
+                    )
+                ).forEach(callback)
             }
         }
 
