@@ -111,7 +111,6 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         val currentDomain = "${uri.scheme}://${uri.host}"
         
         val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
-        val results = mutableListOf<SearchResponse>()
 
         val url1 = "$currentDomain/?s=$encodedQuery"
         val doc1 = app.get(url1, headers = headers).document
@@ -122,25 +121,26 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
             "div.postDiv"
         }
 
-        // جلب نتائج الصفحة الأولى
-        results.addAll(doc1.select(selector).mapNotNull { it.toSearchResult() })
+        // تم استبدال addAll بالدمج المباشر (+) لتفادي خطأ المترجم (Compiler Error)
+        val page1 = doc1.select(selector).mapNotNull { it.toSearchResult() }
+        var page2 = listOf<SearchResponse>()
+        var page3 = listOf<SearchResponse>()
 
-        // جلب نتائج الصفحة الثانية والثالثة (لدمجهم وعرض المزيد من النتائج دفعة واحدة)
         try {
             if (doc1.select("a[href*='/page/2']").isNotEmpty()) {
                 val doc2 = app.get("$currentDomain/page/2?s=$encodedQuery", headers = headers).document
-                results.addAll(doc2.select(selector).mapNotNull { it.toSearchResult() })
+                page2 = doc2.select(selector).mapNotNull { it.toSearchResult() }
                 
                 if (doc2.select("a[href*='/page/3']").isNotEmpty()) {
                     val doc3 = app.get("$currentDomain/page/3?s=$encodedQuery", headers = headers).document
-                    results.addAll(doc3.select(selector).mapNotNull { it.toSearchResult() })
+                    page3 = doc3.select(selector).mapNotNull { it.toSearchResult() }
                 }
             }
         } catch (e: Exception) {
             // تجاهل الأخطاء لجلب ما تيسر من الصفحات
         }
 
-        return results.distinctBy { it.url }
+        return (page1 + page2 + page3).distinctBy { it.url }
     }
     
     private fun Element.getMetaInfo(iconClass: String): String? {
@@ -155,7 +155,6 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
             ?: document.selectFirst("title")?.text()?.substringBefore("-")?.trim() 
             ?: "No Title"
         
-        // جلب البوستر بطريقة تضمن عدم اختيار مسار فارغ والاعتماد على البوستر الاحتياطي إن لزم الأمر
         val posterElements = document.select("div.posterImg img, img.poster, .imgdiv-class img, meta[itemprop=image], .singlePage img, div.seasonDiv img, div#seasonList img")
         val rawPosterUrl = posterElements.mapNotNull {
             it.attr("data-src").ifBlank { it.attr("src") }.ifBlank { it.attr("content") }
@@ -540,7 +539,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
                     if (request.method.equals("GET", ignoreCase = true) && lower.contains(".m3u8")) {
                         handleFoundLink(url)
                         try {
-                            val reqBuilder = OkHttpRequest.Builder().url(url)
+                            val reqBuilder = okhttp3.Request.Builder().url(url)
                                 .header("User-Agent", lastValidUserAgent)
                                 .header("Referer", referer)
                             try { cookieManager.getCookie(url)?.let { ck -> reqBuilder.header("Cookie", ck) } } catch (_: Exception) {}
