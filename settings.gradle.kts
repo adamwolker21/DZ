@@ -7,7 +7,5 @@ pluginManagement {
 }
 
 rootProject.name = "CSX"
-include(":EgyDead")
-include(":Asiatv.one")
-include(":FaselHDS")
+include(":Fivetv")
 
