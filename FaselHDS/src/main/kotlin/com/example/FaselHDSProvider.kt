@@ -26,6 +26,7 @@ import android.widget.FrameLayout
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import kotlinx.coroutines.delay
@@ -135,26 +136,17 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         }
     }
 
-    override suspend fun search(query: String, page: Int): SearchResponseList {
+    // إرجاع دالة البحث للشكل القياسي المتوافق مع التطبيق مع الاحتفاظ بتشفير اللغة العربية
+    override suspend fun search(query: String): List<SearchResponse> {
         val base = getBaseUrl()
         val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
-        
-        val url = if (page == 1) {
-            "$base/?s=$encodedQuery"
-        } else {
-            "$base/page/$page/?s=$encodedQuery"
-        }
+        val url = "$base/?s=$encodedQuery"
         
         val document = app.get(url, headers = getDynamicHeaders()).document
         
-        val items = document.select("div.postDiv").mapNotNull {
+        return document.select("div.postDiv").mapNotNull {
             it.toSearchResult(base)
         }
-        
-        val hasNext = document.select("a[href*='/page/${page + 1}']").isNotEmpty() || 
-                      document.select("ul.pagination a, .pagination a, .page-link").any { it.text().contains("التالي") || it.text().contains("Next") }
-        
-        return newSearchResponseList(items, hasNext)
     }
     
     private fun Element.getMetaInfo(iconClass: String): String? {
