@@ -40,9 +40,6 @@ class FaselHDSProvider : MainAPI() {
         val url = "$mainUrl${request.data}" + (if (page > 1) "/page/$page" else "")
         val document = app.get(url, headers = headers).document
         
-        // THE FINAL FIX: Use conditional logic for the selector
-        // If the specific container exists, use it to avoid duplicates.
-        // Otherwise, use the general selector to ensure content is always found.
         val selector = if (document.selectFirst("div.post-listing") != null) {
             "div.post-listing div.postDiv"
         } else {
@@ -76,7 +73,6 @@ class FaselHDSProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val document = app.get("$mainUrl/?s=$query", headers = headers).document
-        // Search page has a simple structure, the general selector is best
         return document.select("div.postDiv").mapNotNull {
             it.toSearchResult()
         }
@@ -173,13 +169,11 @@ class FaselHDSProvider : MainAPI() {
         } else { // It's a Movie
             val year = document.selectFirst("span:contains(سنة الإنتاج) a")?.text()?.toIntOrNull()
             val duration = document.getMetaInfo("fa-clock")?.filter { it.isDigit() }?.toIntOrNull()
-            val ratingText = document.selectFirst("span.singleStar strong")?.text()
-            val rating = ratingText?.let {
-                if (it.equals("N/A", true)) null else (it.toFloatOrNull()?.times(1000))?.toInt()
-            }
+            
+            // تم إزالة جزء استخراج التقييم rating لتفادي خطأ الـ Deprecation في البناء.
 
             return newMovieLoadResponse(title, url, TvType.Movie, url) {
-                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags; this.duration = duration; this.rating = rating
+                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags; this.duration = duration
             }
         }
     }
