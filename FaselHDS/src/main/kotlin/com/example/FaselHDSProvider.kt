@@ -23,15 +23,11 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.M3u8Helper
+import com.lagradost.cloudstream3.utils.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
-import okhttp3.CookieJar
-import okhttp3.Request as OkHttpRequest
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import java.net.URI
 import kotlin.coroutines.resume
 
 class FaselHDSProvider(private val context: Context) : MainAPI() {
@@ -47,34 +43,10 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
 
     private val lastValidUserAgent = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36"
 
-    companion object {
-        var activeBaseUrl: String? = null
-    }
-
-    private suspend fun getBaseUrl(): String {
-        activeBaseUrl?.let { return it }
-        return try {
-            val response = app.get(mainUrl)
-            val finalUrl = response.url
-            val uri = URI(finalUrl)
-            val base = "${uri.scheme}://${uri.host}"
-            activeBaseUrl = base
-            base
-        } catch (e: Exception) {
-            mainUrl
-        }
-    }
-
-    private suspend fun getDynamicHeaders(referer: String? = null): Map<String, String> {
-        val base = getBaseUrl()
-        val map = mutableMapOf(
-            "User-Agent" to lastValidUserAgent,
-            "Origin" to base,
-            "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
-        )
-        map["Referer"] = referer ?: "$base/"
-        return map
-    }
+    private val headers = mapOf(
+        "User-Agent" to lastValidUserAgent,
+        "Referer" to "$mainUrl/"
+    )
 
     override val mainPage = mainPageOf(
         "/movies" to "أفلام أجنبي",
@@ -91,9 +63,8 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
-        val base = getBaseUrl()
-        val url = "$base${request.data}" + (if (page > 1) "/page/$page" else "")
-        val document = app.get(url, headers = getDynamicHeaders()).document
+        val url = "$mainUrl${request.data}" + (if (page > 1) "/page/$page" else "")
+        val document = app.get(url, headers = headers).document
         
         val selector = if (document.selectFirst("div.post-listing") != null) {
             "div.post-listing div.postDiv"
@@ -102,46 +73,42 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         }
 
         val home = document.select(selector).mapNotNull {
-            it.toSearchResult(base)
+            it.toSearchResult()
         }
 
         val hasNext = document.select("a[href*='/page/${page + 1}']").isNotEmpty() || 
                       document.select("ul.pagination a, .pagination a, .page-link").any { it.text().contains("التالي") || it.text().contains("Next") }
 
-        // تم تصحيح الدالة هنا لتتوافق مع بيئة البناء
         return newHomePageResponse(request.name, home, hasNext)
     }
 
-    private fun Element.toSearchResult(baseUrl: String): SearchResponse? {
+    private fun Element.toSearchResult(): SearchResponse? {
         val anchor = this.selectFirst("a") ?: return null
-        val href = anchor.attr("href").ifBlank { return null }
-        val finalHref = if (href.startsWith("http")) href else "$baseUrl$href"
+        val href = fixUrlNull(anchor.attr("href")) ?: return null
         
         val title = anchor.selectFirst("div.h1, .h1, h1, .post-title, h4, h5")?.text()?.trim() ?: "No Title"
         
         val posterElement = this.selectFirst("div.imgdiv-class img, a > img.img-fluid, img.poster")
-        val posterUrl = posterElement?.attr("data-src")?.ifBlank { posterElement.attr("src") }
-        val finalPoster = if (posterUrl?.startsWith("http") == false) "$baseUrl$posterUrl" else posterUrl
+        val posterUrl = fixUrlNull(posterElement?.attr("data-src")?.ifBlank { posterElement.attr("src") })
         
         val isSeries = title.contains("مسلسل") || title.contains("برنامج") ||
                        this.selectFirst("span.quality:contains(حلقة), span.quality:contains(مواسم)") != null
         
         return if (isSeries) {
-            newTvSeriesSearchResponse(title, finalHref, TvType.TvSeries) { this.posterUrl = finalPoster }
+            newTvSeriesSearchResponse(title, href, TvType.TvSeries) { this.posterUrl = posterUrl }
         } else {
-            newMovieSearchResponse(title, finalHref, TvType.Movie) { this.posterUrl = finalPoster }
+            newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = posterUrl }
         }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val base = getBaseUrl()
         val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
-        val url = "$base/?s=$encodedQuery"
+        val url = "$mainUrl/?s=$encodedQuery"
         
-        val document = app.get(url, headers = getDynamicHeaders()).document
+        val document = app.get(url, headers = headers).document
         
         return document.select("div.postDiv").mapNotNull {
-            it.toSearchResult(base)
+            it.toSearchResult()
         }
     }
     
@@ -150,17 +117,16 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val base = getBaseUrl()
-        val document = app.get(url, headers = getDynamicHeaders()).document
+        val document = app.get(url, headers = headers).document
         
         val titleElement = document.selectFirst("div.h1.title, h1.title, div.title h1, .singleInfo .title, h1, .post-title")
         val title = titleElement?.text()?.trim() 
             ?: document.selectFirst("title")?.text()?.substringBefore("-")?.trim() 
             ?: "No Title"
         
-        val posterUrl = document.selectFirst("div.posterImg img, img.poster, .imgdiv-class img, meta[itemprop=image], .singlePage img")?.let {
+        val posterUrl = fixUrlNull(document.selectFirst("div.posterImg img, img.poster, .imgdiv-class img, meta[itemprop=image], .singlePage img")?.let {
             it.attr("data-src").ifBlank { it.attr("src") }.ifBlank { it.attr("content") }
-        }
+        })
 
         val plot = document.selectFirst("div.singleDesc p, div.singleDesc, .story p, .story")?.text()?.trim()
 
@@ -199,7 +165,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
                         ?: seasonElement.selectFirst("a")?.attr("href")
                     
                     if (!seasonLinkRel.isNullOrBlank()) {
-                        val absoluteSeasonLink = if (seasonLinkRel.startsWith("http")) seasonLinkRel else "$base$seasonLinkRel"
+                        val absoluteSeasonLink = fixUrl(seasonLinkRel)
                         val seasonNum = Regex("""\d+""").find(seasonElement.selectFirst("div.title, .title")?.text() ?: "")?.value?.toIntOrNull() ?: 1
                         
                         val seasonDoc = if (absoluteSeasonLink.substringBefore("?") == url.substringBefore("?")) {
@@ -207,7 +173,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
                         } else {
                             delay(300) 
                             try {
-                                app.get(absoluteSeasonLink, headers = getDynamicHeaders()).document
+                                app.get(absoluteSeasonLink, headers = headers).document
                             } catch (e: Exception) {
                                 null
                             }
@@ -215,11 +181,10 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
                         
                         seasonDoc?.select(episodeSelector)?.forEach { ep ->
                             val epText = ep.text().trim()
-                            val epHref = ep.attr("href")
-                            if (epHref.isNotBlank() && !epText.contains("باقي") && !epText.contains("المزيد")) {
-                                val finalEpHref = if (epHref.startsWith("http")) epHref else "$base$epHref"
+                            val epHref = fixUrlNull(ep.attr("href"))
+                            if (!epHref.isNullOrBlank() && !epText.contains("باقي") && !epText.contains("المزيد")) {
                                 episodes.add(
-                                    newEpisode(finalEpHref) {
+                                    newEpisode(epHref) {
                                         name = epText.ifBlank { "حلقة ${episodes.size + 1}" }
                                         season = seasonNum
                                         episode = Regex("""\d+""").find(name ?: "")?.value?.toIntOrNull()
@@ -234,11 +199,10 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
             if (episodes.isEmpty()) {
                 document.select(episodeSelector).forEach { ep ->
                     val epText = ep.text().trim()
-                    val epHref = ep.attr("href")
-                    if (epHref.isNotBlank() && !epText.contains("باقي") && !epText.contains("المزيد")) {
-                        val finalEpHref = if (epHref.startsWith("http")) epHref else "$base$epHref"
+                    val epHref = fixUrlNull(ep.attr("href"))
+                    if (!epHref.isNullOrBlank() && !epText.contains("باقي") && !epText.contains("المزيد")) {
                         episodes.add(
-                            newEpisode(finalEpHref) {
+                            newEpisode(epHref) {
                                 name = epText.ifBlank { "حلقة ${episodes.size + 1}" }
                                 season = 1
                                 episode = Regex("""\d+""").find(name ?: "")?.value?.toIntOrNull()
@@ -290,8 +254,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         doc.select("ul.tabs-ul li").forEach { serverElement ->
             val serverUrl = serverElement.attr("onclick").substringAfter("href = '").substringBefore("'")
             if (serverUrl.isNotBlank()) {
-                val fixedUrl = if (serverUrl.startsWith("//")) "https:$serverUrl" else serverUrl
-                results.add(fixedUrl)
+                results.add(serverUrl)
             }
         }
 
@@ -381,7 +344,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
             val client = app.baseClient.newBuilder()
                 .followRedirects(true)
                 .followSslRedirects(true)
-                .cookieJar(CookieJar.NO_COOKIES)
+                .cookieJar(okhttp3.CookieJar.NO_COOKIES)
                 .build()
 
             val foundM3u8 = linkedSetOf<String>()
@@ -542,7 +505,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
                     if (request.method.equals("GET", ignoreCase = true) && lower.contains(".m3u8")) {
                         handleFoundLink(url)
                         try {
-                            val reqBuilder = OkHttpRequest.Builder().url(url)
+                            val reqBuilder = okhttp3.Request.Builder().url(url)
                                 .header("User-Agent", lastValidUserAgent)
                                 .header("Referer", referer)
                             try { cookieManager.getCookie(url)?.let { ck -> reqBuilder.header("Cookie", ck) } } catch (_: Exception) {}
@@ -587,8 +550,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         
-        val base = getBaseUrl()
-        val response = app.get(data, headers = getDynamicHeaders())
+        val response = app.get(data, headers = headers)
         val document = response.document
         val currentPageUrl = response.url 
 
@@ -603,12 +565,12 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         iframeUrls.distinct().forEach { iframeUrl ->
             if (foundLink) return@forEach 
 
-            val finalIframeUrl = if (iframeUrl.startsWith("http")) iframeUrl else "$base$iframeUrl"
+            val finalIframeUrl = fixUrl(iframeUrl)
             val m3u8 = resolveWithWebView(finalIframeUrl, currentPageUrl)
 
             if (!m3u8.isNullOrBlank()) {
                 foundLink = true
-                val playerOrigin = try { "https://${java.net.URI(finalIframeUrl).host}" } catch(e:Exception){ base }
+                val playerOrigin = try { "https://${java.net.URI(finalIframeUrl).host}" } catch(e:Exception){ mainUrl }
 
                 M3u8Helper.generateM3u8(
                     source = name,
