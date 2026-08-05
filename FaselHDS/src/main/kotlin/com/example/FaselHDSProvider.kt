@@ -6,6 +6,7 @@ import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import java.net.URI
 
@@ -185,52 +186,90 @@ class FaselHDSProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val document = app.get(data, headers = headers).document
+        // قمنا باستخلاص رابط الصفحة الحالي بعد أي Redirect لأنه ضروري لتجاوز حماية الـ iframe
+        val response = app.get(data, headers = headers)
+        val document = response.document
+        val currentPageUrl = response.url 
         
-        // استخراج رابط الـ iframe بشكل مباشر للتكيف مع أي تغيير في النطاق 
         val iframeUrl = document.selectFirst("iframe[name=player_iframe]")?.attr("src") 
             ?: document.selectFirst("iframe[name=player_iframe]")?.attr("data-src")
 
         if (!iframeUrl.isNullOrBlank()) {
             try {
-                val playerOrigin = "https://${URI(iframeUrl).host}"
+                val fixedIframeUrl = if (iframeUrl.startsWith("//")) "https:$iframeUrl" else iframeUrl
+                val playerOrigin = "https://${URI(fixedIframeUrl).host}"
                 
-                val playerHeaders = mapOf(
+                // استدعاء المشغل باستخدام رابط الحلقة/الفيلم كـ Referer بدلاً من رابط المشغل
+                val iframeHeaders = mapOf(
                     "User-Agent" to headers["User-Agent"]!!,
-                    "Referer" to "$playerOrigin/",
-                    "Origin" to playerOrigin,
+                    "Referer" to currentPageUrl,
                     "Accept" to "*/*"
                 )
 
-                val playerDoc = app.get(iframeUrl, headers = playerHeaders).document
+                // الهيدر المطلوب لروابط الفيديو M3U8 النهائية
+                val m3u8Headers = mapOf(
+                    "User-Agent" to headers["User-Agent"]!!,
+                    "Origin" to playerOrigin,
+                    "Referer" to "$playerOrigin/"
+                )
+
+                val playerPageContent = app.get(fixedIframeUrl, headers = iframeHeaders).text
+                val playerDoc = Jsoup.parse(playerPageContent)
+                
                 val buttons = playerDoc.select("button.hd_btn")
 
-                buttons.forEach { button ->
-                    val link = button.attr("data-url")
-                    val qualityName = button.text().trim()
+                if (buttons.isNotEmpty()) {
+                    buttons.forEach { button ->
+                        val link = button.attr("data-url")
+                        val qualityName = button.text().trim()
 
-                    if (link.isNotBlank()) {
-                        if (qualityName.equals("auto", ignoreCase = true)) {
+                        if (link.isNotBlank()) {
+                            if (qualityName.equals("auto", ignoreCase = true)) {
+                                M3u8Helper.generateM3u8(
+                                    source = "$name - Auto",
+                                    streamUrl = link,
+                                    referer = "$playerOrigin/",
+                                    headers = m3u8Headers
+                                ).forEach(callback)
+                            } else {
+                                val qualityNum = Regex("""\d+""").find(qualityName)?.value?.toIntOrNull() ?: Qualities.Unknown.value
+
+                                callback.invoke(
+                                    newExtractorLink(
+                                        source = name,
+                                        name = "$name - $qualityName",
+                                        url = link,
+                                        type = ExtractorLinkType.M3U8
+                                    ) {
+                                        this.referer = "$playerOrigin/"
+                                        this.headers = m3u8Headers
+                                        this.quality = qualityNum
+                                    }
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    // Fallback 1: البحث عن وسم الفيديو
+                    val videoSrc = playerDoc.selectFirst("video#video")?.attr("src")
+                    if (!videoSrc.isNullOrBlank()) {
+                        M3u8Helper.generateM3u8(
+                            source = name,
+                            streamUrl = videoSrc,
+                            referer = "$playerOrigin/",
+                            headers = m3u8Headers
+                        ).forEach(callback)
+                    } else {
+                        // Fallback 2: البحث العشوائي عبر Regex
+                        val regex = Regex("""(https?://[^"']+\.m3u8[^"']*)""")
+                        val foundLink = regex.find(playerPageContent)?.groupValues?.get(1)
+                        if (foundLink != null) {
                             M3u8Helper.generateM3u8(
-                                source = "$name - Auto",
-                                streamUrl = link,
+                                source = name,
+                                streamUrl = foundLink,
                                 referer = "$playerOrigin/",
-                                headers = playerHeaders
+                                headers = m3u8Headers
                             ).forEach(callback)
-                        } else {
-                            val qualityNum = Regex("""\d+""").find(qualityName)?.value?.toIntOrNull() ?: Qualities.Unknown.value
-
-                            callback.invoke(
-                                newExtractorLink(
-                                    source = name,
-                                    name = "$name - $qualityName",
-                                    url = link,
-                                    type = ExtractorLinkType.M3U8
-                                ) {
-                                    this.referer = "$playerOrigin/"
-                                    this.quality = qualityNum
-                                }
-                            )
                         }
                     }
                 }
@@ -238,6 +277,7 @@ class FaselHDSProvider : MainAPI() {
                 // Ignore errors
             }
         } else {
+             // قسم سيرفرات المشاهدة البديلة، تم تطبيق نفس الإصلاحات عليه أيضاً
              document.select("ul.tabs-ul li").forEachIndexed { index, serverElement ->
                 val serverUrl = serverElement.attr("onclick").substringAfter("href = '").substringBefore("'")
                 if (serverUrl.isBlank()) return@forEachIndexed
@@ -246,14 +286,20 @@ class FaselHDSProvider : MainAPI() {
                     val fixedUrl = if (serverUrl.startsWith("//")) "https:$serverUrl" else serverUrl
                     val playerOrigin = "https://${URI(fixedUrl).host}"
                     
-                    val playerHeaders = mapOf(
+                    val iframeHeaders = mapOf(
                         "User-Agent" to headers["User-Agent"]!!,
-                        "Referer" to "$playerOrigin/",
-                        "Origin" to playerOrigin,
+                        "Referer" to currentPageUrl, // استخدام رابط الصفحة الصحيح
                         "Accept" to "*/*"
                     )
 
-                    val playerDoc = app.get(fixedUrl, headers = playerHeaders).document
+                    val m3u8Headers = mapOf(
+                        "User-Agent" to headers["User-Agent"]!!,
+                        "Origin" to playerOrigin,
+                        "Referer" to "$playerOrigin/"
+                    )
+
+                    val playerPageContent = app.get(fixedUrl, headers = iframeHeaders).text
+                    val playerDoc = Jsoup.parse(playerPageContent)
                     val buttons = playerDoc.select("button.hd_btn")
 
                     if (buttons.isNotEmpty()) {
@@ -266,7 +312,7 @@ class FaselHDSProvider : MainAPI() {
                                         source = "$name Server ${index + 1} - Auto",
                                         streamUrl = link,
                                         referer = "$playerOrigin/",
-                                        headers = playerHeaders
+                                        headers = m3u8Headers
                                     ).forEach(callback)
                                 } else {
                                     val qualityNum = Regex("""\d+""").find(qualityName)?.value?.toIntOrNull() ?: Qualities.Unknown.value
@@ -279,6 +325,7 @@ class FaselHDSProvider : MainAPI() {
                                             type = ExtractorLinkType.M3U8
                                         ) {
                                             this.referer = "$playerOrigin/"
+                                            this.headers = m3u8Headers
                                             this.quality = qualityNum
                                         }
                                     )
