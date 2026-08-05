@@ -51,11 +51,9 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
     private val lastValidUserAgent = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36"
 
     companion object {
-        // متغير لحفظ النطاق النشط حالياً بعد التحويل لتجنب مشاكل تغير الدومين
         var activeBaseUrl: String? = null
     }
 
-    // دالة للحصول على النطاق الفعلي بعد الـ Redirect
     private suspend fun getBaseUrl(): String {
         activeBaseUrl?.let { return it }
         return try {
@@ -70,7 +68,6 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         }
     }
 
-    // دالة لجلب الـ Headers بديناميكية باستخدام النطاق النشط
     private suspend fun getDynamicHeaders(referer: String? = null): Map<String, String> {
         val base = getBaseUrl()
         val map = mutableMapOf(
@@ -110,7 +107,11 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         val home = document.select(selector).mapNotNull {
             it.toSearchResult(base)
         }
-        return newHomePageResponse(request.name, home)
+
+        // التحقق من وجود صفحة تالية (Pagination)
+        val hasNext = document.select("a.page-link[href*='/page/${page + 1}'], ul.pagination a[href*='/page/${page + 1}']").isNotEmpty()
+
+        return newHomePageResponse(request.name, home, hasNext)
     }
 
     private fun Element.toSearchResult(baseUrl: String): SearchResponse? {
@@ -133,12 +134,30 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         }
     }
 
-    override suspend fun search(query: String): List<SearchResponse> {
+    // استبدال دالة البحث السابقة بدوال تدعم التشفير (Encoding) وتعدد الصفحات (Pagination)
+    override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query, 1).items
+
+    override suspend fun search(query: String, page: Int): SearchResponseList {
         val base = getBaseUrl()
-        val document = app.get("$base/?s=$query", headers = getDynamicHeaders()).document
-        return document.select("div.postDiv").mapNotNull {
+        // تشفير النص ليدعم اللغة العربية والمسافات
+        val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
+        
+        val url = if (page == 1) {
+            "$base/?s=$encodedQuery"
+        } else {
+            "$base/page/$page/?s=$encodedQuery"
+        }
+        
+        val document = app.get(url, headers = getDynamicHeaders()).document
+        
+        val items = document.select("div.postDiv").mapNotNull {
             it.toSearchResult(base)
         }
+        
+        // التحقق من وجود صفحة نتائج تالية
+        val hasNext = document.select("a.page-link[href*='/page/${page + 1}'], ul.pagination a[href*='/page/${page + 1}']").isNotEmpty()
+        
+        return newSearchResponseList(items, hasNext)
     }
     
     private fun Element.getMetaInfo(iconClass: String): String? {
@@ -164,7 +183,6 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
 
         val tags = document.select("div.col-xl-6:contains(تصنيف) a").map { it.text() }
         
-        // التحقق مما إذا كان مسلسلاً
         val isTvSeries = document.select("div#seasonList, div#epAll, div.epAll, div#episodes").isNotEmpty()
 
         if (isTvSeries) {
@@ -188,7 +206,6 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
 
             val episodes = mutableListOf<Episode>()
             val seasonElements = document.select("div#seasonList div.seasonDiv")
-            // محدد الحلقات المحدث: يستهدف وسوم a فقط ليتجاهل زر "باقي الحلقات"
             val episodeSelector = "div#epAll a, div.epAll a, div#episodes a, div.ep-item a"
 
             if (seasonElements.isNotEmpty()) {
@@ -205,7 +222,6 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
                     seasonDoc.select(episodeSelector).forEach { ep ->
                         val epText = ep.text().trim()
                         val epHref = ep.attr("href")
-                        // التحقق الإضافي لضمان عدم سحب أزرار
                         if (epHref.isNotBlank() && !epText.contains("باقي") && !epText.contains("المزيد")) {
                             val finalEpHref = if (epHref.startsWith("http")) epHref else "$base$epHref"
                             episodes.add(
