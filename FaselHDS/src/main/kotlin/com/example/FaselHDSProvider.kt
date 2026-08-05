@@ -5,7 +5,6 @@ import android.app.Activity
 import android.app.Dialog
 import android.content.Context
 import android.graphics.Bitmap
-import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
@@ -24,16 +23,13 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.M3u8Helper
-import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.CookieJar
 import okhttp3.Request
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import java.net.URI
 import kotlin.coroutines.resume
 
 class FaselHDSProvider(private val context: Context) : MainAPI() {
@@ -56,9 +52,10 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
     private suspend fun getBaseUrl(): String {
         activeBaseUrl?.let { return it }
         return try {
-            val response = app.get(mainUrl, allowRedirects = true)
+            // تم إزالة allowRedirects = true لأنها السبب الرئيسي لفشل البناء 
+            val response = app.get(mainUrl)
             val finalUrl = response.url
-            val uri = URI(finalUrl)
+            val uri = java.net.URI(finalUrl)
             val base = "${uri.scheme}://${uri.host}"
             activeBaseUrl = base
             base
@@ -110,7 +107,14 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         val hasNext = document.select("a[href*='/page/${page + 1}']").isNotEmpty() || 
                       document.select("ul.pagination a, .pagination a, .page-link").any { it.text().contains("التالي") || it.text().contains("Next") }
 
-        return newHomePageResponse(request.name, home, hasNext)
+        return newHomePageResponse(
+            list = HomePageList(
+                name = request.name,
+                list = home,
+                hasNext = hasNext
+            ),
+            hasNext = hasNext
+        )
     }
 
     private fun Element.toSearchResult(baseUrl: String): SearchResponse? {
@@ -609,7 +613,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
 
             if (!m3u8.isNullOrBlank()) {
                 foundLink = true
-                val playerOrigin = try { "https://${Uri.parse(finalIframeUrl).host}" } catch(e:Exception){ base }
+                val playerOrigin = try { "https://${java.net.URI(finalIframeUrl).host}" } catch(e:Exception){ base }
 
                 M3u8Helper.generateM3u8(
                     source = name,
