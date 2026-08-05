@@ -172,7 +172,6 @@ class AsiatvoneProvider : MainAPI() {
         try {
             Log.d(logTag, "Starting loadLinks for: $data")
 
-            // 1. استخراج epwatch
             val episodePage = app.get(data, headers = commonHeaders).document
             val epwatch = episodePage.selectFirst("input[name=epwatch]")?.attr("value")
             
@@ -182,65 +181,66 @@ class AsiatvoneProvider : MainAPI() {
             }
             Log.d(logTag, "Target epwatch: $epwatch")
 
-            // 2. إرسال الطلب للموقع الوسيط للتهيئة والحصول على رابط المشاهدة (Watch URL)
+            val watchUrl = "https://asiawiki.me/"
+            
+            // 1. إرسال الطلب الأولي وتخزين الكوكيز تلقائياً في OkHttp
             val watchResponse = app.post(
-                "https://asiawiki.me/",
+                watchUrl,
                 data = mapOf("epwatch" to epwatch),
                 headers = mapOf(
                     "Origin" to mainUrl,
                     "Referer" to data,
                     "User-Agent" to USER_AGENT
-                )
+                ),
+                allowRedirects = true
             )
-            
-            // هذا هو الرابط السري الذي نحتاجه كـ Referer لكي يقبل السيرفر طلب الـ AJAX
-            val watchUrl = watchResponse.url 
-            Log.d(logTag, "Navigated to Watch URL: $watchUrl")
+            val newReferer = watchResponse.url
 
-            // 3. إرسال طلب AJAX مع الهيدرز المطابقة 100% للمتصفح
-            val ajaxUrl = "https://asiawiki.me/wp-admin/admin-ajax.php"
-            val ajaxResponseText = app.post(
+            // 2. السر الأكبر: طلب الـ AJAX يجب أن يكون بصيغة GET !
+            val ajaxUrl = "https://asiawiki.me/wp-admin/admin-ajax.php?action=fetch_episode&id=$epwatch"
+            
+            val ajaxResponseText = app.get(
                 ajaxUrl,
                 headers = mapOf(
                     "X-Requested-With" to "XMLHttpRequest",
-                    "Content-Type" to "application/x-www-form-urlencoded; charset=UTF-8",
+                    "Accept" to "application/json, text/javascript, */*; q=0.01",
                     "Origin" to "https://asiawiki.me",
-                    "Referer" to watchUrl, // أهم خطوة!
-                    "User-Agent" to USER_AGENT,
-                    "Accept" to "*/*"
-                ),
-                data = mapOf("action" to "fetch_episode", "id" to epwatch)
+                    "Referer" to newReferer,
+                    "User-Agent" to USER_AGENT
+                )
             ).text
-            
+
             Log.d(logTag, "AJAX Response Length: ${ajaxResponseText.length}")
 
-            // 4. التنظيف الشامل لأي نوع من أنواع التشفير (JSON أو HTML)
+            // 3. التنظيف العنيف لفك أي تشفير سواء كان JSON أو Unicode أو HTML Entities
             val cleanHtml = ajaxResponseText
                 .replace("\\\"", "\"")
                 .replace("\\/", "/")
                 .replace("\\n", "")
                 .replace("\\r", "")
+                .replace("\\u003c", "<")
+                .replace("\\u003e", ">")
+                .replace("\\u0022", "\"")
                 .replace("&quot;", "\"")
                 .replace("&lt;", "<")
                 .replace("&gt;", ">")
                 .replace("&#038;", "&")
                 .replace("&amp;", "&")
 
-            // 5. استخراج كل الروابط الموجودة داخل src="..." بغض النظر عن بنية الصفحة
+            // 4. استخراج كافة روابط الفيديو بقوة الـ Regex
             val srcRegex = """src=["'](.*?)["']""".toRegex(RegexOption.IGNORE_CASE)
             val extractedUrls = srcRegex.findAll(cleanHtml).map { it.groupValues[1] }.toList()
 
             Log.d(logTag, "Found ${extractedUrls.size} potential links.")
 
-            // 6. تصفية وتشغيل الروابط
             extractedUrls.distinct().amap { rawUrl ->
                 try {
-                    // استبعاد الروابط التي لا تمثل فيديو
+                    // استبعاد الصور أو الملفات غير المرغوبة
                     if (rawUrl.endsWith(".jpg") || rawUrl.endsWith(".png") || rawUrl.contains("google.com")) return@amap
                     
                     var embedUrl = if (rawUrl.startsWith("//")) "https:$rawUrl" else rawUrl
                     
-                    // خدع الدومينات
+                    // استبدال النطاقات الوهمية بالنطاقات التي تفهمها إضافة Cloudstream
                     when {
                         embedUrl.contains("playmogo.com") -> embedUrl = embedUrl.replace("playmogo.com", "dood.to")
                         embedUrl.contains("vidmoly.biz") -> embedUrl = embedUrl.replace("vidmoly.biz", "vidmoly.to")
@@ -252,7 +252,7 @@ class AsiatvoneProvider : MainAPI() {
                     
                     Log.d(logTag, "Loading extractor for: $embedUrl")
                     
-                    loadExtractor(embedUrl, watchUrl, subtitleCallback, callback)?.let {
+                    loadExtractor(embedUrl, newReferer, subtitleCallback, callback)?.let {
                         linksLoaded = true
                     }
                 } catch (e: Exception) {
