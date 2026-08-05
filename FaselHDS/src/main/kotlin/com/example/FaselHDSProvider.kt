@@ -34,6 +34,7 @@ import okhttp3.CookieJar
 import okhttp3.Request
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import java.net.URI
 import kotlin.coroutines.resume
 
 class FaselHDSProvider(private val context: Context) : MainAPI() {
@@ -49,11 +50,37 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
 
     private val lastValidUserAgent = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36"
 
-    private val headers = mapOf(
-        "User-Agent" to lastValidUserAgent,
-        "Referer" to "$mainUrl/",
-        "Origin" to mainUrl,
-    )
+    companion object {
+        // متغير لحفظ النطاق النشط حالياً بعد التحويل لتجنب مشاكل تغير الدومين
+        var activeBaseUrl: String? = null
+    }
+
+    // دالة للحصول على النطاق الفعلي بعد الـ Redirect
+    private suspend fun getBaseUrl(): String {
+        activeBaseUrl?.let { return it }
+        return try {
+            val response = app.get(mainUrl, allowRedirects = true)
+            val finalUrl = response.url
+            val uri = URI(finalUrl)
+            val base = "${uri.scheme}://${uri.host}"
+            activeBaseUrl = base
+            base
+        } catch (e: Exception) {
+            mainUrl
+        }
+    }
+
+    // دالة لجلب الـ Headers بديناميكية باستخدام النطاق النشط
+    private suspend fun getDynamicHeaders(referer: String? = null): Map<String, String> {
+        val base = getBaseUrl()
+        val map = mutableMapOf(
+            "User-Agent" to lastValidUserAgent,
+            "Origin" to base,
+            "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+        )
+        map["Referer"] = referer ?: "$base/"
+        return map
+    }
 
     override val mainPage = mainPageOf(
         "/movies" to "أفلام أجنبي",
@@ -70,8 +97,9 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
-        val url = "$mainUrl${request.data}" + (if (page > 1) "/page/$page" else "")
-        val document = app.get(url, headers = headers).document
+        val base = getBaseUrl()
+        val url = "$base${request.data}" + (if (page > 1) "/page/$page" else "")
+        val document = app.get(url, headers = getDynamicHeaders()).document
         
         val selector = if (document.selectFirst("div.post-listing") != null) {
             "div.post-listing div.postDiv"
@@ -80,33 +108,36 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         }
 
         val home = document.select(selector).mapNotNull {
-            it.toSearchResult()
+            it.toSearchResult(base)
         }
         return newHomePageResponse(request.name, home)
     }
 
-    private fun Element.toSearchResult(): SearchResponse? {
+    private fun Element.toSearchResult(baseUrl: String): SearchResponse? {
         val anchor = this.selectFirst("a") ?: return null
         val href = anchor.attr("href").ifBlank { return null }
+        val finalHref = if (href.startsWith("http")) href else "$baseUrl$href"
         val title = anchor.selectFirst("div.h1")?.text() ?: "No Title"
         
         val posterElement = this.selectFirst("div.imgdiv-class img, a > img.img-fluid")
         val posterUrl = posterElement?.attr("data-src") ?: posterElement?.attr("src")
+        val finalPoster = if (posterUrl?.startsWith("http") == false) "$baseUrl$posterUrl" else posterUrl
         
         val isSeries = title.contains("مسلسل") || title.contains("برنامج") ||
                        this.selectFirst("span.quality:contains(حلقة), span.quality:contains(مواسم)") != null
         
         return if (isSeries) {
-            newTvSeriesSearchResponse(title, href, TvType.TvSeries) { this.posterUrl = posterUrl }
+            newTvSeriesSearchResponse(title, finalHref, TvType.TvSeries) { this.posterUrl = finalPoster }
         } else {
-            newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = posterUrl }
+            newMovieSearchResponse(title, finalHref, TvType.Movie) { this.posterUrl = finalPoster }
         }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val document = app.get("$mainUrl/?s=$query", headers = headers).document
+        val base = getBaseUrl()
+        val document = app.get("$base/?s=$query", headers = getDynamicHeaders()).document
         return document.select("div.postDiv").mapNotNull {
-            it.toSearchResult()
+            it.toSearchResult(base)
         }
     }
     
@@ -115,7 +146,8 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url, headers = headers).document
+        val base = getBaseUrl()
+        val document = app.get(url, headers = getDynamicHeaders()).document
         val title = document.selectFirst("div.h1.title")?.ownText()?.trim() ?: "No Title"
         
         var posterUrl = document.selectFirst("div.posterImg img")?.attr("src")
@@ -132,20 +164,17 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
 
         val tags = document.select("div.col-xl-6:contains(تصنيف) a").map { it.text() }
         
-        val isTvSeries = document.select("div#seasonList, div#epAll").isNotEmpty()
+        // التحقق مما إذا كان مسلسلاً
+        val isTvSeries = document.select("div#seasonList, div#epAll, div.epAll, div#episodes").isNotEmpty()
 
         if (isTvSeries) {
             val year = Regex("""\d{4}""").find(document.select("span:contains(موعد الصدور)").firstOrNull()?.text() ?: "")?.value?.toIntOrNull()
             var status: ShowStatus? = null
             val statusText = document.selectFirst("span:contains(حالة المسلسل)")?.text() ?: ""
-            if (statusText.contains("مستمر")) {
-                status = ShowStatus.Ongoing
-            } else if (statusText.contains("مكتمل")) {
-                status = ShowStatus.Completed
-            }
+            if (statusText.contains("مستمر")) status = ShowStatus.Ongoing
+            else if (statusText.contains("مكتمل")) status = ShowStatus.Completed
             
             val duration = document.getMetaInfo("fa-clock")?.filter { it.isDigit() }?.toIntOrNull()
-            
             val country = document.getMetaInfo("fa-flag")
             val episodeCount = document.getMetaInfo("fa-film")
 
@@ -159,38 +188,53 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
 
             val episodes = mutableListOf<Episode>()
             val seasonElements = document.select("div#seasonList div.seasonDiv")
-            val episodeSelector = "div#epAll a, div#episodes a, div.ep-item a"
+            // محدد الحلقات المحدث: يستهدف وسوم a فقط ليتجاهل زر "باقي الحلقات"
+            val episodeSelector = "div#epAll a, div.epAll a, div#episodes a, div.ep-item a"
 
             if (seasonElements.isNotEmpty()) {
                 seasonElements.amap { seasonElement ->
-                    val seasonLink = seasonElement.attr("onclick")?.substringAfter("'")?.substringBefore("'")
+                    val onclickAttr = seasonElement.attr("onclick")
+                    val seasonLink = Regex("""['"]([^'"]+)['"]""").find(onclickAttr ?: "")?.groupValues?.get(1)
                         ?: seasonElement.selectFirst("a")?.attr("href") ?: return@amap
-                    val absoluteSeasonLink = if (seasonLink.startsWith("http")) seasonLink else "$mainUrl$seasonLink"
+                    
+                    val absoluteSeasonLink = if (seasonLink.startsWith("http")) seasonLink else "$base$seasonLink"
                     val seasonNum = Regex("""\d+""").find(seasonElement.selectFirst("div.title")?.text() ?: "")?.value?.toIntOrNull()
-                    val seasonDoc = app.get(absoluteSeasonLink, headers = headers).document
+                    
+                    val seasonDoc = app.get(absoluteSeasonLink, headers = getDynamicHeaders()).document
                     
                     seasonDoc.select(episodeSelector).forEach { ep ->
+                        val epText = ep.text().trim()
+                        val epHref = ep.attr("href")
+                        // التحقق الإضافي لضمان عدم سحب أزرار
+                        if (epHref.isNotBlank() && !epText.contains("باقي") && !epText.contains("المزيد")) {
+                            val finalEpHref = if (epHref.startsWith("http")) epHref else "$base$epHref"
+                            episodes.add(
+                                newEpisode(finalEpHref) {
+                                    name = epText.ifBlank { "حلقة ${episodes.size + 1}" }
+                                    season = seasonNum
+                                    episode = Regex("""\d+""").find(name ?: "")?.value?.toIntOrNull()
+                                }
+                            )
+                        }
+                    }
+                }
+            } else {
+                document.select(episodeSelector).forEach { ep ->
+                    val epText = ep.text().trim()
+                    val epHref = ep.attr("href")
+                    if (epHref.isNotBlank() && !epText.contains("باقي") && !epText.contains("المزيد")) {
+                        val finalEpHref = if (epHref.startsWith("http")) epHref else "$base$epHref"
                         episodes.add(
-                            newEpisode(ep.attr("href")) {
-                                name = ep.text().trim()
-                                season = seasonNum
+                            newEpisode(finalEpHref) {
+                                name = epText.ifBlank { "حلقة ${episodes.size + 1}" }
+                                season = 1
                                 episode = Regex("""\d+""").find(name ?: "")?.value?.toIntOrNull()
                             }
                         )
                     }
                 }
-            } else {
-                document.select(episodeSelector).forEach { ep ->
-                    episodes.add(
-                        newEpisode(ep.attr("href")) {
-                            name = ep.text().trim()
-                            season = 1
-                            episode = Regex("""\d+""").find(name ?: "")?.value?.toIntOrNull()
-                        }
-                    )
-                }
             }
-            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
+            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes.distinctBy { it.data }.sortedBy { it.episode }) {
                 this.posterUrl = posterUrl
                 this.plot = plot
                 this.year = year
@@ -198,7 +242,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
                 this.showStatus = status
                 this.duration = duration
             }
-        } else { // It's a Movie
+        } else {
             val year = document.selectFirst("span:contains(سنة الإنتاج) a")?.text()?.toIntOrNull()
             val duration = document.getMetaInfo("fa-clock")?.filter { it.isDigit() }?.toIntOrNull()
 
@@ -211,12 +255,10 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
     private fun extractIframeSources(doc: Document): List<String> {
         val results = mutableSetOf<String>()
 
-        // 1. البحث الدقيق بناءً على بنية الموقع المعتادة
         val iframeUrl = doc.selectFirst("iframe[name=player_iframe]")?.attr("src") 
             ?: doc.selectFirst("iframe[name=player_iframe]")?.attr("data-src")
         if (!iframeUrl.isNullOrBlank()) results.add(iframeUrl)
 
-        // 2. قائمة السيرفرات إن وجدت
         doc.select("ul.tabs-ul li").forEach { serverElement ->
             val serverUrl = serverElement.attr("onclick").substringAfter("href = '").substringBefore("'")
             if (serverUrl.isNotBlank()) {
@@ -225,7 +267,6 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
             }
         }
 
-        // 3. البحث الشامل كإجراء احتياطي (Fallback)
         val blockedKeywords = listOf("google.com", "googlesyndication.com", "googletagmanager.com")
         doc.select("iframe[src]").forEach { el ->
             val src = el.attr("src")
@@ -519,12 +560,11 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         
-        // استخراج رابط الصفحة الصحيح لتمريره كـ Referer
-        val response = app.get(data, headers = headers)
+        val base = getBaseUrl()
+        val response = app.get(data, headers = getDynamicHeaders())
         val document = response.document
         val currentPageUrl = response.url 
 
-        // استخراج روابط سيرفرات المشاهدة من الـ iframe والأزرار
         val iframeUrls = extractIframeSources(document)
 
         if (iframeUrls.isEmpty()) {
@@ -533,16 +573,15 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
 
         var foundLink = false
 
-        // المرور على السيرفرات وإرسالها للمتصفح المخفي لاصطياد رابط الـ m3u8 الحقيقي
         iframeUrls.distinct().forEach { iframeUrl ->
-            if (foundLink) return@forEach // التوقف بمجرد إيجاد أول رابط صحيح
+            if (foundLink) return@forEach 
 
-            // تشغيل المتصفح المخفي
-            val m3u8 = resolveWithWebView(iframeUrl, currentPageUrl)
+            val finalIframeUrl = if (iframeUrl.startsWith("http")) iframeUrl else "$base$iframeUrl"
+            val m3u8 = resolveWithWebView(finalIframeUrl, currentPageUrl)
 
             if (!m3u8.isNullOrBlank()) {
                 foundLink = true
-                val playerOrigin = try { "https://${Uri.parse(iframeUrl).host}" } catch(e:Exception){ mainUrl }
+                val playerOrigin = try { "https://${Uri.parse(finalIframeUrl).host}" } catch(e:Exception){ base }
 
                 callback.invoke(
                     newExtractorLink(
@@ -551,7 +590,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
                         url = m3u8,
                         type = ExtractorLinkType.M3U8
                     ) {
-                        this.referer = iframeUrl 
+                        this.referer = finalIframeUrl 
                         this.headers = mapOf(
                             "Origin" to playerOrigin,
                             "User-Agent" to lastValidUserAgent
