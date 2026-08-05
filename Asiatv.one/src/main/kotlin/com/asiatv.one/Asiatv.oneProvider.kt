@@ -166,24 +166,15 @@ class AsiatvoneProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val logTag = "AsiaTVLogs"
         var linksLoaded = false
 
         try {
-            Log.d(logTag, "Starting loadLinks for: $data")
-
+            // 1. جلب epwatch
             val episodePage = app.get(data, headers = commonHeaders).document
-            val epwatch = episodePage.selectFirst("input[name=epwatch]")?.attr("value")
-            
-            if (epwatch.isNullOrBlank()) {
-                Log.e(logTag, "Could not find 'epwatch' ID.")
-                return false
-            }
-            Log.d(logTag, "Target epwatch: $epwatch")
+            val epwatch = episodePage.selectFirst("input[name=epwatch]")?.attr("value") ?: return false
 
+            // 2. زيارة الموقع الوسيط لتفعيل الجلسة (الكوكيز تُحفظ تلقائياً)
             val watchUrl = "https://asiawiki.me/"
-            
-            // 1. إرسال الطلب الأولي وتخزين الكوكيز تلقائياً في OkHttp
             val watchResponse = app.post(
                 watchUrl,
                 data = mapOf("epwatch" to epwatch),
@@ -191,28 +182,38 @@ class AsiatvoneProvider : MainAPI() {
                     "Origin" to mainUrl,
                     "Referer" to data,
                     "User-Agent" to USER_AGENT
-                ),
-                allowRedirects = true
+                )
             )
-            val newReferer = watchResponse.url
 
-            // 2. السر الأكبر: طلب الـ AJAX يجب أن يكون بصيغة GET !
-            val ajaxUrl = "https://asiawiki.me/wp-admin/admin-ajax.php?action=fetch_episode&id=$epwatch"
-            
-            val ajaxResponseText = app.get(
+            // 3. طلب AJAX (نبدأ بـ POST كما ظهر في أدوات المطور الخاصة بك)
+            val ajaxUrl = "https://asiawiki.me/wp-admin/admin-ajax.php"
+            var ajaxResponseText = app.post(
                 ajaxUrl,
                 headers = mapOf(
                     "X-Requested-With" to "XMLHttpRequest",
-                    "Accept" to "application/json, text/javascript, */*; q=0.01",
+                    "Content-Type" to "application/x-www-form-urlencoded; charset=UTF-8",
                     "Origin" to "https://asiawiki.me",
-                    "Referer" to newReferer,
-                    "User-Agent" to USER_AGENT
-                )
+                    "Referer" to watchResponse.url,
+                    "User-Agent" to USER_AGENT,
+                    "Accept" to "*/*"
+                ),
+                data = mapOf("action" to "fetch_episode", "id" to epwatch)
             ).text
 
-            Log.d(logTag, "AJAX Response Length: ${ajaxResponseText.length}")
+            // إذا رد الموقع بفراغ أو صفر، نرسل الطلب كـ GET كخطة بديلة
+            if (ajaxResponseText.isBlank() || ajaxResponseText.trim() == "0") {
+                ajaxResponseText = app.get(
+                    "$ajaxUrl?action=fetch_episode&id=$epwatch",
+                    headers = mapOf(
+                        "X-Requested-With" to "XMLHttpRequest",
+                        "Referer" to watchResponse.url,
+                        "User-Agent" to USER_AGENT,
+                        "Accept" to "*/*"
+                    )
+                ).text
+            }
 
-            // 3. التنظيف العنيف لفك أي تشفير سواء كان JSON أو Unicode أو HTML Entities
+            // 4. فك تشفير الرد بالكامل
             val cleanHtml = ajaxResponseText
                 .replace("\\\"", "\"")
                 .replace("\\/", "/")
@@ -227,20 +228,19 @@ class AsiatvoneProvider : MainAPI() {
                 .replace("&#038;", "&")
                 .replace("&amp;", "&")
 
-            // 4. استخراج كافة روابط الفيديو بقوة الـ Regex
+            // 5. استخراج الروابط من أي src موجود
             val srcRegex = """src=["'](.*?)["']""".toRegex(RegexOption.IGNORE_CASE)
-            val extractedUrls = srcRegex.findAll(cleanHtml).map { it.groupValues[1] }.toList()
+            val extractedUrls = srcRegex.findAll(cleanHtml).map { it.groupValues[1] }.distinct().toList()
 
-            Log.d(logTag, "Found ${extractedUrls.size} potential links.")
-
-            extractedUrls.distinct().amap { rawUrl ->
+            // 6. استخدام حلقة for آمنة جداً (لن تسبب أي Crash نهائياً)
+            for (rawUrl in extractedUrls) {
                 try {
-                    // استبعاد الصور أو الملفات غير المرغوبة
-                    if (rawUrl.endsWith(".jpg") || rawUrl.endsWith(".png") || rawUrl.contains("google.com")) return@amap
+                    // تجاهل الملفات غير المرغوبة
+                    if (rawUrl.endsWith(".jpg") || rawUrl.endsWith(".png") || rawUrl.contains("google.com")) continue
                     
                     var embedUrl = if (rawUrl.startsWith("//")) "https:$rawUrl" else rawUrl
                     
-                    // استبدال النطاقات الوهمية بالنطاقات التي تفهمها إضافة Cloudstream
+                    // خدع الدومينات
                     when {
                         embedUrl.contains("playmogo.com") -> embedUrl = embedUrl.replace("playmogo.com", "dood.to")
                         embedUrl.contains("vidmoly.biz") -> embedUrl = embedUrl.replace("vidmoly.biz", "vidmoly.to")
@@ -250,19 +250,18 @@ class AsiatvoneProvider : MainAPI() {
                         embedUrl.contains("luluvdo.com") -> embedUrl = embedUrl.replace("luluvdo.com", "lulustream.com")
                     }
                     
-                    Log.d(logTag, "Loading extractor for: $embedUrl")
-                    
-                    loadExtractor(embedUrl, newReferer, subtitleCallback, callback)?.let {
+                    // استدعاء الأداة لاستخراج الفيديو النهائي
+                    val success = loadExtractor(embedUrl, watchResponse.url, subtitleCallback, callback)
+                    if (success) {
                         linksLoaded = true
                     }
                 } catch (e: Exception) {
-                    Log.e(logTag, "Error processing URL ($rawUrl): ${e.message}")
+                    Log.e("AsiaTVLogs", "Extractor Error: ${e.message}")
                 }
             }
 
-        } catch (e: Throwable) {
-            Log.e(logTag, "Crash Prevented: ${e.message}")
-            e.printStackTrace()
+        } catch (e: Exception) {
+            Log.e("AsiaTVLogs", "Critical Error in loadLinks: ${e.message}")
         }
 
         return linksLoaded
