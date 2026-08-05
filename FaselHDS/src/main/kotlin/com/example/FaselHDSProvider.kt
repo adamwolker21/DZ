@@ -1,13 +1,14 @@
 package com.example
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.M3u8Helper
 import org.jsoup.nodes.Element
 import java.net.URI
 
 class FaselHDSProvider : MainAPI() {
-    // تم تغيير الرابط الأساسي للرابط المباشر لتخطي خطأ التوجيه (Redirect)
-    override var mainUrl = "https://web850x.faselhdx.bid"
+    // تم إرجاع الرابط الأصلي لكي تعمل واجهة الموقع بشكل صحيح
+    override var mainUrl = "https://www.faselhds.life"
     override var name = "FaselHDS"
     override val hasMainPage = true
     override var lang = "ar"
@@ -56,12 +57,13 @@ class FaselHDSProvider : MainAPI() {
     private fun Element.toSearchResult(): SearchResponse? {
         val anchor = this.selectFirst("a") ?: return null
         val href = anchor.attr("href").ifBlank { return null }
-        val title = anchor.selectFirst("div.h1")?.text()?.trim() ?: "No Title"
+        val title = anchor.selectFirst("div.h1")?.text() ?: "No Title"
         
-        val posterElement = this.selectFirst("div.imgdiv-class img, a > img.img-fluid, img.poster")
+        val posterElement = this.selectFirst("div.imgdiv-class img, a > img.img-fluid")
         val posterUrl = posterElement?.attr("data-src") ?: posterElement?.attr("src")
         
-        val isSeries = href.contains("/series/") || href.contains("/asian-series/") || title.contains("مسلسل")
+        val isSeries = title.contains("مسلسل") || title.contains("برنامج") ||
+                       this.selectFirst("span.quality:contains(حلقة), span.quality:contains(مواسم)") != null
         
         return if (isSeries) {
             newTvSeriesSearchResponse(title, href, TvType.TvSeries) { this.posterUrl = posterUrl }
@@ -71,87 +73,112 @@ class FaselHDSProvider : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val url = "$mainUrl/?s=$query"
-        val document = app.get(url, headers = headers).document
+        val document = app.get("$mainUrl/?s=$query", headers = headers).document
         return document.select("div.postDiv").mapNotNull {
             it.toSearchResult()
         }
     }
+    
+    private fun Element.getMetaInfo(iconClass: String): String? {
+        return this.selectFirst("span:has(i.$iconClass)")?.ownText()?.substringAfter(":")?.trim()
+    }
 
+    // تم إرجاع هذه الدالة لنسختك الأصلية التي تتعرف على المسلسلات بشكل صحيح
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url, headers = headers).document
-        val title = document.selectFirst("div.h1.title, h1.title")?.ownText()?.trim() ?: "No Title"
+        val title = document.selectFirst("div.h1.title")?.ownText()?.trim() ?: "No Title"
         
-        var posterUrl = document.selectFirst("div.posterImg img, img.poster")?.attr("src")
+        var posterUrl = document.selectFirst("div.posterImg img")?.attr("src")
         if (posterUrl.isNullOrBlank()) {
             val seasonListPoster = document.selectFirst("div#seasonList img")
             posterUrl = seasonListPoster?.attr("data-src") ?: seasonListPoster?.attr("src")
         }
+        if (posterUrl.isNullOrBlank()) {
+            posterUrl = document.selectFirst("img.poster")?.attr("src")
+        }
 
-        val plot = document.selectFirst("div.singleDesc p, div.singleDesc")?.text()?.trim()
-        val tags = document.select("div.col-xl-6:contains(تصنيف) a, div.tags a").map { it.text() }
-        val year = document.select("span:contains(سنة الإنتاج) a, span:contains(موعد الصدور)").text().let { Regex("""\d{4}""").find(it)?.value?.toIntOrNull() }
+        var plot = document.selectFirst("div.singleDesc p")?.text()?.trim()
+            ?: document.selectFirst("div.singleDesc")?.text()?.trim()
 
-        val isSingleEpisode = url.contains("/episodes/") || url.contains("episode")
-        val isTvSeries = (url.contains("/series/") || url.contains("/asian-series/") || document.select("div#seasonList, div#epAll, div.seasonDiv").isNotEmpty()) && !isSingleEpisode
+        val tags = document.select("div.col-xl-6:contains(تصنيف) a").map { it.text() }
+        
+        val isTvSeries = document.select("div#seasonList, div#epAll").isNotEmpty()
 
         if (isTvSeries) {
-            val episodes = mutableListOf<Episode>()
-            val seasonElements = document.select("div#seasonList div.seasonDiv")
-            val episodeSelector = "div#epAll a, div#episodes a, div.ep-item a, div.episodes-list a"
-
-            if (seasonElements.isNotEmpty()) {
-                seasonElements.forEach { seasonElement ->
-                    val onClick = seasonElement.attr("onclick")
-                    val seasonUrl = Regex("""['"](https?://[^'"]+|/[^'"]+)['"]""").find(onClick)?.groupValues?.get(1) 
-                        ?: seasonElement.selectFirst("a")?.attr("href")
-                        
-                    if (!seasonUrl.isNullOrBlank()) {
-                        val absSeasonUrl = if (seasonUrl.startsWith("http")) seasonUrl else "$mainUrl$seasonUrl"
-                        val seasonNum = Regex("""\d+""").find(seasonElement.text())?.value?.toIntOrNull() ?: 1
-                        
-                        try {
-                            val seasonDoc = app.get(absSeasonUrl, headers = headers).document
-                            seasonDoc.select(episodeSelector).forEach { ep ->
-                                val epName = ep.text().trim()
-                                episodes.add(newEpisode(ep.attr("href")) {
-                                    this.name = epName
-                                    this.season = seasonNum
-                                    this.episode = Regex("""\d+""").find(epName)?.value?.toIntOrNull()
-                                })
-                            }
-                        } catch (e: Exception) {}
-                    }
-                }
+            val year = Regex("""\d{4}""").find(document.select("span:contains(موعد الصدور)").firstOrNull()?.text() ?: "")?.value?.toIntOrNull()
+            var status: ShowStatus? = null
+            val statusText = document.selectFirst("span:contains(حالة المسلسل)")?.text() ?: ""
+            if (statusText.contains("مستمر")) {
+                status = ShowStatus.Ongoing
+            } else if (statusText.contains("مكتمل")) {
+                status = ShowStatus.Completed
             }
             
-            if (episodes.isEmpty()) {
+            val duration = document.getMetaInfo("fa-clock")?.filter { it.isDigit() }?.toIntOrNull()
+            
+            val country = document.getMetaInfo("fa-flag")
+            val episodeCount = document.getMetaInfo("fa-film")
+
+            val infoList = mutableListOf<String>()
+            episodeCount?.let { infoList.add("<b>الحلقات:</b> $it") }
+            country?.let { infoList.add("<b>دولة المسلسل:</b> $it") }
+            
+            if (infoList.isNotEmpty()) {
+                plot += "<br><br>${infoList.joinToString(" | ")}"
+            }
+
+            val episodes = mutableListOf<Episode>()
+            val seasonElements = document.select("div#seasonList div.seasonDiv")
+            val episodeSelector = "div#epAll a, div#episodes a, div.ep-item a"
+
+            if (seasonElements.isNotEmpty()) {
+                seasonElements.amap { seasonElement ->
+                    val seasonLink = seasonElement.attr("onclick")?.substringAfter("'")?.substringBefore("'")
+                        ?: seasonElement.selectFirst("a")?.attr("href") ?: return@amap
+                    val absoluteSeasonLink = if (seasonLink.startsWith("http")) seasonLink else "$mainUrl$seasonLink"
+                    val seasonNum = Regex("""\d+""").find(seasonElement.selectFirst("div.title")?.text() ?: "")?.value?.toIntOrNull()
+                    val seasonDoc = app.get(absoluteSeasonLink, headers = headers).document
+                    
+                    seasonDoc.select(episodeSelector).forEach { ep ->
+                        episodes.add(
+                            newEpisode(ep.attr("href")) {
+                                name = ep.text().trim()
+                                season = seasonNum
+                                episode = Regex("""\d+""").find(name ?: "")?.value?.toIntOrNull()
+                            }
+                        )
+                    }
+                }
+            } else {
                 document.select(episodeSelector).forEach { ep ->
-                    val epName = ep.text().trim()
-                    episodes.add(newEpisode(ep.attr("href")) {
-                        this.name = epName
-                        this.season = 1
-                        this.episode = Regex("""\d+""").find(epName)?.value?.toIntOrNull()
-                    })
+                    episodes.add(
+                        newEpisode(ep.attr("href")) {
+                            name = ep.text().trim()
+                            season = 1
+                            episode = Regex("""\d+""").find(name ?: "")?.value?.toIntOrNull()
+                        }
+                    )
                 }
             }
-
-            if (episodes.isEmpty()) {
-                return newMovieLoadResponse(title, url, TvType.Movie, url) {
-                    this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
-                }
+            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes.sortedBy { it.episode }) {
+                this.posterUrl = posterUrl
+                this.plot = plot
+                this.year = year
+                this.tags = tags
+                this.showStatus = status
+                this.duration = duration
             }
+        } else { // It's a Movie
+            val year = document.selectFirst("span:contains(سنة الإنتاج) a")?.text()?.toIntOrNull()
+            val duration = document.getMetaInfo("fa-clock")?.filter { it.isDigit() }?.toIntOrNull()
 
-            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes.distinctBy { it.data }.sortedBy { it.episode }) {
-                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
-            }
-        } else {
             return newMovieLoadResponse(title, url, TvType.Movie, url) {
-                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags
+                this.posterUrl = posterUrl; this.plot = plot; this.year = year; this.tags = tags; this.duration = duration
             }
         }
     }
 
+    // هذه هي الدالة الوحيدة التي تم تحديثها لجلب الروابط وتخطي الحماية
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -160,69 +187,40 @@ class FaselHDSProvider : MainAPI() {
     ): Boolean {
         val document = app.get(data, headers = headers).document
         
-        document.select("ul.tabs-ul li, div.servers-list li").forEachIndexed { index, serverElement ->
-            val serverUrl = Regex("""['"](https?://[^'"]+)['"]""").find(serverElement.attr("onclick"))?.groupValues?.get(1)
-                ?: serverElement.attr("data-url")
-            
+        document.select("ul.tabs-ul li").forEachIndexed { index, serverElement ->
+            val serverUrl = serverElement.attr("onclick").substringAfter("href = '").substringBefore("'")
             if (serverUrl.isBlank()) return@forEachIndexed
 
             try {
+                // إصلاح رابط المشغل
                 val fixedUrl = if (serverUrl.startsWith("//")) "https:$serverUrl" else serverUrl
                 
-                // استخراج نطاق المشغل لعمل هيدرز خاصة به (مهم جداً لتخطي الحماية)
-                val playerDomain = "https://${URI(fixedUrl).host}"
-                val playerHeaders = mapOf(
-                    "User-Agent" to headers["User-Agent"]!!,
-                    "Referer" to "$playerDomain/",
-                    "Origin" to playerDomain
-                )
+                // جلب صفحة المشغل مع تمرير الرابط الأصلي (data) كـ Referer
+                val playerPageContent = app.get(fixedUrl, headers = mapOf("Referer" to data, "User-Agent" to headers["User-Agent"]!!)).text
                 
-                val playerDoc = app.get(fixedUrl, headers = playerHeaders).document
-                val playerHtml = playerDoc.html()
-                
-                var foundLink: String? = null
-                
-                val regexes = listOf(
-                    Regex("""(https?://[^"']+\.m3u8[^"']*)"""),
-                    Regex("""(https?://[^"']+\.mp4[^"']*)"""),
-                    Regex("""file\s*:\s*["']([^"']+)["']"""),
-                    Regex("""source\s*:\s*["']([^"']+)["']""")
-                )
+                // البحث عن الرابط داخل صفحة المشغل
+                val regex = Regex("""(https?://[^"']+\.m3u8[^"']*)""")
+                val foundLink = regex.find(playerPageContent)?.groupValues?.get(1)
 
-                for (regex in regexes) {
-                    val match = regex.find(playerHtml)
-                    if (match != null) {
-                        foundLink = match.groupValues[1]
-                        break
-                    }
-                }
-
-                if (!foundLink.isNullOrBlank()) {
-                    val isM3u8Url = foundLink.contains(".m3u8", ignoreCase = true)
+                if (foundLink != null) {
+                    // استخراج نطاق المشغل (مثال: https://web850x.faselhdx.bid)
+                    val playerOrigin = "https://${URI(fixedUrl).host}"
                     
-                    if (isM3u8Url) {
-                        M3u8Helper.generateM3u8(
-                            source = "$name - Server ${index + 1}",
-                            streamUrl = foundLink,
-                            referer = "$playerDomain/",
-                            headers = playerHeaders
-                        ).forEach(callback)
-                    } else {
-                        callback.invoke(
-                            newExtractorLink(
-                                source = "$name - Server ${index + 1}",
-                                name = "$name - Server ${index + 1}",
-                                url = foundLink
-                            ) {
-                                this.referer = "$playerDomain/"
-                                this.quality = Qualities.Unknown.value
-                                this.headers = playerHeaders
-                            }
+                    // استخدام الهيدرز المطلوبة لتشغيل الفيديو (بناءً على الـ curl الخاص بك)
+                    M3u8Helper.generateM3u8(
+                        source = "$name Server ${index + 1}",
+                        streamUrl = foundLink,
+                        referer = "$playerOrigin/",
+                        headers = mapOf(
+                            "Origin" to playerOrigin,
+                            "Referer" to "$playerOrigin/",
+                            "User-Agent" to headers["User-Agent"]!!,
+                            "Accept" to "*/*"
                         )
-                    }
+                    ).forEach(callback)
                 }
             } catch (e: Exception) {
-                // تخطي في حال تعطل أحد السيرفرات
+                // Ignore errors to let other servers load
             }
         }
         return true
