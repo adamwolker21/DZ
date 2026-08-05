@@ -26,6 +26,8 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
+import okhttp3.CookieJar
+import okhttp3.Request
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import kotlin.coroutines.resume
@@ -102,12 +104,17 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
-        val url = "$mainUrl/?s=$encodedQuery"
-        
+        // تم إلغاء التشفير اليدوي لتجنب خطأ Double Encoding، التطبيق يتكفل بها.
+        val url = "$mainUrl/?s=$query"
         val document = app.get(url, headers = headers).document
         
-        return document.select("div.postDiv").mapNotNull {
+        val selector = if (document.selectFirst("div.post-listing") != null) {
+            "div.post-listing div.postDiv"
+        } else {
+            "div.postDiv"
+        }
+
+        return document.select(selector).mapNotNull {
             it.toSearchResult()
         }
     }
@@ -124,7 +131,9 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
             ?: document.selectFirst("title")?.text()?.substringBefore("-")?.trim() 
             ?: "No Title"
         
-        val posterUrl = fixUrlNull(document.selectFirst("div.posterImg img, img.poster, .imgdiv-class img, meta[itemprop=image], .singlePage img")?.let {
+        // تم تضمين الأماكن الاحتياطية الجديدة للبوستر لتغطية جميع الاحتمالات
+        val posterElement = document.selectFirst("div.posterImg img, img.poster, .imgdiv-class img, meta[itemprop=image], .singlePage img, div.seasonDiv img, div#seasonList img")
+        val posterUrl = fixUrlNull(posterElement?.let {
             it.attr("data-src").ifBlank { it.attr("src") }.ifBlank { it.attr("content") }
         })
 
@@ -344,7 +353,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
             val client = app.baseClient.newBuilder()
                 .followRedirects(true)
                 .followSslRedirects(true)
-                .cookieJar(okhttp3.CookieJar.NO_COOKIES)
+                .cookieJar(CookieJar.NO_COOKIES)
                 .build()
 
             val foundM3u8 = linkedSetOf<String>()
@@ -505,7 +514,7 @@ class FaselHDSProvider(private val context: Context) : MainAPI() {
                     if (request.method.equals("GET", ignoreCase = true) && lower.contains(".m3u8")) {
                         handleFoundLink(url)
                         try {
-                            val reqBuilder = okhttp3.Request.Builder().url(url)
+                            val reqBuilder = Request.Builder().url(url)
                                 .header("User-Agent", lastValidUserAgent)
                                 .header("Referer", referer)
                             try { cookieManager.getCookie(url)?.let { ck -> reqBuilder.header("Cookie", ck) } } catch (_: Exception) {}
