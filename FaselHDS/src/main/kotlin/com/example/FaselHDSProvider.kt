@@ -193,7 +193,7 @@ class FaselHDSProvider : MainAPI() {
                 // إصلاح الرابط في حال كان يبدأ بـ // بدلاً من https://
                 val fixedUrl = if (serverUrl.startsWith("//")) "https:$serverUrl" else serverUrl
                 
-                // جلب صفحة المشغل مع تمرير الرابط الأصلي كـ Referer لتخطي بعض الحمايات
+                // جلب صفحة المشغل مع تمرير الرابط الأصلي كـ Referer
                 val playerDoc = app.get(fixedUrl, headers = mapOf("Referer" to data, "User-Agent" to headers["User-Agent"]!!)).document
                 val playerHtml = playerDoc.html()
                 
@@ -236,7 +236,7 @@ class FaselHDSProvider : MainAPI() {
                             headers = mapOf("Referer" to fixedUrl, "Origin" to fixedUrl.substringBefore("/video_player"))
                         ).forEach(callback)
                     } else {
-                        // تم تطبيق التعديل هنا لاستخدام الـ Lambda بشكل صحيح
+                        // حذفنا المتغير isM3u8 لأنه لم يعد مطلوباً وهو مقروء فقط (Read-only)
                         callback.invoke(
                             newExtractorLink(
                                 source = "$name - Server ${index + 1}",
@@ -245,7 +245,6 @@ class FaselHDSProvider : MainAPI() {
                             ) {
                                 this.referer = fixedUrl
                                 this.quality = Qualities.Unknown.value
-                                this.isM3u8 = false
                             }
                         )
                     }
