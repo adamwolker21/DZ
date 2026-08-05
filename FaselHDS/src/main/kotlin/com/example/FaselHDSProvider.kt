@@ -4,6 +4,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.M3u8Helper
 import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.newExtractorLink
 import org.jsoup.nodes.Element
 import java.net.URI
 
@@ -218,7 +219,6 @@ class FaselHDSProvider : MainAPI() {
                         } else {
                             val qualityNum = Regex("""\d+""").find(qualityName)?.value?.toIntOrNull() ?: Qualities.Unknown.value
 
-                            // تم استخدام newExtractorLink بدلاً من ExtractorLink لحل مشكلة التحديثات في التطبيق
                             callback.invoke(
                                 newExtractorLink(
                                     source = name,
@@ -269,7 +269,6 @@ class FaselHDSProvider : MainAPI() {
                                 } else {
                                     val qualityNum = Regex("""\d+""").find(qualityName)?.value?.toIntOrNull() ?: Qualities.Unknown.value
                                     
-                                    // تم استخدام newExtractorLink هنا أيضاً
                                     callback.invoke(
                                         newExtractorLink(
                                             source = "$name Server ${index + 1}",
