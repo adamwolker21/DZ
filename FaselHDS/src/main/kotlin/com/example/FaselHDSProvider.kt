@@ -226,9 +226,9 @@ class FaselHDSProvider : MainAPI() {
 
                 // 3. إذا تم العثور على الرابط، نقوم بإرجاعه بناءً على نوعه
                 if (!foundLink.isNullOrBlank()) {
-                    val isM3u8 = foundLink.contains(".m3u8", ignoreCase = true)
+                    val isM3u8Url = foundLink.contains(".m3u8", ignoreCase = true)
                     
-                    if (isM3u8) {
+                    if (isM3u8Url) {
                         M3u8Helper.generateM3u8(
                             source = "$name - Server ${index + 1}",
                             streamUrl = foundLink,
@@ -236,16 +236,17 @@ class FaselHDSProvider : MainAPI() {
                             headers = mapOf("Referer" to fixedUrl, "Origin" to fixedUrl.substringBefore("/video_player"))
                         ).forEach(callback)
                     } else {
-                        // تم التعديل هنا لاستخدام newExtractorLink بدلاً من ExtractorLink
+                        // تم تطبيق التعديل هنا لاستخدام الـ Lambda بشكل صحيح
                         callback.invoke(
                             newExtractorLink(
                                 source = "$name - Server ${index + 1}",
                                 name = "$name - Server ${index + 1}",
-                                url = foundLink,
-                                referer = fixedUrl,
-                                quality = Qualities.Unknown.value,
-                                isM3u8 = false
-                            )
+                                url = foundLink
+                            ) {
+                                this.referer = fixedUrl
+                                this.quality = Qualities.Unknown.value
+                                this.isM3u8 = false
+                            }
                         )
                     }
                 }
