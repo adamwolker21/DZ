@@ -110,7 +110,6 @@ class StreamHG : ExtractorApi() {
     }
 }
 
-// مستخرج سيرفر Ult4vid المحدث مع إصلاح مشكلة &amp; وإضافة Logs
 class Ult4vid : ExtractorApi() {
     override var name = "Ult4vid"
     override var mainUrl = "ult4vid.one"
@@ -127,8 +126,8 @@ class Ult4vid : ExtractorApi() {
             if (!sourceUrlRaw.isNullOrBlank()) {
                 Log.d("Ult4vidExtractor", "Raw URL found: $sourceUrlRaw")
                 
-                // --- الإصلاح الأهم: تنظيف الرابط من كود الـ HTML Entities ---
-                val cleanUrl = sourceUrlRaw.replace("&amp;", "&")
+                // تنظيف الرابط من كود الـ HTML Entities (إصلاح &amp;)
+                val cleanUrl = sourceUrlRaw.replace("&amp;", "&").replace("&#038;", "&")
                 Log.d("Ult4vidExtractor", "Cleaned URL: $cleanUrl")
 
                 return listOf(
