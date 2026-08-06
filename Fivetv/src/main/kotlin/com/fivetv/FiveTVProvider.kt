@@ -175,15 +175,18 @@ class FiveTVProvider : MainAPI() {
                             actualUrl.contains("vinovo.to") -> actualUrl = actualUrl.replace("vinovo.to", "vidmoly.to")
                             actualUrl.contains("luluvdo.com") -> actualUrl = actualUrl.replace("luluvdo.com", "lulustream.com")
                             actualUrl.contains("earnvids.com") -> actualUrl = actualUrl.replace("earnvids.com", "morencius.com")
-                            
-                            // توجيه النطاقات البديلة لسيرفر Hgcloud
                             actualUrl.contains("streamhg.com") -> actualUrl = actualUrl.replace("streamhg.com", "hgcloud.to")
                             actualUrl.contains("hgcloud.com") -> actualUrl = actualUrl.replace("hgcloud.com", "hgcloud.to")
                             actualUrl.contains("hanerix.com") -> actualUrl = actualUrl.replace("hanerix.com", "hgcloud.to")
                             actualUrl.contains("vibuxer.com") -> actualUrl = actualUrl.replace("vibuxer.com", "hgcloud.to")
                         }
 
-                        loadExtractor(actualUrl, data, subtitleCallback, callback)
+                        // --- التحديث الأهم: الاستدعاء المباشر للمستخرج لتجنب تجاهله من التطبيق ---
+                        if (actualUrl.contains("ult4vid")) {
+                            Ult4vid().getUrl(actualUrl, data)?.forEach { callback.invoke(it) }
+                        } else {
+                            loadExtractor(actualUrl, data, subtitleCallback, callback)
+                        }
                     }
                 }
             } catch (e: Exception) {
