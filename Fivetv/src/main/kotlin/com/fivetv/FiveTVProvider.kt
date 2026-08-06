@@ -78,7 +78,6 @@ class FiveTVProvider : MainAPI() {
             document = app.get(currentUrl).document
         }
 
-        // جلب العنوان (دعم الأفلام والمسلسلات ftvx و ftvm)
         val title = document.selectFirst("meta[property=og:title]")?.attr("content")
             ?.replace("مشاهدة مسلسل", "")
             ?.replace("مترجم اون لاين - فايف تي في", "")
@@ -88,15 +87,12 @@ class FiveTVProvider : MainAPI() {
             
         val posterUrl = document.selectFirst("meta[property=og:image]")?.attr("content")
         
-        // جلب القصة بدقة للأفلام (ftvm) والمسلسلات (ftvx)
         val plot = document.selectFirst(".ftvx-description-inner p, .ftvm-description-inner p, .ftvx-description-inner, .ftvm-description-inner")?.text()?.trim()
             ?: document.selectFirst("meta[name=description]")?.attr("content")?.trim() ?: ""
         
-        // جلب سنة الإنتاج
         val yearText = document.selectFirst(".ftvx-chip, .ftvm-chip")?.text() ?: document.selectFirst(".card-year")?.text()
         val year = yearText?.filter { it.isDigit() }?.toIntOrNull()
         
-        // جلب المدة الزمنية بذكاء
         var duration: Int? = null
         val durationText = document.select(".ftvm-chip, .ftvx-chip").find { 
             it.text().contains("m") || it.text().contains("h") || it.text().contains("دقيقة") 
@@ -113,7 +109,6 @@ class FiveTVProvider : MainAPI() {
             }
         }
 
-        // جلب التصنيفات (دعم الأفلام والمسلسلات)
         val tags = document.select(".ftvx-cats a, .ftvm-cats a").map { it.text() }
 
         val episodesElements = document.select(".modern-episodes-grid a.modern-episode-card")
@@ -167,16 +162,34 @@ class FiveTVProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val document = app.get(data).document
-        val iframes = document.select("iframe")
         
-        iframes.amap { iframe ->
+        // استهداف أزرار التحميل المباشرة
+        val downloadButtons = document.select(".ftv-download-item a.ftv-download-button")
+        
+        downloadButtons.amap { button ->
             try {
-                val src = iframe.attr("data-src").takeIf { it.isNotBlank() } ?: iframe.attr("src")
-                if (src.isNotBlank() && src.startsWith("http")) {
-                    loadExtractor(src, data, subtitleCallback, callback)
+                val redirectUrl = button.attr("href")
+                
+                if (redirectUrl.isNotBlank() && redirectUrl.startsWith("http")) {
+                    // نقوم بزيارة رابط التحميل (الوسيط) لمعرفة الدومين الحقيقي الذي سيوجهنا إليه
+                    val response = app.get(redirectUrl)
+                    var actualUrl = response.url // استخراج الرابط الحقيقي بعد التوجيه
+                    
+                    if (actualUrl.isNotBlank()) {
+                        // تنظيف الدومينات المعروفة التي قد تسبب مشاكل
+                        when {
+                            actualUrl.contains("playmogo.com") -> actualUrl = actualUrl.replace("playmogo.com", "dood.to")
+                            actualUrl.contains("vidmoly.biz") -> actualUrl = actualUrl.replace("vidmoly.biz", "vidmoly.to")
+                            actualUrl.contains("vinovo.to") -> actualUrl = actualUrl.replace("vinovo.to", "vidmoly.to")
+                            actualUrl.contains("luluvdo.com") -> actualUrl = actualUrl.replace("luluvdo.com", "lulustream.com")
+                        }
+
+                        // تمرير الرابط النهائي لأداة الاستخراج
+                        loadExtractor(actualUrl, data, subtitleCallback, callback)
+                    }
                 }
             } catch (e: Exception) {
-                Log.e("FiveTVProvider", "Failed to load extractor: ${e.message}")
+                Log.e("FiveTVProvider", "Failed to resolve or load link: ${e.message}")
             }
         }
         
