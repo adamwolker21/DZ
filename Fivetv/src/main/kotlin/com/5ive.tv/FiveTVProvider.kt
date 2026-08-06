@@ -1,10 +1,8 @@
 package com.5ive.tv
 
 import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.loadExtractor
+import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
-import java.util.ArrayList
 
 class FiveTVProvider : MainAPI() {
     override var mainUrl = "https://5tv.lol"
@@ -45,7 +43,7 @@ class FiveTVProvider : MainAPI() {
         val url = this.selectFirst("a")?.attr("href") ?: return null
         
         val imgElement = this.selectFirst("img")
-        val posterUrl = imgElement?.attr("data-src")?.ifEmpty { imgElement.attr("src") }
+        val posterUrl = imgElement?.attr("data-src")?.ifBlank { imgElement.attr("src") }
         val year = this.selectFirst(".card-year")?.text()?.toIntOrNull()
 
         val isSeries = url.contains("/series/") || url.contains("مسلسل")
@@ -75,35 +73,32 @@ class FiveTVProvider : MainAPI() {
         var currentUrl = url
         var document = app.get(currentUrl).document
 
-        // --- الميزة الأهم: إعادة التوجيه لصفحة المسلسل إذا كنا داخل حلقة ---
-        // نبحث عن زر "قائمه الحلقات والمواسم"
+        // إعادة التوجيه لصفحة المسلسل إذا كنا داخل حلقة
         val backToSeriesLink = document.selectFirst("a:has(span:contains(قائمه الحلقات))")?.attr("href")
         
-        if (!backToSeriesLink.isNullOrEmpty() && (currentUrl.contains("/episode/") || currentUrl.contains("حلقة"))) {
-            // تحديث الرابط والمستند ليكون الخاص بالمسلسل بدلاً من الحلقة
+        if (!backToSeriesLink.isNullOrBlank() && (currentUrl.contains("/episode/") || currentUrl.contains("حلقة"))) {
             currentUrl = backToSeriesLink
             document = app.get(currentUrl).document
         }
 
         // استخراج البيانات الأساسية
-        // تم تحديث المحددات لتشمل meta tags لأنها أدق وتعمل دائماً
-        val title = document.selectFirst("meta[property=og:title]")?.attr("content")?.replace("مشاهدة مسلسل", "")?.replace("مترجم اون لاين - فايف تي في", "")?.replace("مشاهدة فيلم", "")?.trim() 
+        val title = document.selectFirst("meta[property=og:title]")?.attr("content")
+            ?.replace("مشاهدة مسلسل", "")
+            ?.replace("مترجم اون لاين - فايف تي في", "")
+            ?.replace("مشاهدة فيلم", "")
+            ?.trim() 
             ?: document.selectFirst(".ftvx-title-main h1, h1")?.text() ?: ""
             
         val poster = document.selectFirst("meta[property=og:image]")?.attr("content")
         
-        // استخراج القصة (الوصف)
         val plot = document.selectFirst("meta[name=description]")?.attr("content") 
             ?: document.selectFirst(".story-content, .ftvx-story")?.text()
         
-        // استخراج السنة
         val yearText = document.selectFirst(".ftvx-chip")?.text() ?: document.selectFirst(".card-year")?.text()
         val year = yearText?.replace(Regex("[^0-9]"), "")?.toIntOrNull()
         
-        // استخراج التصنيفات
         val tags = document.select(".ftvx-cats a").map { it.text() }
 
-        // استخراج الحلقات
         val episodesElements = document.select(".modern-episodes-grid a.modern-episode-card")
 
         if (episodesElements.isNotEmpty()) {
@@ -111,23 +106,20 @@ class FiveTVProvider : MainAPI() {
                 val epUrl = epLink.attr("href") ?: return@mapNotNull null
                 val epTitle = epLink.selectFirst(".modern-badge")?.text() ?: ""
                 val epPosterElement = epLink.selectFirst("img")
-                val epPoster = epPosterElement?.attr("data-src")?.ifEmpty { epPosterElement.attr("src") }
+                val epPoster = epPosterElement?.attr("data-src")?.ifBlank { epPosterElement.attr("src") }
                 
-                // استخراج رقم الموسم والحلقة من الرابط بذكاء
-                // الروابط في الموقع تأتي بصيغة: name-1x2 (الموسم 1 الحلقة 2)
                 val seasonEpisodeMatch = Regex("-(\\d+)x(\\d+)").find(epUrl)
-                
                 val seasonNum = seasonEpisodeMatch?.groupValues?.get(1)?.toIntOrNull() ?: 1
                 val episodeNum = seasonEpisodeMatch?.groupValues?.get(2)?.toIntOrNull() 
                     ?: epTitle.replace(Regex("[^0-9]"), "").toIntOrNull()
 
-                Episode(
-                    data = epUrl,
-                    name = epTitle,
-                    season = seasonNum,
-                    episode = episodeNum,
-                    posterUrl = epPoster
-                )
+                // استخدام دالة newEpisode بدلاً من Episode لحل مشكلة البناء (Deprecated)
+                newEpisode(epUrl) {
+                    this.name = epTitle
+                    this.season = seasonNum
+                    this.episode = episodeNum
+                    this.posterUrl = epPoster
+                }
             }
 
             return newTvSeriesLoadResponse(title, currentUrl, TvType.TvSeries, episodes) {
@@ -137,7 +129,6 @@ class FiveTVProvider : MainAPI() {
                 this.plot = plot
             }
         } else {
-            // إذا لم توجد حلقات فهو فيلم
             return newMovieLoadResponse(title, currentUrl, TvType.Movie, currentUrl) {
                 this.posterUrl = poster
                 this.year = year
@@ -156,49 +147,19 @@ class FiveTVProvider : MainAPI() {
         val document = app.get(data).document
         var foundLinks = false
         
-        // 1. البحث عن مشغلات الفيديو المضمنة مباشرة (iframes)
+        // البحث عن مشغلات الفيديو المضمنة مباشرة (iframes)
         document.select("iframe").forEach { iframe ->
-            val src = iframe.attr("data-src").ifEmpty { iframe.attr("src") }
-            if (src.isNotEmpty() && src.startsWith("http")) {
-                loadExtractor(src, data, subtitleCallback, callback)
-                foundLinks = true
+            val src = iframe.attr("data-src").ifBlank { iframe.attr("src") }
+            if (src.isNotBlank() && src.startsWith("http")) {
+                if (loadExtractor(src, data, subtitleCallback, callback)) {
+                    foundLinks = true
+                }
             }
         }
 
-        // 2. محاولة جلب روابط التحميل المباشرة إن وجدت في الـ HTML (كما في ملف الفيلم الذي أرسلته)
-        document.select(".ftv-download-item a.ftv-download-button").forEach { downloadLink ->
-            val href = downloadLink.attr("href")
-            val serverName = downloadLink.parent()?.selectFirst(".ftv-download-info strong")?.text() ?: "تحميل"
-            val quality = downloadLink.parent()?.selectFirst(".ftv-quality-chip .ftv-chip-value")?.text() ?: ""
-            val name = "$serverName $quality".trim()
-
-            if (href.isNotEmpty()) {
-                // قد تكون روابط التحميل تحتاج لتخطي، لكننا نرسلها كـ ExtractorLink لاختبارها
-                callback.invoke(
-                    ExtractorLink(
-                        source = "FiveTV Download",
-                        name = name,
-                        url = href,
-                        referer = mainUrl,
-                        quality = getQualityFromName(quality),
-                        isM3u8 = href.contains(".m3u8")
-                    )
-                )
-                foundLinks = true
-            }
-        }
+        // تم تجاهل أزرار التحميل اليدوية لأنها غالباً روابط توجيهية (Redirect)
+        // وليست روابط MP4 مباشرة، ومحاولة جلبها كانت تسبب أخطاء Qualities.
 
         return foundLinks
-    }
-
-    // دالة مساعدة لتحويل النص إلى صيغة جودة يفهمها التطبيق
-    private fun getQualityFromName(qualityName: String): Int {
-        return when {
-            qualityName.contains("1080") -> Qualities.P1080.value
-            qualityName.contains("720") -> Qualities.P720.value
-            qualityName.contains("480") -> Qualities.P480.value
-            qualityName.contains("360") -> Qualities.P360.value
-            else -> Qualities.Unknown.value
-        }
     }
 }
