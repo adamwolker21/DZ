@@ -4,8 +4,7 @@ import com.lagradost.cloudstream3.USER_AGENT
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.newExtractorLink
+import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import com.lagradost.cloudstream3.utils.JsUnpacker
 import android.util.Log
@@ -47,10 +46,16 @@ class Earnvids : ExtractorApi() {
                 val headers = mapOf("Referer" to finalPageUrl, "User-Agent" to USER_AGENT)
                 val finalUrlWithHeaders = "$videoLink#headers=${JSONObject(headers)}"
 
+                // استخدام ExtractorLink الكلاسيكي المدعوم في كل الإصدارات
                 return listOf(
-                    newExtractorLink(source = "Morencius", name = "Morencius", url = finalUrlWithHeaders, type = ExtractorLinkType.M3U8) {
-                        this.referer = finalPageUrl
-                    }
+                    ExtractorLink(
+                        source = "Morencius",
+                        name = "Morencius",
+                        url = finalUrlWithHeaders,
+                        referer = finalPageUrl,
+                        quality = Qualities.Unknown.value,
+                        isM3u8 = true
+                    )
                 )
             } catch (e: Exception) {
                 Log.e(logTag, "Failed to extract from host $host. Error: ${e.message}")
@@ -76,8 +81,16 @@ class StreamHG : ExtractorApi() {
             val videoLink = findUrlInUnpackedJs(unpackedJs)
             
             if (videoLink != null) {
+                // استخدام ExtractorLink الكلاسيكي المدعوم في كل الإصدارات
                 return listOf(
-                    newExtractorLink(source = "Hgcloud", name = "Hgcloud", url = videoLink, referer = embedUrl, type = ExtractorLinkType.M3U8)
+                    ExtractorLink(
+                        source = "Hgcloud",
+                        name = "Hgcloud",
+                        url = videoLink,
+                        referer = embedUrl,
+                        quality = Qualities.Unknown.value,
+                        isM3u8 = true
+                    )
                 )
             }
         } catch (e: Exception) {
