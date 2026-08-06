@@ -2,7 +2,9 @@ package com.5ive.tv
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import android.util.Log
 
 class FiveTVProvider : MainAPI() {
     override var mainUrl = "https://5tv.lol"
@@ -23,57 +25,54 @@ class FiveTVProvider : MainAPI() {
         "$mainUrl/category/new-rows/" to "أحدث الإضافات"
     )
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val url = if (page == 1) {
-            request.data
-        } else {
-            "${request.data}page/$page/"
-        }
-
+    override suspend fun getMainPage(
+        page: Int,
+        request: MainPageRequest
+    ): HomePageResponse {
+        val url = if (page == 1) request.data else "${request.data}page/$page/"
         val document = app.get(url).document
+        
         val home = document.select("li[class*=-publish] article.card-modern, .card-modern").mapNotNull {
             it.toSearchResult()
         }
-
+        
         return newHomePageResponse(request.name, home)
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
-        val title = this.selectFirst(".card-title")?.text() ?: return null
-        val url = this.selectFirst("a")?.attr("href") ?: return null
+        val linkTag = this.selectFirst("a") ?: return null
+        val href = linkTag.attr("href")
+        val title = this.selectFirst(".card-title")?.text()?.trim() ?: return null
         
         val imgElement = this.selectFirst("img")
-        val posterUrl = imgElement?.attr("data-src")?.ifBlank { imgElement.attr("src") }
-        val year = this.selectFirst(".card-year")?.text()?.toIntOrNull()
+        val posterUrl = imgElement?.attr("data-src")?.takeIf { it.isNotBlank() } ?: imgElement?.attr("src")
 
-        val isSeries = url.contains("/series/") || url.contains("مسلسل")
+        val isSeries = href.contains("/series/") || href.contains("مسلسل")
 
         return if (isSeries) {
-            newTvSeriesSearchResponse(title, url, TvType.TvSeries) {
+            newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
                 this.posterUrl = posterUrl
-                this.year = year
+                // تم إزالة this.year من هنا لأنه السبب الرئيسي لخطأ البناء (غير مدعوم في البحث)
             }
         } else {
-            newMovieSearchResponse(title, url, TvType.Movie) {
+            newMovieSearchResponse(title, href, TvType.Movie) {
                 this.posterUrl = posterUrl
-                this.year = year
             }
         }
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val searchUrl = "$mainUrl/?s=$query"
-        val document = app.get(searchUrl).document
+        val document = app.get("$mainUrl/?s=$query").document
         return document.select("li[class*=-publish] article.card-modern, .card-modern").mapNotNull {
             it.toSearchResult()
         }
     }
 
-    override suspend fun load(url: String): LoadResponse {
+    override suspend fun load(url: String): LoadResponse? {
         var currentUrl = url
         var document = app.get(currentUrl).document
 
-        // إعادة التوجيه لصفحة المسلسل إذا كنا داخل حلقة
+        // التوجيه الذكي من صفحة الحلقة إلى صفحة المسلسل الأصلية
         val backToSeriesLink = document.selectFirst("a:has(span:contains(قائمه الحلقات))")?.attr("href")
         
         if (!backToSeriesLink.isNullOrBlank() && (currentUrl.contains("/episode/") || currentUrl.contains("حلقة"))) {
@@ -81,57 +80,59 @@ class FiveTVProvider : MainAPI() {
             document = app.get(currentUrl).document
         }
 
-        // استخراج البيانات الأساسية
         val title = document.selectFirst("meta[property=og:title]")?.attr("content")
             ?.replace("مشاهدة مسلسل", "")
             ?.replace("مترجم اون لاين - فايف تي في", "")
             ?.replace("مشاهدة فيلم", "")
             ?.trim() 
-            ?: document.selectFirst(".ftvx-title-main h1, h1")?.text() ?: ""
+            ?: document.selectFirst(".ftvx-title-main h1, h1")?.text()?.trim() ?: return null
             
-        val poster = document.selectFirst("meta[property=og:image]")?.attr("content")
+        val posterUrl = document.selectFirst("meta[property=og:image]")?.attr("content")
         
         val plot = document.selectFirst("meta[name=description]")?.attr("content") 
-            ?: document.selectFirst(".story-content, .ftvx-story")?.text()
+            ?: document.selectFirst(".story-content, .ftvx-story")?.text()?.trim() ?: ""
         
         val yearText = document.selectFirst(".ftvx-chip")?.text() ?: document.selectFirst(".card-year")?.text()
-        val year = yearText?.replace(Regex("[^0-9]"), "")?.toIntOrNull()
+        val year = yearText?.filter { it.isDigit() }?.toIntOrNull()
         
         val tags = document.select(".ftvx-cats a").map { it.text() }
 
         val episodesElements = document.select(".modern-episodes-grid a.modern-episode-card")
+        val isSeries = episodesElements.isNotEmpty() || currentUrl.contains("/series/") || currentUrl.contains("مسلسل")
 
-        if (episodesElements.isNotEmpty()) {
+        if (isSeries) {
             val episodes = episodesElements.mapNotNull { epLink ->
-                val epUrl = epLink.attr("href") ?: return@mapNotNull null
-                val epTitle = epLink.selectFirst(".modern-badge")?.text() ?: ""
-                val epPosterElement = epLink.selectFirst("img")
-                val epPoster = epPosterElement?.attr("data-src")?.ifBlank { epPosterElement.attr("src") }
-                
-                val seasonEpisodeMatch = Regex("-(\\d+)x(\\d+)").find(epUrl)
-                val seasonNum = seasonEpisodeMatch?.groupValues?.get(1)?.toIntOrNull() ?: 1
-                val episodeNum = seasonEpisodeMatch?.groupValues?.get(2)?.toIntOrNull() 
-                    ?: epTitle.replace(Regex("[^0-9]"), "").toIntOrNull()
+                val epUrl = epLink.attr("href")
+                if (epUrl.isBlank()) return@mapNotNull null
 
-                // تم العودة لاستخدام Episode القياسي المدعوم 100% لتفادي أخطاء البناء
-                Episode(
-                    data = epUrl,
-                    name = epTitle,
-                    season = seasonNum,
-                    episode = episodeNum,
-                    posterUrl = epPoster
-                )
+                val epTitle = epLink.selectFirst(".modern-badge")?.text()?.trim() ?: ""
+                
+                // استخراج رقم الموسم والحلقة بطريقة آمنة
+                val seasonEpisodeMatch = Regex("-(\\d+)x(\\d+)").find(epUrl)
+                val seasonNum = seasonEpisodeMatch?.groupValues?.get(1)?.toIntOrNull()
+                val episodeNum = seasonEpisodeMatch?.groupValues?.get(2)?.toIntOrNull() 
+                    ?: epTitle.filter { it.isDigit() }.toIntOrNull()
+
+                val epPosterElement = epLink.selectFirst("img")
+                val epPosterUrl = epPosterElement?.attr("data-src")?.takeIf { it.isNotBlank() } ?: epPosterElement?.attr("src")
+
+                newEpisode(epUrl) {
+                    this.name = epTitle
+                    this.season = seasonNum
+                    this.episode = episodeNum
+                    this.posterUrl = epPosterUrl
+                }
             }
 
             return newTvSeriesLoadResponse(title, currentUrl, TvType.TvSeries, episodes) {
-                this.posterUrl = poster
+                this.posterUrl = posterUrl
                 this.year = year
                 this.tags = tags
                 this.plot = plot
             }
         } else {
             return newMovieLoadResponse(title, currentUrl, TvType.Movie, currentUrl) {
-                this.posterUrl = poster
+                this.posterUrl = posterUrl
                 this.year = year
                 this.tags = tags
                 this.plot = plot
@@ -140,24 +141,26 @@ class FiveTVProvider : MainAPI() {
     }
 
     override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
+        data: String, 
+        isCasting: Boolean, 
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val document = app.get(data).document
-        var foundLinks = false
+        val iframes = document.select("iframe")
         
-        // البحث عن مشغلات الفيديو المضمنة مباشرة (iframes)
-        document.select("iframe").forEach { iframe ->
-            val src = iframe.attr("data-src").ifBlank { iframe.attr("src") }
-            if (src.isNotBlank() && src.startsWith("http")) {
-                if (loadExtractor(src, data, subtitleCallback, callback)) {
-                    foundLinks = true
+        // استخدام amap للمزامنة وتفادي الانهيارات (Crash) مثل إضافة EgyDead
+        iframes.amap { iframe ->
+            try {
+                val src = iframe.attr("data-src").takeIf { it.isNotBlank() } ?: iframe.attr("src")
+                if (src.isNotBlank() && src.startsWith("http")) {
+                    loadExtractor(src, data, subtitleCallback, callback)
                 }
+            } catch (e: Exception) {
+                Log.e("FiveTVProvider", "Failed to load extractor: ${e.message}")
             }
         }
-
-        return foundLinks
+        
+        return true
     }
 }
