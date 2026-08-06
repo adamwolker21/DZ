@@ -198,9 +198,11 @@ class FiveTVProvider : MainAPI() {
 
                         Log.d("FiveTVProvider", "Final Extracted URL: $actualUrl")
 
-                        // شبكة صيد واسعة لالتقاط أي دومين يحتوي على الكلمة (ult أو ultra)
+                        // تمرير السيرفرات إلى المستخرجات المخصصة أو الافتراضية
                         if (actualUrl.contains("ult4vid", ignoreCase = true) || actualUrl.contains("ultra4vid", ignoreCase = true)) {
                             Ult4vid().getUrl(actualUrl, data)?.forEach { callback.invoke(it) }
+                        } else if (actualUrl.contains("71stream", ignoreCase = true)) {
+                            Stream71().getUrl(actualUrl, data)?.forEach { callback.invoke(it) } // استدعاء السيرفر الجديد
                         } else {
                             loadExtractor(actualUrl, data, subtitleCallback, callback)
                         }
