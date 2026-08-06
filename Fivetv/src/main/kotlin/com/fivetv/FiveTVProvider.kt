@@ -24,10 +24,7 @@ class FiveTVProvider : MainAPI() {
         "$mainUrl/category/new-rows/" to "أحدث الإضافات"
     )
 
-    override suspend fun getMainPage(
-        page: Int,
-        request: MainPageRequest
-    ): HomePageResponse {
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page == 1) request.data else "${request.data}page/$page/"
         val document = app.get(url).document
         
@@ -177,9 +174,13 @@ class FiveTVProvider : MainAPI() {
                             actualUrl.contains("vidmoly.biz") -> actualUrl = actualUrl.replace("vidmoly.biz", "vidmoly.to")
                             actualUrl.contains("vinovo.to") -> actualUrl = actualUrl.replace("vinovo.to", "vidmoly.to")
                             actualUrl.contains("luluvdo.com") -> actualUrl = actualUrl.replace("luluvdo.com", "lulustream.com")
-                            // توجيه الدومينات البديلة للمستخرجات المخصصة
                             actualUrl.contains("earnvids.com") -> actualUrl = actualUrl.replace("earnvids.com", "morencius.com")
-                            actualUrl.contains("streamhg.com") -> actualUrl = actualUrl.replace("streamhg.com", "hgcloud.com")
+                            
+                            // توجيه النطاقات البديلة لسيرفر Hgcloud
+                            actualUrl.contains("streamhg.com") -> actualUrl = actualUrl.replace("streamhg.com", "hgcloud.to")
+                            actualUrl.contains("hgcloud.com") -> actualUrl = actualUrl.replace("hgcloud.com", "hgcloud.to")
+                            actualUrl.contains("hanerix.com") -> actualUrl = actualUrl.replace("hanerix.com", "hgcloud.to")
+                            actualUrl.contains("vibuxer.com") -> actualUrl = actualUrl.replace("vibuxer.com", "hgcloud.to")
                         }
 
                         loadExtractor(actualUrl, data, subtitleCallback, callback)
