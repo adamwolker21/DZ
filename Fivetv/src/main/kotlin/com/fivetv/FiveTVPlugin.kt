@@ -13,6 +13,7 @@ class FiveTVPlugin: Plugin() {
         // تسجيل المستخرجات المخصصة للسيرفرات
         registerExtractorAPI(Earnvids())
         registerExtractorAPI(StreamHG())
-        registerExtractorAPI(Ult4vid()) // تم إضافة سيرفر Ult4vid هنا
+        registerExtractorAPI(Ult4vid())
+        registerExtractorAPI(Stream71()) // تسجيل السيرفر الجديد 71stream
     }
 }
