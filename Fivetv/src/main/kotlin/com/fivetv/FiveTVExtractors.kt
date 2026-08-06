@@ -117,9 +117,6 @@ class Ult4vid : ExtractorApi() {
 
     override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
         try {
-            Log.d("Ult4vidExtractor", "Fetching URL: $url")
-            
-            // إضافة هيدرز متكاملة لضمان استجابة الموقع بشكل صحيح بدلاً من الحجب
             val headers = mapOf(
                 "User-Agent" to USER_AGENT,
                 "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
@@ -128,7 +125,6 @@ class Ult4vid : ExtractorApi() {
             
             val responseText = app.get(url, headers = headers, referer = referer ?: url, interceptor = cloudflareKiller).text
             
-            // البحث عن الرابط بطريقتين: وسم source أو دومين cloudflarestorage مباشرة
             var sourceUrlRaw = Regex("""<source[^>]+src=["']([^"']+)["']""").find(responseText)?.groupValues?.get(1)
             
             if (sourceUrlRaw.isNullOrBlank()) {
@@ -136,12 +132,7 @@ class Ult4vid : ExtractorApi() {
             }
 
             if (!sourceUrlRaw.isNullOrBlank()) {
-                Log.d("Ult4vidExtractor", "Raw URL found: $sourceUrlRaw")
-                
-                // تنظيف الرابط من كود الـ HTML Entities بدقة
                 val cleanUrl = sourceUrlRaw.replace("&amp;", "&").replace("&#038;", "&")
-                Log.d("Ult4vidExtractor", "Cleaned URL: $cleanUrl")
-
                 return listOf(
                     newExtractorLink(
                         source = this.name,
@@ -153,12 +144,69 @@ class Ult4vid : ExtractorApi() {
                         this.quality = Qualities.P1080.value
                     }
                 )
-            } else {
-                Log.e("Ult4vidExtractor", "Could not find video URL in HTML.")
             }
         } catch (e: Exception) {
-            Log.e("Ult4vidExtractor", "Error during extraction: ${e.message}")
+            Log.e("Ult4vidExtractor", "Error: ${e.message}")
         }
         return null
+    }
+}
+
+// المستخرج الجديد الخاص بـ 71stream
+class Stream71 : ExtractorApi() {
+    override var name = "71stream"
+    override var mainUrl = "71stream.one"
+    override val requiresReferer = false
+
+    override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
+        val extractedLinks = mutableListOf<ExtractorLink>()
+        try {
+            val document = app.get(url, referer = referer ?: url, interceptor = cloudflareKiller).document
+            
+            // استخراج كود الـ JSON من داخل <div id="app" data-page="...">
+            val dataPageContent = document.selectFirst("#app")?.attr("data-page")
+            if (dataPageContent.isNullOrBlank()) return null
+
+            val jsonObject = JSONObject(dataPageContent)
+            val props = jsonObject.optJSONObject("props") ?: return null
+            val qualitiesArray = props.optJSONArray("qualities") ?: return null
+
+            // المرور على جميع الجودات المتاحة
+            for (i in 0 until qualitiesArray.length()) {
+                val qualityItem = qualitiesArray.optJSONObject(i) ?: continue
+                val rawUrl = qualityItem.optString("url")
+                val label = qualityItem.optString("label") // مثال: 720p, 480p, Original
+
+                if (rawUrl.isNotBlank()) {
+                    // تنظيف الرابط من التشفير
+                    val cleanUrl = rawUrl.replace("&amp;", "&").replace("&#038;", "&")
+                    
+                    // تحديد الجودة بناءً على النص
+                    val qualityValue = when {
+                        label.contains("Original", ignoreCase = true) || label.contains("1080") -> Qualities.P1080.value
+                        label.contains("720") -> Qualities.P720.value
+                        label.contains("480") -> Qualities.P480.value
+                        label.contains("360") -> Qualities.P360.value
+                        else -> Qualities.Unknown.value
+                    }
+
+                    extractedLinks.add(
+                        newExtractorLink(
+                            source = this.name,
+                            name = "${this.name} $label",
+                            url = cleanUrl,
+                            type = ExtractorLinkType.VIDEO
+                        ) {
+                            this.referer = url
+                            this.quality = qualityValue
+                        }
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("Stream71Extractor", "Error: ${e.message}")
+        }
+        
+        return if (extractedLinks.isNotEmpty()) extractedLinks else null
     }
 }
