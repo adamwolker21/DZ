@@ -78,20 +78,22 @@ class FiveTVProvider : MainAPI() {
             document = app.get(currentUrl).document
         }
 
+        // جلب العنوان (دعم الأفلام والمسلسلات ftvx و ftvm)
         val title = document.selectFirst("meta[property=og:title]")?.attr("content")
             ?.replace("مشاهدة مسلسل", "")
             ?.replace("مترجم اون لاين - فايف تي في", "")
             ?.replace("مشاهدة فيلم", "")
             ?.trim() 
-            ?: document.selectFirst(".ftvx-title-main h1, h1")?.text()?.trim() ?: return null
+            ?: document.selectFirst(".ftvx-title-main h1, .ftvm-title-main h1, h1")?.text()?.trim() ?: return null
             
         val posterUrl = document.selectFirst("meta[property=og:image]")?.attr("content")
         
-        // جلب القصة من المسار الدقيق الجديد
-        val plot = document.selectFirst(".ftvx-description-inner p, .ftvx-description-inner")?.text()?.trim()
+        // جلب القصة بدقة للأفلام (ftvm) والمسلسلات (ftvx)
+        val plot = document.selectFirst(".ftvx-description-inner p, .ftvm-description-inner p, .ftvx-description-inner, .ftvm-description-inner")?.text()?.trim()
             ?: document.selectFirst("meta[name=description]")?.attr("content")?.trim() ?: ""
         
-        val yearText = document.selectFirst(".ftvx-chip")?.text() ?: document.selectFirst(".card-year")?.text()
+        // جلب سنة الإنتاج
+        val yearText = document.selectFirst(".ftvx-chip, .ftvm-chip")?.text() ?: document.selectFirst(".card-year")?.text()
         val year = yearText?.filter { it.isDigit() }?.toIntOrNull()
         
         // جلب المدة الزمنية بذكاء
@@ -102,10 +104,8 @@ class FiveTVProvider : MainAPI() {
 
         if (durationText != null) {
             if (durationText.contains("دقيقة")) {
-                // إذا كانت بالدقائق مباشرة مثل "75 دقيقة"
                 duration = durationText.filter { it.isDigit() }.toIntOrNull()
             } else {
-                // إذا كانت بالساعات والدقائق مثل "1h 46m" يتم تحويلها إلى دقائق
                 val hours = Regex("(\\d+)h").find(durationText)?.groupValues?.get(1)?.toIntOrNull() ?: 0
                 val minutes = Regex("(\\d+)m").find(durationText)?.groupValues?.get(1)?.toIntOrNull() ?: 0
                 val totalMinutes = (hours * 60) + minutes
@@ -113,7 +113,8 @@ class FiveTVProvider : MainAPI() {
             }
         }
 
-        val tags = document.select(".ftvx-cats a").map { it.text() }
+        // جلب التصنيفات (دعم الأفلام والمسلسلات)
+        val tags = document.select(".ftvx-cats a, .ftvm-cats a").map { it.text() }
 
         val episodesElements = document.select(".modern-episodes-grid a.modern-episode-card")
         val isSeries = episodesElements.isNotEmpty() || currentUrl.contains("/series/") || currentUrl.contains("مسلسل")
