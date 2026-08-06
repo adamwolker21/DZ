@@ -110,7 +110,7 @@ class StreamHG : ExtractorApi() {
     }
 }
 
-// مستخرج سيرفر Ult4vid المحدث (بالاعتماد على Regex)
+// مستخرج سيرفر Ult4vid المحدث مع إصلاح مشكلة &amp; وإضافة Logs
 class Ult4vid : ExtractorApi() {
     override var name = "Ult4vid"
     override var mainUrl = "ult4vid.one"
@@ -118,27 +118,35 @@ class Ult4vid : ExtractorApi() {
 
     override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
         try {
-            // جلب النص الخام للصفحة
+            Log.d("Ult4vidExtractor", "Fetching URL: $url")
             val responseText = app.get(url, referer = referer, interceptor = cloudflareKiller).text
             
-            // استخدام Regex قوي للبحث عن وسم <source> ورابط mp4
-            val sourceUrl = Regex("""<source[^>]+src=["']([^"']+)["']""").find(responseText)?.groupValues?.get(1)
+            // استخراج الرابط الخام
+            val sourceUrlRaw = Regex("""<source[^>]+src=["']([^"']+)["']""").find(responseText)?.groupValues?.get(1)
 
-            if (!sourceUrl.isNullOrBlank()) {
+            if (!sourceUrlRaw.isNullOrBlank()) {
+                Log.d("Ult4vidExtractor", "Raw URL found: $sourceUrlRaw")
+                
+                // --- الإصلاح الأهم: تنظيف الرابط من كود الـ HTML Entities ---
+                val cleanUrl = sourceUrlRaw.replace("&amp;", "&")
+                Log.d("Ult4vidExtractor", "Cleaned URL: $cleanUrl")
+
                 return listOf(
                     newExtractorLink(
                         source = this.name,
-                        name = this.name, // سيظهر باسم Ult4vid
-                        url = sourceUrl,
-                        type = ExtractorLinkType.VIDEO // تحديد مباشر كفيديو MP4
+                        name = this.name,
+                        url = cleanUrl,
+                        type = ExtractorLinkType.VIDEO
                     ) {
                         this.referer = url
-                        this.quality = Qualities.P1080.value // جودة 1080p
+                        this.quality = Qualities.P1080.value
                     }
                 )
+            } else {
+                Log.e("Ult4vidExtractor", "Could not find <source> tag or src attribute in HTML.")
             }
         } catch (e: Exception) {
-            Log.e("Ult4vidExtractor", "Error: ${e.message}")
+            Log.e("Ult4vidExtractor", "Error during extraction: ${e.message}")
         }
         return null
     }
