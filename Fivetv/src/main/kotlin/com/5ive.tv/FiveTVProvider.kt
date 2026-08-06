@@ -1,4 +1,4 @@
-package com.5ive.tv
+package com.fivetv
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
@@ -11,10 +11,11 @@ class FiveTVProvider : MainAPI() {
     override val hasMainPage = true
     override var lang = "ar"
     override val hasDownloadSupport = true
+    
+    // تم الاكتفاء بالأنواع الأساسية لتفادي أخطاء عدم التعرف على AsianDrama
     override val supportedTypes = setOf(
         TvType.Movie,
-        TvType.TvSeries,
-        TvType.AsianDrama
+        TvType.TvSeries
     )
 
     override val mainPage = mainPageOf(
@@ -113,14 +114,13 @@ class FiveTVProvider : MainAPI() {
                 val epPosterElement = epLink.selectFirst("img")
                 val epPosterUrl = epPosterElement?.attr("data-src")?.takeIf { it.isNotBlank() } ?: epPosterElement?.attr("src")
 
-                // استخدام كلاس Episode الأساسي لتجنب أي أخطاء متعلقة بالدوال الحديثة
-                Episode(
-                    data = epUrl,
-                    name = epTitle,
-                    season = seasonNum,
-                    episode = episodeNum,
-                    posterUrl = epPosterUrl
-                )
+                // الاستخدام الصحيح والمدعوم لـ newEpisode
+                newEpisode(epUrl) {
+                    this.name = epTitle
+                    this.season = seasonNum
+                    this.episode = episodeNum
+                    this.posterUrl = epPosterUrl
+                }
             }
 
             return newTvSeriesLoadResponse(title, currentUrl, TvType.TvSeries, episodes) {
@@ -147,22 +147,20 @@ class FiveTVProvider : MainAPI() {
     ): Boolean {
         val document = app.get(data).document
         val iframes = document.select("iframe")
-        var foundLinks = false
         
-        // استخدام حلقة forEach قياسية مضادة للأخطاء بدلاً من amap
-        iframes.forEach { iframe ->
+        // استخدام amap كما في إضافة EgyDead بنجاح
+        iframes.amap { iframe ->
             try {
                 val src = iframe.attr("data-src").takeIf { it.isNotBlank() } ?: iframe.attr("src")
                 if (src.isNotBlank() && src.startsWith("http")) {
-                    if (loadExtractor(src, data, subtitleCallback, callback)) {
-                        foundLinks = true
-                    }
+                    // تم إزالة الـ if من هنا لأنها تسبب خطأ
+                    loadExtractor(src, data, subtitleCallback, callback)
                 }
             } catch (e: Exception) {
                 Log.e("FiveTVProvider", "Failed to load extractor: ${e.message}")
             }
         }
         
-        return foundLinks
+        return true
     }
 }
