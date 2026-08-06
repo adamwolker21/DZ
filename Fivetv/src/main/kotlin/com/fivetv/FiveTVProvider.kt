@@ -168,6 +168,23 @@ class FiveTVProvider : MainAPI() {
                     val response = app.get(redirectUrl)
                     var actualUrl = response.url
                     
+                    // --- صائد التوجيهات المخفية (Meta Refresh & JS Redirect) ---
+                    val metaRefresh = response.document.selectFirst("meta[http-equiv=refresh]")?.attr("content")
+                    if (!metaRefresh.isNullOrBlank()) {
+                        val match = Regex("""url=['"]?(https?://[^'"]+)['"]?""", RegexOption.IGNORE_CASE).find(metaRefresh)
+                        if (match != null) {
+                            actualUrl = match.groupValues[1]
+                        }
+                    }
+                    
+                    if (actualUrl == response.url) {
+                        val jsMatch = Regex("""window\.location(?:\.href|\.replace)?\s*=\s*['"](https?://[^'"]+)['"]""").find(response.text)
+                        if (jsMatch != null) {
+                            actualUrl = jsMatch.groupValues[1]
+                        }
+                    }
+                    // -----------------------------------------------------------
+
                     if (actualUrl.isNotBlank()) {
                         when {
                             actualUrl.contains("playmogo.com") -> actualUrl = actualUrl.replace("playmogo.com", "dood.to")
@@ -181,7 +198,8 @@ class FiveTVProvider : MainAPI() {
                             actualUrl.contains("vibuxer.com") -> actualUrl = actualUrl.replace("vibuxer.com", "hgcloud.to")
                         }
 
-                        // --- التحديث الأهم: الاستدعاء المباشر للمستخرج لتجنب تجاهله من التطبيق ---
+                        Log.d("FiveTVProvider", "Final Extracted URL: $actualUrl")
+
                         if (actualUrl.contains("ult4vid")) {
                             Ult4vid().getUrl(actualUrl, data)?.forEach { callback.invoke(it) }
                         } else {
