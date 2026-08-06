@@ -12,7 +12,6 @@ class FiveTVProvider : MainAPI() {
     override var lang = "ar"
     override val hasDownloadSupport = true
     
-    // تم الاكتفاء بالأنواع الأساسية لتفادي أخطاء عدم التعرف على AsianDrama
     override val supportedTypes = setOf(
         TvType.Movie,
         TvType.TvSeries
@@ -88,12 +87,32 @@ class FiveTVProvider : MainAPI() {
             
         val posterUrl = document.selectFirst("meta[property=og:image]")?.attr("content")
         
-        val plot = document.selectFirst("meta[name=description]")?.attr("content") 
-            ?: document.selectFirst(".story-content, .ftvx-story")?.text()?.trim() ?: ""
+        // جلب القصة من المسار الدقيق الجديد
+        val plot = document.selectFirst(".ftvx-description-inner p, .ftvx-description-inner")?.text()?.trim()
+            ?: document.selectFirst("meta[name=description]")?.attr("content")?.trim() ?: ""
         
         val yearText = document.selectFirst(".ftvx-chip")?.text() ?: document.selectFirst(".card-year")?.text()
         val year = yearText?.filter { it.isDigit() }?.toIntOrNull()
         
+        // جلب المدة الزمنية بذكاء
+        var duration: Int? = null
+        val durationText = document.select(".ftvm-chip, .ftvx-chip").find { 
+            it.text().contains("m") || it.text().contains("h") || it.text().contains("دقيقة") 
+        }?.text()
+
+        if (durationText != null) {
+            if (durationText.contains("دقيقة")) {
+                // إذا كانت بالدقائق مباشرة مثل "75 دقيقة"
+                duration = durationText.filter { it.isDigit() }.toIntOrNull()
+            } else {
+                // إذا كانت بالساعات والدقائق مثل "1h 46m" يتم تحويلها إلى دقائق
+                val hours = Regex("(\\d+)h").find(durationText)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                val minutes = Regex("(\\d+)m").find(durationText)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                val totalMinutes = (hours * 60) + minutes
+                if (totalMinutes > 0) duration = totalMinutes
+            }
+        }
+
         val tags = document.select(".ftvx-cats a").map { it.text() }
 
         val episodesElements = document.select(".modern-episodes-grid a.modern-episode-card")
@@ -114,7 +133,6 @@ class FiveTVProvider : MainAPI() {
                 val epPosterElement = epLink.selectFirst("img")
                 val epPosterUrl = epPosterElement?.attr("data-src")?.takeIf { it.isNotBlank() } ?: epPosterElement?.attr("src")
 
-                // الاستخدام الصحيح والمدعوم لـ newEpisode
                 newEpisode(epUrl) {
                     this.name = epTitle
                     this.season = seasonNum
@@ -128,6 +146,7 @@ class FiveTVProvider : MainAPI() {
                 this.year = year
                 this.tags = tags
                 this.plot = plot
+                this.duration = duration
             }
         } else {
             return newMovieLoadResponse(title, currentUrl, TvType.Movie, currentUrl) {
@@ -135,6 +154,7 @@ class FiveTVProvider : MainAPI() {
                 this.year = year
                 this.tags = tags
                 this.plot = plot
+                this.duration = duration
             }
         }
     }
@@ -148,12 +168,10 @@ class FiveTVProvider : MainAPI() {
         val document = app.get(data).document
         val iframes = document.select("iframe")
         
-        // استخدام amap كما في إضافة EgyDead بنجاح
         iframes.amap { iframe ->
             try {
                 val src = iframe.attr("data-src").takeIf { it.isNotBlank() } ?: iframe.attr("src")
                 if (src.isNotBlank() && src.startsWith("http")) {
-                    // تم إزالة الـ if من هنا لأنها تسبب خطأ
                     loadExtractor(src, data, subtitleCallback, callback)
                 }
             } catch (e: Exception) {
