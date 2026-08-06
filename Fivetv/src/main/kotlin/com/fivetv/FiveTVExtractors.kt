@@ -118,15 +118,27 @@ class Ult4vid : ExtractorApi() {
     override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
         try {
             Log.d("Ult4vidExtractor", "Fetching URL: $url")
-            val responseText = app.get(url, referer = referer, interceptor = cloudflareKiller).text
             
-            // استخراج الرابط الخام
-            val sourceUrlRaw = Regex("""<source[^>]+src=["']([^"']+)["']""").find(responseText)?.groupValues?.get(1)
+            // إضافة هيدرز متكاملة لضمان استجابة الموقع بشكل صحيح بدلاً من الحجب
+            val headers = mapOf(
+                "User-Agent" to USER_AGENT,
+                "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Language" to "en-US,en;q=0.5"
+            )
+            
+            val responseText = app.get(url, headers = headers, referer = referer ?: url, interceptor = cloudflareKiller).text
+            
+            // البحث عن الرابط بطريقتين: وسم source أو دومين cloudflarestorage مباشرة
+            var sourceUrlRaw = Regex("""<source[^>]+src=["']([^"']+)["']""").find(responseText)?.groupValues?.get(1)
+            
+            if (sourceUrlRaw.isNullOrBlank()) {
+                sourceUrlRaw = Regex("""(https?://[^"']+\.r2\.cloudflarestorage\.com[^"']+)""").find(responseText)?.groupValues?.get(1)
+            }
 
             if (!sourceUrlRaw.isNullOrBlank()) {
                 Log.d("Ult4vidExtractor", "Raw URL found: $sourceUrlRaw")
                 
-                // تنظيف الرابط من كود الـ HTML Entities (إصلاح &amp;)
+                // تنظيف الرابط من كود الـ HTML Entities بدقة
                 val cleanUrl = sourceUrlRaw.replace("&amp;", "&").replace("&#038;", "&")
                 Log.d("Ult4vidExtractor", "Cleaned URL: $cleanUrl")
 
@@ -142,7 +154,7 @@ class Ult4vid : ExtractorApi() {
                     }
                 )
             } else {
-                Log.e("Ult4vidExtractor", "Could not find <source> tag or src attribute in HTML.")
+                Log.e("Ult4vidExtractor", "Could not find video URL in HTML.")
             }
         } catch (e: Exception) {
             Log.e("Ult4vidExtractor", "Error during extraction: ${e.message}")
