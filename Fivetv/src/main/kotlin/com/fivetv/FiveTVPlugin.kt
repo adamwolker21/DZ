@@ -7,7 +7,11 @@ import android.content.Context
 @CloudstreamPlugin
 class FiveTVPlugin: Plugin() {
     override fun load(context: Context) {
-        // تسجيل المزود
+        // تسجيل المزود الأساسي
         registerMainAPI(FiveTVProvider())
+        
+        // تسجيل المستخرجات المخصصة للسيرفرات
+        registerExtractorAPI(Earnvids())
+        registerExtractorAPI(StreamHG())
     }
 }
