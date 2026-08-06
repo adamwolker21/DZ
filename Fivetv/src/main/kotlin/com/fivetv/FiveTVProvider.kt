@@ -70,7 +70,6 @@ class FiveTVProvider : MainAPI() {
         var currentUrl = url
         var document = app.get(currentUrl).document
 
-        // التوجيه الذكي من صفحة الحلقة إلى صفحة المسلسل الأصلية
         val backToSeriesLink = document.selectFirst("a:has(span:contains(قائمه الحلقات))")?.attr("href")
         
         if (!backToSeriesLink.isNullOrBlank() && (currentUrl.contains("/episode/") || currentUrl.contains("حلقة"))) {
@@ -162,8 +161,6 @@ class FiveTVProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val document = app.get(data).document
-        
-        // استهداف أزرار التحميل المباشرة
         val downloadButtons = document.select(".ftv-download-item a.ftv-download-button")
         
         downloadButtons.amap { button ->
@@ -171,20 +168,20 @@ class FiveTVProvider : MainAPI() {
                 val redirectUrl = button.attr("href")
                 
                 if (redirectUrl.isNotBlank() && redirectUrl.startsWith("http")) {
-                    // نقوم بزيارة رابط التحميل (الوسيط) لمعرفة الدومين الحقيقي الذي سيوجهنا إليه
                     val response = app.get(redirectUrl)
-                    var actualUrl = response.url // استخراج الرابط الحقيقي بعد التوجيه
+                    var actualUrl = response.url
                     
                     if (actualUrl.isNotBlank()) {
-                        // تنظيف الدومينات المعروفة التي قد تسبب مشاكل
                         when {
                             actualUrl.contains("playmogo.com") -> actualUrl = actualUrl.replace("playmogo.com", "dood.to")
                             actualUrl.contains("vidmoly.biz") -> actualUrl = actualUrl.replace("vidmoly.biz", "vidmoly.to")
                             actualUrl.contains("vinovo.to") -> actualUrl = actualUrl.replace("vinovo.to", "vidmoly.to")
                             actualUrl.contains("luluvdo.com") -> actualUrl = actualUrl.replace("luluvdo.com", "lulustream.com")
+                            // توجيه الدومينات البديلة للمستخرجات المخصصة
+                            actualUrl.contains("earnvids.com") -> actualUrl = actualUrl.replace("earnvids.com", "morencius.com")
+                            actualUrl.contains("streamhg.com") -> actualUrl = actualUrl.replace("streamhg.com", "hgcloud.com")
                         }
 
-                        // تمرير الرابط النهائي لأداة الاستخراج
                         loadExtractor(actualUrl, data, subtitleCallback, callback)
                     }
                 }
