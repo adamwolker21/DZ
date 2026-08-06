@@ -2,7 +2,6 @@ package com.5ive.tv
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import android.util.Log
 
@@ -52,7 +51,6 @@ class FiveTVProvider : MainAPI() {
         return if (isSeries) {
             newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
                 this.posterUrl = posterUrl
-                // تم إزالة this.year من هنا لأنه السبب الرئيسي لخطأ البناء (غير مدعوم في البحث)
             }
         } else {
             newMovieSearchResponse(title, href, TvType.Movie) {
@@ -103,11 +101,10 @@ class FiveTVProvider : MainAPI() {
         if (isSeries) {
             val episodes = episodesElements.mapNotNull { epLink ->
                 val epUrl = epLink.attr("href")
-                if (epUrl.isBlank()) return@mapNotNull null
+                if (epUrl.isNullOrBlank()) return@mapNotNull null
 
                 val epTitle = epLink.selectFirst(".modern-badge")?.text()?.trim() ?: ""
                 
-                // استخراج رقم الموسم والحلقة بطريقة آمنة
                 val seasonEpisodeMatch = Regex("-(\\d+)x(\\d+)").find(epUrl)
                 val seasonNum = seasonEpisodeMatch?.groupValues?.get(1)?.toIntOrNull()
                 val episodeNum = seasonEpisodeMatch?.groupValues?.get(2)?.toIntOrNull() 
@@ -116,12 +113,14 @@ class FiveTVProvider : MainAPI() {
                 val epPosterElement = epLink.selectFirst("img")
                 val epPosterUrl = epPosterElement?.attr("data-src")?.takeIf { it.isNotBlank() } ?: epPosterElement?.attr("src")
 
-                newEpisode(epUrl) {
-                    this.name = epTitle
-                    this.season = seasonNum
-                    this.episode = episodeNum
-                    this.posterUrl = epPosterUrl
-                }
+                // استخدام كلاس Episode الأساسي لتجنب أي أخطاء متعلقة بالدوال الحديثة
+                Episode(
+                    data = epUrl,
+                    name = epTitle,
+                    season = seasonNum,
+                    episode = episodeNum,
+                    posterUrl = epPosterUrl
+                )
             }
 
             return newTvSeriesLoadResponse(title, currentUrl, TvType.TvSeries, episodes) {
@@ -148,19 +147,22 @@ class FiveTVProvider : MainAPI() {
     ): Boolean {
         val document = app.get(data).document
         val iframes = document.select("iframe")
+        var foundLinks = false
         
-        // استخدام amap للمزامنة وتفادي الانهيارات (Crash) مثل إضافة EgyDead
-        iframes.amap { iframe ->
+        // استخدام حلقة forEach قياسية مضادة للأخطاء بدلاً من amap
+        iframes.forEach { iframe ->
             try {
                 val src = iframe.attr("data-src").takeIf { it.isNotBlank() } ?: iframe.attr("src")
                 if (src.isNotBlank() && src.startsWith("http")) {
-                    loadExtractor(src, data, subtitleCallback, callback)
+                    if (loadExtractor(src, data, subtitleCallback, callback)) {
+                        foundLinks = true
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("FiveTVProvider", "Failed to load extractor: ${e.message}")
             }
         }
         
-        return true
+        return foundLinks
     }
 }
