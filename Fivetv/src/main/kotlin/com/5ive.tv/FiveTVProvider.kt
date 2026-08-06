@@ -113,13 +113,14 @@ class FiveTVProvider : MainAPI() {
                 val episodeNum = seasonEpisodeMatch?.groupValues?.get(2)?.toIntOrNull() 
                     ?: epTitle.replace(Regex("[^0-9]"), "").toIntOrNull()
 
-                // استخدام دالة newEpisode بدلاً من Episode لحل مشكلة البناء (Deprecated)
-                newEpisode(epUrl) {
-                    this.name = epTitle
-                    this.season = seasonNum
-                    this.episode = episodeNum
-                    this.posterUrl = epPoster
-                }
+                // تم العودة لاستخدام Episode القياسي المدعوم 100% لتفادي أخطاء البناء
+                Episode(
+                    data = epUrl,
+                    name = epTitle,
+                    season = seasonNum,
+                    episode = episodeNum,
+                    posterUrl = epPoster
+                )
             }
 
             return newTvSeriesLoadResponse(title, currentUrl, TvType.TvSeries, episodes) {
@@ -156,9 +157,6 @@ class FiveTVProvider : MainAPI() {
                 }
             }
         }
-
-        // تم تجاهل أزرار التحميل اليدوية لأنها غالباً روابط توجيهية (Redirect)
-        // وليست روابط MP4 مباشرة، ومحاولة جلبها كانت تسبب أخطاء Qualities.
 
         return foundLinks
     }
