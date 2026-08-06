@@ -14,7 +14,6 @@ import org.json.JSONObject
 
 private val cloudflareKiller by lazy { CloudflareKiller() }
 
-// دالة مساعدة للبحث عن روابط الفيديو بعد فك التشفير
 private fun findUrlInUnpackedJs(unpackedJs: String): String? {
     Regex("""(?i)"hls2"\s*:\s*"([^"]+)"""").find(unpackedJs)?.groupValues?.get(1)?.let { return it }
     Regex("""(?i)(https?://[^\s'"]+\.(?:m3u8|mp4)[^\s'"]*)""").find(unpackedJs)?.groupValues?.get(1)?.let { return it }
@@ -22,12 +21,10 @@ private fun findUrlInUnpackedJs(unpackedJs: String): String? {
     return null
 }
 
-// مستخرج سيرفر Morencius / Earnvids
 class Earnvids : ExtractorApi() {
     override var name = "Morencius"
     override var mainUrl = "morencius.com" 
     override val requiresReferer = true
-    private val logTag = "EarnvidsExtractor"
     private val potentialHosts = listOf("https://morencius.com", "https://earnvids.com")
 
     override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
@@ -37,7 +34,6 @@ class Earnvids : ExtractorApi() {
         for (host in potentialHosts) {
             try {
                 val finalPageUrl = if (url.contains("/e/")) "$host/e/$videoId" else "$host/v/$videoId"
-                
                 val playerPageContent = app.get(finalPageUrl, referer = referer ?: url, interceptor = cloudflareKiller).text
                 if (playerPageContent.isBlank()) continue
 
@@ -62,27 +58,22 @@ class Earnvids : ExtractorApi() {
                     }
                 )
             } catch (e: Exception) {
-                Log.e(logTag, "Failed to extract from host $host. Error: ${e.message}")
+                Log.e("EarnvidsExtractor", "Error: ${e.message}")
             }
         }
         return null
     }
 }
 
-// مستخرج سيرفر Hgcloud / StreamHG
 class StreamHG : ExtractorApi() {
     override var name = "Hgcloud"
     override var mainUrl = "hgcloud.to"
     override val requiresReferer = true
-    private val logTag = "StreamHGExtractor"
     private val potentialHosts = listOf("https://hgcloud.to", "https://vibuxer.com", "https://hanerix.com")
 
     override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
         val videoId = url.substringAfterLast("/")
-        if (videoId.isBlank()) {
-            Log.e(logTag, "Failed to extract video ID from $url")
-            return null
-        }
+        if (videoId.isBlank()) return null
 
         for (host in potentialHosts) {
             try {
@@ -112,14 +103,14 @@ class StreamHG : ExtractorApi() {
                     }
                 )
             } catch (e: Exception) {
-                Log.e(logTag, "Failed to extract from host $host. Error: ${e.message}")
+                Log.e("StreamHGExtractor", "Error: ${e.message}")
             }
         }
         return null
     }
 }
 
-// مستخرج سيرفر Ult4vid الجديد
+// مستخرج سيرفر Ult4vid المحدث (بالاعتماد على Regex)
 class Ult4vid : ExtractorApi() {
     override var name = "Ult4vid"
     override var mainUrl = "ult4vid.one"
@@ -127,23 +118,22 @@ class Ult4vid : ExtractorApi() {
 
     override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
         try {
-            // جلب صفحة المشاهدة
-            val response = app.get(url, referer = referer, interceptor = cloudflareKiller).document
+            // جلب النص الخام للصفحة
+            val responseText = app.get(url, referer = referer, interceptor = cloudflareKiller).text
             
-            // استخراج رابط الـ mp4 من داخل وسم <source> المتواجد في <video>
-            val sourceUrl = response.selectFirst("video source")?.attr("src")
-                ?: Regex("""<source\s+src=["']([^"']+)["']""").find(response.html())?.groupValues?.get(1)
+            // استخدام Regex قوي للبحث عن وسم <source> ورابط mp4
+            val sourceUrl = Regex("""<source[^>]+src=["']([^"']+)["']""").find(responseText)?.groupValues?.get(1)
 
             if (!sourceUrl.isNullOrBlank()) {
                 return listOf(
                     newExtractorLink(
                         source = this.name,
-                        name = this.name,
+                        name = this.name, // سيظهر باسم Ult4vid
                         url = sourceUrl,
-                        type = ExtractorLinkType.VIDEO // التحديد كـ VIDEO لأنها صيغة mp4 مباشرة
+                        type = ExtractorLinkType.VIDEO // تحديد مباشر كفيديو MP4
                     ) {
                         this.referer = url
-                        this.quality = Qualities.Unknown.value
+                        this.quality = Qualities.P1080.value // جودة 1080p
                     }
                 )
             }
