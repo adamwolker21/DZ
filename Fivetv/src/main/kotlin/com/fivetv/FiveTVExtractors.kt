@@ -4,7 +4,9 @@ import com.lagradost.cloudstream3.USER_AGENT
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import com.lagradost.cloudstream3.utils.JsUnpacker
 import android.util.Log
@@ -22,7 +24,7 @@ private fun findUrlInUnpackedJs(unpackedJs: String): String? {
 
 // مستخرج سيرفر Morencius / Earnvids
 class Earnvids : ExtractorApi() {
-    override var name = "Morencius (Earnvids)"
+    override var name = "Morencius"
     override var mainUrl = "morencius.com" 
     override val requiresReferer = true
     private val logTag = "EarnvidsExtractor"
@@ -45,17 +47,21 @@ class Earnvids : ExtractorApi() {
 
                 val headers = mapOf("Referer" to finalPageUrl, "User-Agent" to USER_AGENT)
                 val finalUrlWithHeaders = "$videoLink#headers=${JSONObject(headers)}"
+                
+                val isM3u8 = videoLink.contains(".m3u8")
+                val linkType = if (isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
 
-                // استخدام ExtractorLink الكلاسيكي المدعوم في كل الإصدارات
+                // استخدام دالة newExtractorLink بالتنسيق الصحيح تماماً كما طلبت
                 return listOf(
-                    ExtractorLink(
-                        source = "Morencius",
-                        name = "Morencius",
+                    newExtractorLink(
+                        source = this.name,
+                        name = this.name,
                         url = finalUrlWithHeaders,
-                        referer = finalPageUrl,
-                        quality = Qualities.Unknown.value,
-                        isM3u8 = true
-                    )
+                        type = linkType
+                    ) {
+                        this.referer = finalPageUrl
+                        this.quality = Qualities.Unknown.value
+                    }
                 )
             } catch (e: Exception) {
                 Log.e(logTag, "Failed to extract from host $host. Error: ${e.message}")
@@ -67,7 +73,7 @@ class Earnvids : ExtractorApi() {
 
 // مستخرج سيرفر Hgcloud / StreamHG
 class StreamHG : ExtractorApi() {
-    override var name = "Hgcloud (StreamHG)"
+    override var name = "Hgcloud"
     override var mainUrl = "hgcloud.com"
     override val requiresReferer = true
     
@@ -81,16 +87,20 @@ class StreamHG : ExtractorApi() {
             val videoLink = findUrlInUnpackedJs(unpackedJs)
             
             if (videoLink != null) {
-                // استخدام ExtractorLink الكلاسيكي المدعوم في كل الإصدارات
+                val isM3u8 = videoLink.contains(".m3u8")
+                val linkType = if (isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+
+                // استخدام دالة newExtractorLink بالتنسيق الصحيح تماماً كما طلبت
                 return listOf(
-                    ExtractorLink(
-                        source = "Hgcloud",
-                        name = "Hgcloud",
+                    newExtractorLink(
+                        source = this.name,
+                        name = this.name,
                         url = videoLink,
-                        referer = embedUrl,
-                        quality = Qualities.Unknown.value,
-                        isM3u8 = true
-                    )
+                        type = linkType
+                    ) {
+                        this.referer = embedUrl
+                        this.quality = Qualities.Unknown.value
+                    }
                 )
             }
         } catch (e: Exception) {
