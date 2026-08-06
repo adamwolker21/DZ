@@ -168,7 +168,6 @@ class FiveTVProvider : MainAPI() {
                     val response = app.get(redirectUrl)
                     var actualUrl = response.url
                     
-                    // --- صائد التوجيهات المخفية (Meta Refresh & JS Redirect) ---
                     val metaRefresh = response.document.selectFirst("meta[http-equiv=refresh]")?.attr("content")
                     if (!metaRefresh.isNullOrBlank()) {
                         val match = Regex("""url=['"]?(https?://[^'"]+)['"]?""", RegexOption.IGNORE_CASE).find(metaRefresh)
@@ -183,7 +182,6 @@ class FiveTVProvider : MainAPI() {
                             actualUrl = jsMatch.groupValues[1]
                         }
                     }
-                    // -----------------------------------------------------------
 
                     if (actualUrl.isNotBlank()) {
                         when {
@@ -200,7 +198,8 @@ class FiveTVProvider : MainAPI() {
 
                         Log.d("FiveTVProvider", "Final Extracted URL: $actualUrl")
 
-                        if (actualUrl.contains("ult4vid")) {
+                        // شبكة صيد واسعة لالتقاط أي دومين يحتوي على الكلمة (ult أو ultra)
+                        if (actualUrl.contains("ult4vid", ignoreCase = true) || actualUrl.contains("ultra4vid", ignoreCase = true)) {
                             Ult4vid().getUrl(actualUrl, data)?.forEach { callback.invoke(it) }
                         } else {
                             loadExtractor(actualUrl, data, subtitleCallback, callback)
