@@ -69,13 +69,12 @@ class Earnvids : ExtractorApi() {
     }
 }
 
-// مستخرج سيرفر Hgcloud / StreamHG (تم تحديثه بناءً على طلبك)
+// مستخرج سيرفر Hgcloud / StreamHG
 class StreamHG : ExtractorApi() {
     override var name = "Hgcloud"
-    override var mainUrl = "hgcloud.to" // تحديث الدومين الرئيسي
+    override var mainUrl = "hgcloud.to"
     override val requiresReferer = true
     private val logTag = "StreamHGExtractor"
-    // إضافة النطاقات المحتملة التي ذكرتها
     private val potentialHosts = listOf("https://hgcloud.to", "https://vibuxer.com", "https://hanerix.com")
 
     override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
@@ -88,15 +87,13 @@ class StreamHG : ExtractorApi() {
         for (host in potentialHosts) {
             try {
                 val finalPageUrl = "$host/e/$videoId"
-                Log.d(logTag, "Attempting to extract from host: $finalPageUrl")
-
+                
                 val playerPageContent = app.get(finalPageUrl, referer = url, interceptor = cloudflareKiller).text
                 if (playerPageContent.isBlank()) continue
 
                 val unpackedJs = JsUnpacker(playerPageContent).unpack() ?: continue
                 val videoLink = findUrlInUnpackedJs(unpackedJs) ?: continue
 
-                // إضافة الهيدر لتجاوز الحماية
                 val headers = mapOf("Referer" to finalPageUrl, "User-Agent" to USER_AGENT)
                 val finalUrlWithHeaders = "$videoLink#headers=${JSONObject(headers)}"
 
@@ -118,8 +115,41 @@ class StreamHG : ExtractorApi() {
                 Log.e(logTag, "Failed to extract from host $host. Error: ${e.message}")
             }
         }
-        
-        Log.e(logTag, "Failed to extract link from any of the potential hosts for URL: $url")
+        return null
+    }
+}
+
+// مستخرج سيرفر Ult4vid الجديد
+class Ult4vid : ExtractorApi() {
+    override var name = "Ult4vid"
+    override var mainUrl = "ult4vid.one"
+    override val requiresReferer = false
+
+    override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
+        try {
+            // جلب صفحة المشاهدة
+            val response = app.get(url, referer = referer, interceptor = cloudflareKiller).document
+            
+            // استخراج رابط الـ mp4 من داخل وسم <source> المتواجد في <video>
+            val sourceUrl = response.selectFirst("video source")?.attr("src")
+                ?: Regex("""<source\s+src=["']([^"']+)["']""").find(response.html())?.groupValues?.get(1)
+
+            if (!sourceUrl.isNullOrBlank()) {
+                return listOf(
+                    newExtractorLink(
+                        source = this.name,
+                        name = this.name,
+                        url = sourceUrl,
+                        type = ExtractorLinkType.VIDEO // التحديد كـ VIDEO لأنها صيغة mp4 مباشرة
+                    ) {
+                        this.referer = url
+                        this.quality = Qualities.Unknown.value
+                    }
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("Ult4vidExtractor", "Error: ${e.message}")
+        }
         return null
     }
 }
