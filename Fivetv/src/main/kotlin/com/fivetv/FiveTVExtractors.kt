@@ -36,7 +36,6 @@ class Earnvids : ExtractorApi() {
 
         for (host in potentialHosts) {
             try {
-                // الكود يدعم كلاً من صيغة embed (حرف e) وصيغة player (حرف v)
                 val finalPageUrl = if (url.contains("/e/")) "$host/e/$videoId" else "$host/v/$videoId"
                 
                 val playerPageContent = app.get(finalPageUrl, referer = referer ?: url, interceptor = cloudflareKiller).text
@@ -51,7 +50,6 @@ class Earnvids : ExtractorApi() {
                 val isM3u8 = videoLink.contains(".m3u8")
                 val linkType = if (isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
 
-                // استخدام دالة newExtractorLink بالتنسيق الصحيح تماماً كما طلبت
                 return listOf(
                     newExtractorLink(
                         source = this.name,
@@ -71,41 +69,57 @@ class Earnvids : ExtractorApi() {
     }
 }
 
-// مستخرج سيرفر Hgcloud / StreamHG
+// مستخرج سيرفر Hgcloud / StreamHG (تم تحديثه بناءً على طلبك)
 class StreamHG : ExtractorApi() {
     override var name = "Hgcloud"
-    override var mainUrl = "hgcloud.com"
+    override var mainUrl = "hgcloud.to" // تحديث الدومين الرئيسي
     override val requiresReferer = true
-    
+    private val logTag = "StreamHGExtractor"
+    // إضافة النطاقات المحتملة التي ذكرتها
+    private val potentialHosts = listOf("https://hgcloud.to", "https://vibuxer.com", "https://hanerix.com")
+
     override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
-        try {
-            // محاولة تحويل رابط المشاهدة العادي إلى رابط Embed لتسهيل جلب البيانات
-            val embedUrl = url.replace("/v/", "/e/").replace("/watch?v=", "/e/")
-            
-            val response = app.get(embedUrl, referer = referer, interceptor = cloudflareKiller)
-            val unpackedJs = JsUnpacker(response.text).unpack() ?: response.text
-            val videoLink = findUrlInUnpackedJs(unpackedJs)
-            
-            if (videoLink != null) {
+        val videoId = url.substringAfterLast("/")
+        if (videoId.isBlank()) {
+            Log.e(logTag, "Failed to extract video ID from $url")
+            return null
+        }
+
+        for (host in potentialHosts) {
+            try {
+                val finalPageUrl = "$host/e/$videoId"
+                Log.d(logTag, "Attempting to extract from host: $finalPageUrl")
+
+                val playerPageContent = app.get(finalPageUrl, referer = url, interceptor = cloudflareKiller).text
+                if (playerPageContent.isBlank()) continue
+
+                val unpackedJs = JsUnpacker(playerPageContent).unpack() ?: continue
+                val videoLink = findUrlInUnpackedJs(unpackedJs) ?: continue
+
+                // إضافة الهيدر لتجاوز الحماية
+                val headers = mapOf("Referer" to finalPageUrl, "User-Agent" to USER_AGENT)
+                val finalUrlWithHeaders = "$videoLink#headers=${JSONObject(headers)}"
+
                 val isM3u8 = videoLink.contains(".m3u8")
                 val linkType = if (isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
 
-                // استخدام دالة newExtractorLink بالتنسيق الصحيح تماماً كما طلبت
                 return listOf(
                     newExtractorLink(
                         source = this.name,
                         name = this.name,
-                        url = videoLink,
+                        url = finalUrlWithHeaders,
                         type = linkType
                     ) {
-                        this.referer = embedUrl
+                        this.referer = finalPageUrl
                         this.quality = Qualities.Unknown.value
                     }
                 )
+            } catch (e: Exception) {
+                Log.e(logTag, "Failed to extract from host $host. Error: ${e.message}")
             }
-        } catch (e: Exception) {
-            Log.e("StreamHGExtractor", "Error: ${e.message}")
         }
+        
+        Log.e(logTag, "Failed to extract link from any of the potential hosts for URL: $url")
         return null
     }
 }
