@@ -110,6 +110,7 @@ class StreamHG : ExtractorApi() {
     }
 }
 
+// سيرفر Ult4vid منظف من السجلات (Logs)
 class Ult4vid : ExtractorApi() {
     override var name = "Ult4vid"
     override var mainUrl = "ult4vid.one"
@@ -146,13 +147,13 @@ class Ult4vid : ExtractorApi() {
                 )
             }
         } catch (e: Exception) {
-            Log.e("Ult4vidExtractor", "Error: ${e.message}")
+            // صامت
         }
         return null
     }
 }
 
-// المستخرج الجديد الخاص بـ 71stream
+// المستخرج الجديد الخاص بـ 71stream (مع تفعيل سجلات التتبع)
 class Stream71 : ExtractorApi() {
     override var name = "71stream"
     override var mainUrl = "71stream.one"
@@ -161,27 +162,60 @@ class Stream71 : ExtractorApi() {
     override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
         val extractedLinks = mutableListOf<ExtractorLink>()
         try {
-            val document = app.get(url, referer = referer ?: url, interceptor = cloudflareKiller).document
+            Log.d("Stream71Extractor", "Fetching URL: $url")
             
-            // استخراج كود الـ JSON من داخل <div id="app" data-page="...">
-            val dataPageContent = document.selectFirst("#app")?.attr("data-page")
-            if (dataPageContent.isNullOrBlank()) return null
+            val headers = mapOf(
+                "User-Agent" to USER_AGENT,
+                "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+            )
+            
+            // جلب النص الخام للصفحة لتجنب فقدان البيانات
+            val responseText = app.get(url, headers = headers, referer = referer ?: url, interceptor = cloudflareKiller).text
+            
+            // البحث عن بيانات الـ JSON باستخدام Regex لتفادي مشاكل Jsoup مع النصوص الضخمة
+            var dataPageContent = Regex("""data-page=(['"])(.*?)\1""").find(responseText)?.groupValues?.get(2)
+            
+            if (!dataPageContent.isNullOrBlank()) {
+                Log.d("Stream71Extractor", "Data found via Regex.")
+                dataPageContent = dataPageContent.replace("&quot;", "\"").replace("&amp;", "&")
+            } else {
+                Log.d("Stream71Extractor", "Regex failed, trying JSoup...")
+                val document = org.jsoup.Jsoup.parse(responseText)
+                dataPageContent = document.selectFirst("#app")?.attr("data-page")
+            }
+
+            if (dataPageContent.isNullOrBlank()) {
+                Log.e("Stream71Extractor", "Could not find data-page attribute in #app")
+                return null
+            }
+            
+            Log.d("Stream71Extractor", "Successfully extracted data-page JSON. Parsing...")
 
             val jsonObject = JSONObject(dataPageContent)
-            val props = jsonObject.optJSONObject("props") ?: return null
-            val qualitiesArray = props.optJSONArray("qualities") ?: return null
+            val props = jsonObject.optJSONObject("props")
+            if (props == null) {
+                Log.e("Stream71Extractor", "Could not find 'props' object in JSON")
+                return null
+            }
+            
+            val qualitiesArray = props.optJSONArray("qualities")
+            if (qualitiesArray == null) {
+                Log.e("Stream71Extractor", "Could not find 'qualities' array in props")
+                return null
+            }
 
-            // المرور على جميع الجودات المتاحة
+            Log.d("Stream71Extractor", "Found ${qualitiesArray.length()} qualities")
+
             for (i in 0 until qualitiesArray.length()) {
                 val qualityItem = qualitiesArray.optJSONObject(i) ?: continue
                 val rawUrl = qualityItem.optString("url")
                 val label = qualityItem.optString("label") // مثال: 720p, 480p, Original
 
+                Log.d("Stream71Extractor", "Processing quality: $label")
+
                 if (rawUrl.isNotBlank()) {
-                    // تنظيف الرابط من التشفير
                     val cleanUrl = rawUrl.replace("&amp;", "&").replace("&#038;", "&")
                     
-                    // تحديد الجودة بناءً على النص
                     val qualityValue = when {
                         label.contains("Original", ignoreCase = true) || label.contains("1080") -> Qualities.P1080.value
                         label.contains("720") -> Qualities.P720.value
@@ -204,9 +238,10 @@ class Stream71 : ExtractorApi() {
                 }
             }
         } catch (e: Exception) {
-            Log.e("Stream71Extractor", "Error: ${e.message}")
+            Log.e("Stream71Extractor", "Error during extraction: ${e.message}")
         }
         
+        Log.d("Stream71Extractor", "Total extracted links: ${extractedLinks.size}")
         return if (extractedLinks.isNotEmpty()) extractedLinks else null
     }
 }
