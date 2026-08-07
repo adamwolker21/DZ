@@ -9,7 +9,6 @@ import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.network.CloudflareKiller
 import com.lagradost.cloudstream3.utils.JsUnpacker
-import android.util.Log
 import org.json.JSONObject
 
 private val cloudflareKiller by lazy { CloudflareKiller() }
@@ -58,7 +57,7 @@ class Earnvids : ExtractorApi() {
                     }
                 )
             } catch (e: Exception) {
-                Log.e("EarnvidsExtractor", "Error: ${e.message}")
+                // تجاهل الخطأ والمحاولة في النطاق التالي
             }
         }
         return null
@@ -103,14 +102,13 @@ class StreamHG : ExtractorApi() {
                     }
                 )
             } catch (e: Exception) {
-                Log.e("StreamHGExtractor", "Error: ${e.message}")
+                // صامت
             }
         }
         return null
     }
 }
 
-// سيرفر Ult4vid منظف من السجلات (Logs)
 class Ult4vid : ExtractorApi() {
     override var name = "Ult4vid"
     override var mainUrl = "ult4vid.one"
@@ -153,7 +151,6 @@ class Ult4vid : ExtractorApi() {
     }
 }
 
-// المستخرج الجديد الخاص بـ 71stream (مع تفعيل سجلات التتبع)
 class Stream71 : ExtractorApi() {
     override var name = "71stream"
     override var mainUrl = "71stream.one"
@@ -162,56 +159,32 @@ class Stream71 : ExtractorApi() {
     override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
         val extractedLinks = mutableListOf<ExtractorLink>()
         try {
-            Log.d("Stream71Extractor", "Fetching URL: $url")
-            
             val headers = mapOf(
                 "User-Agent" to USER_AGENT,
                 "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
             )
             
-            // جلب النص الخام للصفحة لتجنب فقدان البيانات
             val responseText = app.get(url, headers = headers, referer = referer ?: url, interceptor = cloudflareKiller).text
             
-            // البحث عن بيانات الـ JSON باستخدام Regex لتفادي مشاكل Jsoup مع النصوص الضخمة
             var dataPageContent = Regex("""data-page=(['"])(.*?)\1""").find(responseText)?.groupValues?.get(2)
             
             if (!dataPageContent.isNullOrBlank()) {
-                Log.d("Stream71Extractor", "Data found via Regex.")
                 dataPageContent = dataPageContent.replace("&quot;", "\"").replace("&amp;", "&")
             } else {
-                Log.d("Stream71Extractor", "Regex failed, trying JSoup...")
                 val document = org.jsoup.Jsoup.parse(responseText)
                 dataPageContent = document.selectFirst("#app")?.attr("data-page")
             }
 
-            if (dataPageContent.isNullOrBlank()) {
-                Log.e("Stream71Extractor", "Could not find data-page attribute in #app")
-                return null
-            }
-            
-            Log.d("Stream71Extractor", "Successfully extracted data-page JSON. Parsing...")
+            if (dataPageContent.isNullOrBlank()) return null
 
             val jsonObject = JSONObject(dataPageContent)
-            val props = jsonObject.optJSONObject("props")
-            if (props == null) {
-                Log.e("Stream71Extractor", "Could not find 'props' object in JSON")
-                return null
-            }
-            
-            val qualitiesArray = props.optJSONArray("qualities")
-            if (qualitiesArray == null) {
-                Log.e("Stream71Extractor", "Could not find 'qualities' array in props")
-                return null
-            }
-
-            Log.d("Stream71Extractor", "Found ${qualitiesArray.length()} qualities")
+            val props = jsonObject.optJSONObject("props") ?: return null
+            val qualitiesArray = props.optJSONArray("qualities") ?: return null
 
             for (i in 0 until qualitiesArray.length()) {
                 val qualityItem = qualitiesArray.optJSONObject(i) ?: continue
                 val rawUrl = qualityItem.optString("url")
-                val label = qualityItem.optString("label") // مثال: 720p, 480p, Original
-
-                Log.d("Stream71Extractor", "Processing quality: $label")
+                val label = qualityItem.optString("label")
 
                 if (rawUrl.isNotBlank()) {
                     val cleanUrl = rawUrl.replace("&amp;", "&").replace("&#038;", "&")
@@ -238,10 +211,9 @@ class Stream71 : ExtractorApi() {
                 }
             }
         } catch (e: Exception) {
-            Log.e("Stream71Extractor", "Error during extraction: ${e.message}")
+            // صامت
         }
         
-        Log.d("Stream71Extractor", "Total extracted links: ${extractedLinks.size}")
         return if (extractedLinks.isNotEmpty()) extractedLinks else null
     }
 }
