@@ -10,7 +10,8 @@ class KrmziPlugin : Plugin() {
         // تسجيل المزود الأساسي
         registerMainAPI(KrmziProvider())
         
-        // تم تعطيل مستخرج السيرفرات الخاصة مؤقتاً لتجنب الأخطاء
-        // registerExtractorAPI(KrmziExtractor())
+        // تسجيل مستخرجات السيرفرات الخاصة
+        registerExtractorAPI(ArabHdExtractor())
+        registerExtractorAPI(RedHdExtractor())
     }
 }
