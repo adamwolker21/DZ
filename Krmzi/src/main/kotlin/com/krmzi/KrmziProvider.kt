@@ -64,22 +64,18 @@ class KrmziProvider : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
 
-        // استخراج تفاصيل المسلسل (العنوان، القصة، البوستر)
         val seriesInfo = document.selectFirst(".singleSeries") ?: return null
         val fullTitle = seriesInfo.selectFirst("h1 a")?.text()?.trim() 
             ?: seriesInfo.selectFirst("h1")?.text()?.trim() 
             ?: return null
             
-        // تنظيف العنوان
         val title = fullTitle.replace("مسلسل", "").trim()
 
         val style = seriesInfo.selectFirst(".img")?.attr("style") ?: ""
         val poster = style.substringAfter("url(").substringBefore(")").replace("'", "").replace("\"", "")
         
         val plot = seriesInfo.selectFirst(".story")?.text()?.trim()
-        val cast = seriesInfo.select(".tax a").mapNotNull { it.text().trim().replace(" ،", "") }
 
-        // استخراج الحلقات المتوفرة في الصفحة
         val episodes = document.select("article.postEp").mapNotNull { ep ->
             var epHref = ep.selectFirst("a")?.attr("href") ?: return@mapNotNull null
             
@@ -98,18 +94,17 @@ class KrmziProvider : MainAPI() {
             val epPosterStyle = ep.selectFirst(".imgSer")?.attr("style") ?: ""
             val epPoster = epPosterStyle.substringAfter("url(").substringBefore(")").replace("'", "").replace("\"", "")
 
-            Episode(
-                data = epHref,
-                name = epTitle,
-                episode = epNum,
-                posterUrl = epPoster
-            )
-        }.reversed() // عكس القائمة لتبدأ من الحلقة 1
+            // حل مشكلة الخطأ رقم 3: استخدام newEpisode بدلاً من Episode
+            newEpisode(epHref) {
+                this.name = epTitle
+                this.episode = epNum
+                this.posterUrl = epPoster
+            }
+        }.reversed()
 
         return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
             this.posterUrl = poster
             this.plot = plot
-            // إضافات الممثلين كجزء من القصة إن أردت، أو تجاهلها
         }
     }
 
@@ -120,11 +115,8 @@ class KrmziProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val document = app.get(data).document
-        
-        // استخراج رابط الـ Embed الذي يحمل الداتا المشفرة
         val embedLink = document.selectFirst("a.fullscreen-clickable")?.attr("href") ?: return false
         
-        // استخراج قيمة post= التي تحتوي على الـ JSON المشفر بالـ Base64
         val postParamMatch = Regex("post=([^&]+)").find(URLDecoder.decode(embedLink, "UTF-8"))
             ?: Regex("post=([^&]+)").find(embedLink)
             
@@ -148,13 +140,12 @@ class KrmziProvider : MainAPI() {
                             val eUrl = "https://estream.to/embed-$serverId.html"
                             loadExtractor(eUrl, data, subtitleCallback, callback)
                         }
-                        "express" -> { // مثل Mail.ru
+                        "express" -> {
                             if (serverId.startsWith("http")) {
                                 loadExtractor(serverId, data, subtitleCallback, callback)
                             }
                         }
                         else -> {
-                            // إذا كان السيرفر عبارة عن رابط مباشر يمكن للتطبيق استخراجه
                             if (serverId.startsWith("http")) {
                                 loadExtractor(serverId, data, subtitleCallback, callback)
                             }
@@ -168,7 +159,6 @@ class KrmziProvider : MainAPI() {
         return true
     }
     
-    // داتا كلاس لتحويل الـ JSON الخاص بالسيرفرات
     data class ServerJson(
         @JsonProperty("name") val name: String?,
         @JsonProperty("id") val id: String?
