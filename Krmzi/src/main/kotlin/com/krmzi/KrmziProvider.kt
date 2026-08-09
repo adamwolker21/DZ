@@ -136,16 +136,17 @@ class KrmziProvider : MainAPI() {
                             loadExtractor(okUrl, data, subtitleCallback, callback)
                         }
                         "estream", "turk" -> {
-                            val eUrl = "https://estream.to/embed-$serverId.html"
+                            // التوجيه إلى نطاق سيرفر Turk الصحيح
+                            val eUrl = "https://arabveturk.com/embed-$serverId.html"
                             loadExtractor(eUrl, data, subtitleCallback, callback)
                         }
                         "arab hd" -> {
                             val arabUrl = "https://arabhd.onl/embed-$serverId.html"
-                            // سيقوم Cloudstream تلقائياً بتوجيه هذا الرابط إلى المستخرج الذي صنعناه!
                             loadExtractor(arabUrl, data, subtitleCallback, callback)
                         }
                         "red hd" -> {
-                            val redUrl = "https://redhd.onl/embed-$serverId.html"
+                            // التوجيه إلى نطاق سيرفر Red HD الصحيح
+                            val redUrl = "https://iplayerhls.com/e/$serverId"
                             loadExtractor(redUrl, data, subtitleCallback, callback)
                         }
                         else -> {
