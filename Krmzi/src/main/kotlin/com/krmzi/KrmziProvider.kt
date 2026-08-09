@@ -27,7 +27,6 @@ class KrmziProvider : MainAPI() {
         val url = if (page == 1) request.data else "${request.data}page/$page/"
         val document = app.get(url).document
         
-        // تعديل هنا: دمجنا الصنفين ليعمل على الرئيسية وقائمة المسلسلات معاً
         val home = document.select("article.post, article.postEp").mapNotNull {
             it.toSearchResult()
         }
@@ -47,8 +46,6 @@ class KrmziProvider : MainAPI() {
         }
         
         val title = this.selectFirst(".title")?.text()?.trim() ?: return null
-        
-        // تعديل هنا: دمجنا كلاس الصورة ليجلب البوستر من كلا القسمين
         val style = this.selectFirst(".imgBg, .imgSer")?.attr("style") ?: ""
         val posterUrl = style.substringAfter("url(").substringBefore(")").replace("'", "").replace("\"", "")
 
@@ -59,7 +56,6 @@ class KrmziProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val document = app.get("$mainUrl/?s=$query").document
-        // تحديث البحث ليشمل جميع العناصر
         return document.select("article.post, article.postEp").mapNotNull {
             it.toSearchResult()
         }
@@ -139,14 +135,18 @@ class KrmziProvider : MainAPI() {
                             val okUrl = "https://ok.ru/videoembed/$serverId"
                             loadExtractor(okUrl, data, subtitleCallback, callback)
                         }
-                        "estream" -> {
+                        "estream", "turk" -> {
                             val eUrl = "https://estream.to/embed-$serverId.html"
                             loadExtractor(eUrl, data, subtitleCallback, callback)
                         }
-                        "express" -> {
-                            if (serverId.startsWith("http")) {
-                                loadExtractor(serverId, data, subtitleCallback, callback)
-                            }
+                        "arab hd" -> {
+                            val arabUrl = "https://arabhd.onl/embed-$serverId.html"
+                            // سيقوم Cloudstream تلقائياً بتوجيه هذا الرابط إلى المستخرج الذي صنعناه!
+                            loadExtractor(arabUrl, data, subtitleCallback, callback)
+                        }
+                        "red hd" -> {
+                            val redUrl = "https://redhd.onl/embed-$serverId.html"
+                            loadExtractor(redUrl, data, subtitleCallback, callback)
                         }
                         else -> {
                             if (serverId.startsWith("http")) {
