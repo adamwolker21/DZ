@@ -7,5 +7,5 @@ pluginManagement {
 }
 
 rootProject.name = "CSX"
-include(":Krmzi")
+include(":krmzi")
 
