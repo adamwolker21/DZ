@@ -27,7 +27,8 @@ class KrmziProvider : MainAPI() {
         val url = if (page == 1) request.data else "${request.data}page/$page/"
         val document = app.get(url).document
         
-        val home = document.select("article.post").mapNotNull {
+        // تعديل هنا: دمجنا الصنفين ليعمل على الرئيسية وقائمة المسلسلات معاً
+        val home = document.select("article.post, article.postEp").mapNotNull {
             it.toSearchResult()
         }
         
@@ -46,7 +47,9 @@ class KrmziProvider : MainAPI() {
         }
         
         val title = this.selectFirst(".title")?.text()?.trim() ?: return null
-        val style = this.selectFirst(".imgBg")?.attr("style") ?: ""
+        
+        // تعديل هنا: دمجنا كلاس الصورة ليجلب البوستر من كلا القسمين
+        val style = this.selectFirst(".imgBg, .imgSer")?.attr("style") ?: ""
         val posterUrl = style.substringAfter("url(").substringBefore(")").replace("'", "").replace("\"", "")
 
         return newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
@@ -56,7 +59,8 @@ class KrmziProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val document = app.get("$mainUrl/?s=$query").document
-        return document.select("article.post").mapNotNull {
+        // تحديث البحث ليشمل جميع العناصر
+        return document.select("article.post, article.postEp").mapNotNull {
             it.toSearchResult()
         }
     }
@@ -94,7 +98,6 @@ class KrmziProvider : MainAPI() {
             val epPosterStyle = ep.selectFirst(".imgSer")?.attr("style") ?: ""
             val epPoster = epPosterStyle.substringAfter("url(").substringBefore(")").replace("'", "").replace("\"", "")
 
-            // حل مشكلة الخطأ رقم 3: استخدام newEpisode بدلاً من Episode
             newEpisode(epHref) {
                 this.name = epTitle
                 this.episode = epNum
